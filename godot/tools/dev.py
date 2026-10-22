@@ -29,6 +29,7 @@ GODOT_DIR = Path(os.environ.get("GODOT_DIR", Path.home() / "Downloads" / "Godot_
 GODOT_GUI = GODOT_DIR / "Godot_v4.7.2-stable_win64.exe"
 GODOT_CLI = GODOT_DIR / "Godot_v4.7.2-stable_win64_console.exe"
 SITE = Path(os.environ.get("SITE_REPO", ROOT.parent / "rpg_demo"))
+PLAY = Path(os.environ.get("PLAY_DIR", ROOT.parent / "play"))  # the folder the user plays from
 SHOTS = ROOT / "shots"
 EXPORT = ROOT / "export" / "web"
 
@@ -192,6 +193,11 @@ def ship(message):
     git(["add", "-A"], SITE)
     if git(["status", "--porcelain"], SITE).strip():
         git(["commit", "-qm", message + "\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"], SITE)
+    # refresh the user's play folder with the shipped build (user asked for this on every ship)
+    if PLAY.exists():
+        arch = subprocess.run(["git", "archive", "HEAD"], cwd=SITE, capture_output=True, check=True).stdout
+        tarfile.open(fileobj=io.BytesIO(arch)).extractall(PLAY, filter="data")
+        print(f"play folder refreshed: {PLAY}")
     print("shipped:", git(["log", "--oneline", "-1"], ROOT).strip(), "|", git(["log", "--oneline", "-1"], SITE).strip())
     print("not pushed; push only when asked")
     return 0

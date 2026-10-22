@@ -64,7 +64,7 @@ func build(m: Node) -> void:
 				marks[c] = w
 			var col := Color("#5e8f30")
 			match c:
-				"=": col = Color("#c99a62")
+				"=": col = Color("#b8a888")
 				"o": col = Color("#9a9a8e")
 				"#": col = Color("#6a4a2c")
 				"H": col = Color("#4a6a2c")
@@ -79,21 +79,31 @@ func build(m: Node) -> void:
 				dark_spots.append(w)
 			if c == "b":
 				bricks.append(w)
-	var mm := MultiMesh.new()
-	mm.transform_format = MultiMesh.TRANSFORM_3D
-	mm.use_colors = true
-	mm.mesh = BoxMesh.new()
-	mm.instance_count = blocks.size()
-	for i in blocks.size():
-		mm.set_instance_transform(i, blocks[i][0])
-		mm.set_instance_color(i, (blocks[i][1] as Color).srgb_to_linear())
-	var mmi := MultiMeshInstance3D.new()
-	mmi.multimesh = mm
+	# chunked 6x6 so each chunk sees only its nearby lanterns (the web renderer lights a mesh with at most 8)
+	var chunks := {}
+	for bl in blocks:
+		var o: Vector3 = bl[0].origin
+		var key := Vector2i(int(o.x - VILLAGE_X) / 6, int(o.z) / 6)
+		if not chunks.has(key):
+			chunks[key] = []
+		chunks[key].append(bl)
 	var cm := StandardMaterial3D.new()
 	cm.vertex_color_use_as_albedo = true
 	cm.roughness = 0.9
-	mmi.material_override = cm
-	m.add_child(mmi)
+	for key in chunks:
+		var list: Array = chunks[key]
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.use_colors = true
+		mm.mesh = BoxMesh.new()
+		mm.instance_count = list.size()
+		for i in list.size():
+			mm.set_instance_transform(i, list[i][0])
+			mm.set_instance_color(i, (list[i][1] as Color).srgb_to_linear())
+		var mmi := MultiMeshInstance3D.new()
+		mmi.multimesh = mm
+		mmi.material_override = cm
+		m.add_child(mmi)
 	# houses: one per 3x2 block of H, door facing south
 	var seen := {}
 	for z in H:
@@ -155,7 +165,7 @@ func house(m: Node, at: Vector3) -> void:
 # a tall old lamplighter built from blocks: grey coat, white beard, brass pole
 func simji(m: Node) -> Node3D:
 	var g := Node3D.new()
-	var coat: Material = m.mat_color(Color("#5a5a6a"))
+	var coat: Material = m.mat_color(Color("#2f3f7a"))
 	for part in [[Vector3(0.45, 0.9, 0.35), Vector3(0, 0.45, 0), coat],
 			[Vector3(0.36, 0.34, 0.34), Vector3(0, 1.08, 0), m.mat_color(Color("#f1c08f"))],
 			[Vector3(0.3, 0.3, 0.1), Vector3(0, 0.92, 0.18), m.mat_color(Color("#f4f4f4"))],
@@ -167,6 +177,12 @@ func simji(m: Node) -> Node3D:
 	var lamp: MeshInstance3D = m.box(Vector3(0.16, 0.2, 0.16), m.glow_mat(Color("#ffc46a"), 3.0))
 	lamp.position = Vector3(0.35, 1.85, 0)
 	g.add_child(lamp)
+	var glow := OmniLight3D.new() # his own lamp lights him up at night
+	glow.light_color = Color("#ffd8a0")
+	glow.light_energy = 1.4
+	glow.omni_range = 2.5
+	glow.position = Vector3(0.2, 1.6, 0.4)
+	g.add_child(glow)
 	g.scale = Vector3.ONE * 1.25
 	return g
 
