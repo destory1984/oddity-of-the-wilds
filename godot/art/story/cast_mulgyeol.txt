@@ -1,0 +1,10 @@
+Use your image generation tool to create ONE image and save it as cast_mulgyeol.png in the current directory.
+
+Mulgyeol: an anthropomorphic river otter boat-keeper, chibi-sized, sleek brown fur, sailor scarf in teal, holds a long wooden punting pole, a grumpy-but-kind expression.
+Character design sheet: front view and three-quarter view side by side, full body, plain light background, art style matching the attached reference.
+
+STYLE (match the second attached image): classic 1990s TV anime cel, clean uniform ink outlines, flat colors with one hard shadow tone, no gradients, no glow, no sparkles.
+ANATOMY MUST BE CORRECT: every character has exactly two arms and two legs, each clearly attached, natural proportions, five fingers per hand, no extra or merged limbs.
+MODESTY: wholesome and family-friendly; underwear is never visible, no view under skirts; camera at eye level or slightly above, never a low angle looking up at a skirt; in action poses the skirt and petticoat stay down over the thighs.
+No text, no logo, no watermark, no frame.
+When done, reply with only the file path.

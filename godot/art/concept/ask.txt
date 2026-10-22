@@ -1,0 +1,12 @@
+You are an experienced art director for indie action RPGs. Attached:
+1) cave_now.png - the current in-game cave in our Godot 4 game (top-down 3/4 camera, tilt-shift blur, pixel-art heroine sprite, voxel/LEGO-brick world).
+2) marsh_now.png - the current outdoor marsh level.
+3) the story-illustration style we chose (1990s cel anime).
+
+The owner says: "It is minimal, but it looks cheap / empty." Give us a concrete critique and plan. Reply in KOREAN, plain short sentences, max ~350 words:
+- 5 biggest reasons it looks cheap (be specific: lighting, materials, props density, color, UI, silhouette, scale, etc.).
+- For the cave AND the marsh: a numbered list of the 6 most effective changes we can make in code with simple shapes, Godot lights/shaders and a few textures (no 3D modeling tools). Order by impact per effort.
+- A short color palette (hex) and lighting recipe for the cave.
+- What HUD changes would make it feel premium.
+
+Then ALSO use your image generation tool to create ONE concept image and save it as cave_concept.png in the current directory: the same top-down 3/4 voxel-brick cave room, same camera angle as cave_now.png, but redesigned to look rich and atmospheric yet still buildable from blocks: textured stone brick walls with mossy tops, glowing blue mushrooms and crystals, a shallow luminous pool, hanging roots, scattered rubble and toy bricks, warm torch light vs cool crystal light, light fog, the small pixel heroine (lavender hair, gold crown, white-and-blue dress) standing in the middle. Game screenshot look, no UI, 16:9.

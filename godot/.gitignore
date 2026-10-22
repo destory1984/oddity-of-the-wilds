@@ -3,6 +3,15 @@ shot*.png
 *.log
 export/
 shot*.png.import
-.claude/
+.claude/*
+!.claude/agents/
 fonts/title/space-oddity-*
 art/title/ref.png*
+shots/
+art/story/ref.webp*
+art/story/*.png
+art/story/old_gpt/
+art/story/style/
+art/story/style_ref.png*
+art/story/rejected/
+art/story/face_ref.png*

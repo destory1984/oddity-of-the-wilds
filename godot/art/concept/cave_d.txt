@@ -1,0 +1,4 @@
+Use your image generation tool to create ONE concept image and save it as cave_d.png in the current directory.
+The first attached image is the current in-game cave (top-down 3/4 camera, voxel / toy-brick world, small pixel-art heroine). Keep the SAME camera angle and room layout, and keep everything buildable from simple blocks, lights and a few textures (no complex 3D models).
+Redesign it in this direction: OVERGROWN TOY-BRICK RUIN: walls made of large weathered plastic bricks in faded red/blue/yellow, moss and vines growing over them, small waterfalls, fireflies, bright and playful colors, like a forgotten toy box turned into a cave.
+The small pixel heroine (lavender hair, gold crown, white-and-blue dress) stands in the middle. Game screenshot look, no UI, no text, 16:9.

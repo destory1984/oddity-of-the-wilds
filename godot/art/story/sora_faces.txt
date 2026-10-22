@@ -1,0 +1,11 @@
+Use your image generation tool to create ONE image and save it as sora_faces.png in the current directory.
+
+The first attached image is the official character turnaround of Sora, the heroine. Keep her design exactly: lavender-silver short wavy hair, small gold crown with a blue diamond gem, blue ribbon with gold diamond charms on one side, gold diamond earrings, deep blue eyes, white dress with royal-blue panels and gold trim, detached white sleeves with blue-and-gold cuffs, blue tassels ending in gold diamonds, white stockings, blue boots.
+Make Sora as beautiful, lovely and endearing as possible: soft delicate face, big sparkling eyes, gentle blush, natural relaxed pose (not stiff), beautifully rendered hair and fabric.
+Dialogue portrait sheet: a 3 x 2 grid of bust-up portraits of Sora (head and shoulders, same size and framing in every cell) with six expressions: calm smile, surprised, determined, sad with teary eyes, laughing happily, gently embarrassed with blush. Plain soft light background in every cell, no grid lines.
+
+STYLE (match the second attached image): classic 1990s TV anime cel, clean uniform ink outlines, flat colors with one hard shadow tone, no gradients, no glow, no sparkles.
+ANATOMY MUST BE CORRECT: every character has exactly two arms and two legs, each clearly attached, natural proportions, five fingers per hand, no extra or merged limbs.
+MODESTY: wholesome and family-friendly; underwear is never visible, no view under skirts; camera at eye level or slightly above, never a low angle looking up at a skirt; in action poses the skirt and petticoat stay down over the thighs.
+No text, no logo, no watermark, no frame.
+When done, reply with only the file path.
