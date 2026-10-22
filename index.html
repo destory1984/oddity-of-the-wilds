@@ -106,7 +106,6 @@
     <span><kbd>U</kbd><kbd>I</kbd><kbd>O</kbd></span><span>스킬 (또는 1-3)</span>
     <span><kbd>4</kbd></span><span>회복약</span>
     <span><kbd>SPACE</kbd></span><span>상자 열기</span>
-    <span><kbd>Q</kbd><kbd>E</kbd></span><span>카메라 회전</span>
     <span><kbd>Z</kbd><kbd>X</kbd></span><span>확대·축소 (휠)</span>
     <span><kbd>T</kbd><kbd>R</kbd><kbd>P</kbd></span><span>시간 / 비 / 사진</span>
   </div>
@@ -857,7 +856,8 @@ function update(dt) {
   waterTex.offset.set(t * .015, t * .01);
 
   // camera controls
-  if (keys.q) camYaw -= 1.6 * dt; if (keys.e) camYaw += 1.6 * dt;
+  const CAM_ROTATE = false; // camera rotation (Q/E) is switched off for now
+  if (CAM_ROTATE) { if (keys.q) camYaw -= 1.6 * dt; if (keys.e) camYaw += 1.6 * dt; }
   if (keys.z) camDist = Math.max(8, camDist - 12 * dt); if (keys.x) camDist = Math.min(26, camDist + 12 * dt);
 
   // movement relative to camera
