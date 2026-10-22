@@ -170,6 +170,37 @@ func build(m: Node) -> void:
 	m.add_child(simji_node)
 	m.rocks.append({"x": marks.M.x, "z": marks.M.y, "r": 0.5})
 
+# Kongal's friend: a little green brick goblin with the red scarf she knitted (errand 2)
+const KID_AT := Vector2i(6, 21)
+const KID_GUARDS := [Vector2i(4, 20), Vector2i(8, 20), Vector2i(7, 22)]
+
+func kid_goblin(m: Node) -> Node3D:
+	var g := Node3D.new()
+	var green: Material = m.mat_color(Color("#4f9a3a"))
+	for part in [[Vector3(0.3, 0.3, 0.24), Vector3(0, 0.2, 0), green],
+			[Vector3(0.34, 0.26, 0.28), Vector3(0, 0.5, 0), green],
+			[Vector3(0.16, 0.06, 0.06), Vector3(-0.22, 0.56, 0), green], # ears
+			[Vector3(0.16, 0.06, 0.06), Vector3(0.22, 0.56, 0), green],
+			[Vector3(0.36, 0.08, 0.3), Vector3(0, 0.36, 0), m.mat_color(Color("#c8322a"))], # scarf
+			[Vector3(0.05, 0.06, 0.02), Vector3(-0.07, 0.54, 0.145), m.mat_color(Color("#1a1a1a"))],
+			[Vector3(0.05, 0.06, 0.02), Vector3(0.07, 0.54, 0.145), m.mat_color(Color("#1a1a1a"))]]:
+		var b: MeshInstance3D = m.box(part[0], part[2])
+		b.position = part[1]
+		g.add_child(b)
+	# it carries a little firefly jar, so it can be found in the dark south field
+	var jar: MeshInstance3D = m.box(Vector3(0.12, 0.14, 0.12), m.glow_mat(Color("#d8ff8a"), 3.0))
+	jar.position = Vector3(0.24, 0.3, 0.1)
+	g.add_child(jar)
+	var glow := OmniLight3D.new()
+	glow.light_color = Color("#d8ffb0")
+	glow.light_energy = 1.2
+	glow.omni_range = 2.8
+	glow.position = Vector3(0.2, 0.8, 0.3)
+	g.add_child(glow)
+	g.scale = Vector3.ONE * 1.4
+	m.add_child(g)
+	return g
+
 func house(m: Node, at: Vector3) -> void:
 	var g := Node3D.new()
 	g.position = at

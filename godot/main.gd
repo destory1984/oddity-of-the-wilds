@@ -281,6 +281,7 @@ const SCENES := {
 	"scene": {"play": true, "scene": true},
 	"village": {"play": true, "village": true},
 	"village_night": {"play": true, "village": true, "hour": 22.0},
+	"kid": {"play": true, "village": true, "kid": true, "hour": 20.5},
 }
 
 func apply_test_args(args: PackedStringArray) -> void:
@@ -318,6 +319,12 @@ func apply_test_args(args: PackedStringArray) -> void:
 		enter_village()
 		player.x = village.marks.M.x - 2.0
 		player.z = village.marks.M.y + 1.0
+		if sc.get("kid", false): # Kongal's kid goblin trotting after Sora in the south field
+			errand = 3
+			player.x = VILLAGE.VILLAGE_X + 9.0
+			player.z = 19.0
+			kid_q = 2
+			place_kid()
 	if sc.get("scene", false):
 		show_story("res://art/story/06_cave_rival.jpg", STORY.PAINTING)
 		for k in 6:
@@ -2218,7 +2225,7 @@ func save_game() -> void:
 			boss_dead = true
 	var d := {"lv": player.lv, "xp": player.xp, "max_hp": player.max_hp, "hp": player.hp, "atk": player.atk,
 		"gold": player.gold, "pots": player.pots, "x": player.x, "z": player.z,
-		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "in_village": in_village, "met": met.keys(), "pips": crown_pips, "errand": errand, "vlit": village.dark.map(func(d): return d.lit), "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
+		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "in_village": in_village, "met": met.keys(), "pips": crown_pips, "errand": errand, "kid_q": kid_q, "vlit": village.dark.map(func(d): return d.lit), "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
 		"chests": chests.map(func(c): return c.open)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -2243,6 +2250,7 @@ func load_game() -> void:
 	var was_in_cave := bool(d.get("in_cave", false))
 	crown_pips = int(d.get("pips", 8))
 	errand = int(d.get("errand", 0))
+	kid_q = int(d.get("kid_q", 0))
 	for id in d.get("met", []):
 		met[id] = true
 	var vlit: Array = d.get("vlit", [])
@@ -2261,6 +2269,8 @@ func load_game() -> void:
 		errand = e0
 		player.x = vx
 		player.z = vz
+		if kid_q > 0:
+			place_kid()
 	has_skip = bool(d.get("has_skip", false))
 	cave_exit_seen = bool(d.get("cave_exit_seen", false))
 	var opened: Array = d.get("chests", [])
@@ -2518,6 +2528,8 @@ var pip_flash := 0.0
 var rest_t := 0.0
 var met := {}               # villagers already greeted
 var errand := 0            # 0 not given, 1 lighting lanterns, 2 lanterns done, 3 rewarded
+var kid_q := 0             # Kongal's errand: 0 not given, 1 find the kid goblin, 2 it follows Sora, 3 home
+var kid_node: Node3D
 
 func enter_village() -> void:
 	in_village = true
@@ -2573,11 +2585,14 @@ func crown_key() -> void:
 				player.gold += 60
 				player.pots += 1
 				show_story("", STORY.SIMJI_DONE)
-				set_quest("마을 사람들에게 말을 걸어 보자 (다음 장에서 계속)")
+				set_quest("광장 서쪽의 콩알이 울고 있다. 말을 걸어 보자 (E)")
 			save_game()
 			return
 		for id in village.folk_pos:
 			if me.distance_to(village.folk_pos[id]) < 1.6:
+				if id == "kongal" and errand >= 3 and kid_q != 1:
+					kongal_errand()
+					return
 				show_story("", STORY.FOLK[id])
 				met[id] = true
 				save_game()
@@ -2590,6 +2605,64 @@ func crown_key() -> void:
 					light_village_lamp(d)
 					return
 	touch_crown()
+
+# errand 2: Kongal's kid goblin was dragged to the south field by three goblins
+func kongal_errand() -> void:
+	if kid_q == 0:
+		kid_q = 1
+		show_story("", STORY.KONGAL_LOST)
+		set_quest("남쪽 들판에서 꼬마 고블린을 찾자")
+		place_kid()
+	elif kid_q == 2:
+		kid_q = 3
+		player.gold += 40
+		player.pots += 1
+		show_story("", STORY.KONGAL_DONE)
+		set_quest("마을 사람들에게 말을 걸어 보자 (다음 장에서 계속)")
+		place_kid()
+	else:
+		show_story("", STORY.FOLK.kongal)
+	save_game()
+
+# put the kid goblin where kid_q says: in the field with guards, or beside Kongal
+func place_kid() -> void:
+	if kid_node == null:
+		kid_node = village.kid_goblin(self)
+	var vx := float(VILLAGE.VILLAGE_X)
+	match kid_q:
+		1:
+			kid_node.position = Vector3(vx + village.KID_AT.x, 0, village.KID_AT.y)
+			for at in village.KID_GUARDS:
+				spawn_enemy(Vector2(vx + at.x, at.y))
+				enemies[enemies.size() - 1].cave = true # they do not come back
+		2:
+			kid_node.position = Vector3(player.x - 0.8, 0, player.z + 0.4)
+		3:
+			var k: Vector2 = village.folk_pos.kongal
+			kid_node.position = Vector3(k.x + 0.7, 0, k.y + 0.3)
+
+func update_kid(dt: float) -> void:
+	if kid_node == null or not in_village:
+		return
+	kid_node.visible = in_village
+	var me := Vector3(player.x, 0, player.z)
+	if kid_q == 1 and me.distance_to(kid_node.position) < 1.2:
+		var near := enemies.filter(func(e): return not e.dead and Vector2(e.x, e.z).distance_to(Vector2(player.x, player.z)) < 7.0)
+		if near.is_empty():
+			kid_q = 2
+			burst(kid_node.position + Vector3(0, 0.6, 0), Color("#8de07a"), 16, 1.5)
+			sfx(784, 0.2, "triangle", 0.2)
+			toast("꼬마 고블린이 소라를 따라온다")
+			set_quest("꼬마 고블린을 콩알에게 데려다주자 (E)")
+			save_game()
+		elif toast_t <= 0.0:
+			toast("큰 고블린들이 꼬마를 붙잡고 있다")
+	if kid_q == 2: # trot after Sora, a step behind
+		var to := me - kid_node.position
+		if to.length() > 1.0:
+			kid_node.position += to.normalized() * minf(to.length() - 1.0, dt * 5.0)
+		kid_node.position.y = absf(sin(t * 12.0)) * 0.08 if to.length() > 1.05 else 0.0
+		kid_node.rotation.y = atan2(to.x, to.z)
 
 func light_village_lamp(d: Dictionary) -> void:
 	d.lit = true
@@ -3061,6 +3134,7 @@ func _process(dt: float) -> void:
 	if in_village and Vector2(player.x, player.z).distance_to(village.marks.G) < 0.9 and fade_rect.color.a == 0.0:
 		fade_then(leave_village)
 	update_pips(dt)
+	update_kid(dt)
 	if in_cave:
 		check_painting()
 	if in_cave and not has_skip and Vector2(player.x, player.z).distance_to(cave_marks.E) < 1.6 and toast_t <= 0.0:

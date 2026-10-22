@@ -1,0 +1,5 @@
+Attached: (1) our in-game pixel sprite sheet of villagers (style, line weight, palette softness and chibi proportions are correct), (2) the villager girl Kongal, who holds a green brick-goblin doll; that doll is modelled on the real character below.
+Use your image generation tool to create ONE PNG and save it as kid.png in the current directory.
+Content: one row of 2 equal cells showing "the kid goblin": a small, cute, shy goblin whose body is made of glossy green toy bricks (like the doll in image 2, studs on the head), long pointed brick ears, big round dark eyes, a hand-knitted red scarf, holding a small glass jar of glowing yellow-green fireflies. Cell 1: standing, facing the viewer at a 3/4 angle. Cell 2: mid-hop trotting step, same angle. Drawn in exactly the same pixel-art style as image (1). Feet on one baseline near the bottom of each cell. Wholesome, friendly, not scary.
+No text, no grid lines. Background: solid flat pure magenta #FF00FF.
+When done, reply with only the file path.

@@ -8,7 +8,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "village_exit", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "village_exit", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -594,6 +594,36 @@ func run() -> void:
 		await wait(0.6)
 		check("errand_done", main.errand == 3 and main.crown_pips == 8 and main.player.gold == g0 + 60 and main.player.pots == p0 + 1,
 			"errand=%d pips=%d gold +%d pots +%d" % [main.errand, main.crown_pips, main.player.gold - g0, main.player.pots - p0])
+	if want.call("kongal_errand"):
+		main.errand = 3
+		main.kid_q = 0
+		var kp: Vector2 = main.village.folk_pos.kongal
+		reset_to(kp + Vector2(1.0, 0))
+		tap(KEY_E)
+		await wait(0.3)
+		main.close_story()
+		var guards: Array = main.enemies.filter(func(e): return not e.dead and e.x > 130.0)
+		var asked: bool = main.kid_q == 1 and guards.size() >= 3
+		var kid: Vector3 = main.kid_node.position
+		reset_to(Vector2(kid.x + 0.6, kid.z))
+		main.player.inv = 5.0
+		await wait(0.3)
+		var held: bool = main.kid_q == 1 # guards still up: the kid stays
+		for e in guards:
+			e.dead = true
+			e.node.visible = false
+		await wait(0.3)
+		var freed: bool = main.kid_q == 2
+		reset_to(kp + Vector2(1.0, 0))
+		await wait(2.5) # the kid trots after her at 5 m/s
+		var follows: bool = main.kid_node.position.distance_to(Vector3(main.player.x, 0, main.player.z)) < 1.6
+		var g0: int = main.player.gold
+		var p0: int = main.player.pots
+		tap(KEY_E)
+		await wait(0.3)
+		main.close_story()
+		check("kongal_errand", asked and held and freed and follows and main.kid_q == 3 and main.player.gold == g0 + 40 and main.player.pots == p0 + 1,
+			"asked=%s guards=%d held=%s freed=%s follows=%s kid_q=%d gold +%d pots +%d" % [asked, guards.size(), held, freed, follows, main.kid_q, main.player.gold - g0, main.player.pots - p0])
 	if want.call("village_exit"):
 		reset_to(main.village.marks.G + Vector2(0.6, 0))
 		main.player.x = main.village.marks.G.x + 0.3
