@@ -327,6 +327,7 @@ const SCENES := {
 	"castle": {"play": true, "village": true, "castle": true, "hour": 15.0},
 	"knight": {"play": true, "village": true, "castle": true, "knight": true, "hour": 15.0},
 	"shrine": {"play": true, "shrine": true},
+	"journal": {"play": true, "journal": true},
 	"scrap": {"play": true, "at": Vector2(42.5, 5.5), "hour": 17.0},
 }
 
@@ -510,6 +511,18 @@ func apply_test_args(args: PackedStringArray) -> void:
 		skill_up = 0
 		player.x = CAVE_X + 8.0
 		player.z = 18.6
+	if sc.get("journal", false): # the journal mid-game: two map scraps, the firefly errand on, the whirl woken
+		story_step = 8
+		errand = 3
+		kid_q = 3
+		doran_q = 3
+		fly_q = 1
+		has_skip = true
+		shrine_seen = true
+		skill_up = 0
+		marsh.found = [true, false, true]
+		set_quest("마을 심부름을 모두 마쳤다. 밤이 되면 마을에서 쉬자")
+		toggle_journal(true)
 	if sc.get("opening", false):
 		begin_opening()
 	if sc.has("faint"):
@@ -2356,11 +2369,11 @@ func build_hud() -> void:
 	ui.gold = label(gold, "◆ 0", Vector2(10, 4), 14, Color("#ffd84a"))
 
 	# controls help, starts hidden; H or the button toggles it
-	var help := panel(root, Vector2(14, -448), Vector2(340, 434), Control.PRESET_BOTTOM_LEFT)
+	var help := panel(root, Vector2(14, -513), Vector2(340, 461), Control.PRESET_BOTTOM_LEFT) # ends above the buttons
 	help.mouse_filter = Control.MOUSE_FILTER_STOP
 	label(help, "조작법", Vector2(14, 8), 12, Color("#a99d84"))
 	var rows := [["WASD / 방향키", "이동"], ["Shift", "달리기"], ["J / 왼쪽 클릭", "공격 (연속기)"], ["K / 오른쪽 클릭", "구르기 (때맞추면 섬광)"], ["L / 가운데 클릭", "막기 (때맞추면 반격, Lv4부터 1초 모아 J)"],
-		["U I O / 1 2 3", "스킬 (기세 30·15·60)"], ["4", "회복약"], ["Space", "상자 열기, 들어가기"], ["E", "왕관 만지기"], ["Z X / 휠", "확대·축소"], ["T R P", "3시간 뒤로 / 비 / 사진"], ["F8", "처음 자리로 (진행은 그대로)"], ["F9", "처음부터 (저장 지우기)"], ["H", "조작법 숨기기"]]
+		["U I O / 1 2 3", "스킬 (기세 30·15·60)"], ["4", "회복약"], ["Space", "상자 열기, 들어가기"], ["E", "왕관 만지기"], ["Z X / 휠", "확대·축소"], ["T R P", "3시간 뒤로 / 비 / 사진"], ["F8", "처음 자리로 (진행은 그대로)"], ["F9", "처음부터 (저장 지우기)"], ["Q", "일지 (할 일과 곁이야기)"], ["H", "조작법 숨기기"]]
 	for i in rows.size():
 		label(help, rows[i][0], Vector2(14, 34 + i * 27), 13, Color("#e9dfc4"))
 		label(help, rows[i][1], Vector2(150, 34 + i * 27), 15)
@@ -2373,6 +2386,24 @@ func build_hud() -> void:
 	help.add_child(close)
 	help.visible = false
 	ui.help = help
+	# the journal (Q): what to do now, the side stories found so far and the keepsakes Sora carries
+	var journal := panel(root, Vector2(14, -513), Vector2(400, 461), Control.PRESET_BOTTOM_LEFT)
+	journal.mouse_filter = Control.MOUSE_FILTER_STOP
+	label(journal, "일지", Vector2(14, 8), 12, Color("#a99d84"))
+	var jt := label(journal, "", Vector2(14, 34), 14, Color("#e9dfc4"))
+	jt.size = Vector2(372, 420)
+	jt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	jt.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED # each line is translated as it is built
+	ui.journal_text = jt
+	var jclose := Button.new()
+	jclose.text = "X"
+	jclose.add_theme_font_override("font", ui_font)
+	jclose.position = Vector2(370, 6)
+	jclose.size = Vector2(24, 24)
+	jclose.pressed.connect(func(): toggle_journal(false))
+	journal.add_child(jclose)
+	journal.visible = false
+	ui.journal = journal
 	var hint := Button.new()
 	hint.text = "H  조작법 보기"
 	hint.add_theme_font_override("font", ui_font)
@@ -2389,6 +2420,14 @@ func build_hud() -> void:
 	root.add_child(snd)
 	ui.sound_btn = snd
 	refresh_sound_btn()
+	var jbtn := Button.new()
+	jbtn.text = "Q  일지"
+	jbtn.add_theme_font_override("font", ui_font)
+	place(jbtn, Control.PRESET_BOTTOM_LEFT, Vector2(270, -44), Vector2(90, 30))
+	jbtn.focus_mode = Control.FOCUS_NONE
+	jbtn.pressed.connect(func(): toggle_journal(not ui.journal.visible))
+	root.add_child(jbtn)
+	ui.journal_btn = jbtn
 
 	ui.toast = label(root, "", Vector2(0, 0), 20)
 	place(ui.toast, Control.PRESET_CENTER_BOTTOM, Vector2(-300, -220), Vector2(600, 30))
@@ -2534,7 +2573,7 @@ func build_hud() -> void:
 	for c in root.get_children():
 		if c != title:
 			c.visible = false
-	ui.hidden_for_intro = root.get_children().filter(func(c): return c != title and c != ui.help and c != ui.boss and c != ui.shop and c != ui.shop_hint and c != ui.slowmo_tint and c != ui.story and c != ui.quest and c != ui.legacy)
+	ui.hidden_for_intro = root.get_children().filter(func(c): return c != title and c != ui.help and c != ui.journal and c != ui.boss and c != ui.shop and c != ui.shop_hint and c != ui.slowmo_tint and c != ui.story and c != ui.quest and c != ui.legacy)
 	for k in ["zone", "stats"]:
 		pass
 
@@ -5292,8 +5331,53 @@ func refresh_sound_btn() -> void:
 	ui.sound_btn.modulate = Color(0.6, 0.6, 0.65) if muted else Color.WHITE
 
 func toggle_help(show: bool) -> void:
+	if show:
+		ui.journal.visible = false
 	ui.help.visible = show
 	ui.hint.visible = not show
+
+func toggle_journal(show: bool) -> void:
+	if show:
+		ui.help.visible = false
+		ui.journal_text.text = "\n".join(journal_lines())
+	ui.journal.visible = show
+
+# one line per thing: the current quest, each side story once it has been found, and the keepsakes
+func journal_lines() -> Array:
+	var out: Array = []
+	out.append(tr("지금 할 일"))
+	out.append("  " + (tr(ui.quest.text) if ui.quest.text != "" else tr("마음 가는 대로 둘러보자")))
+	out.append("")
+	out.append(tr("곁이야기"))
+	var side := func(name: String, state: String): out.append("  · " + tr(name) + "  —  " + state)
+	if story_step >= 2:
+		var n: int = marsh.count()
+		side.call("늪의 옛 지도 조각", tr("끝") if marsh.chest_open else (tr("달지기 상자가 동쪽 둔덕에 솟았다") if n == 3 else tr("%d/3 찾음") % n))
+	if story_step >= 6:
+		side.call("동굴의 세 돌단", tr("아직 찾지 못했다") if not shrine_seen else (tr("깨운 기술: %s") % tr(["회오리", "불씨탄", "빛파동"][skill_up]) if skill_up >= 0 else tr("하나를 고르자")))
+	if errand >= 1:
+		var done := int(errand >= 3) + int(kid_q >= 3) + int(doran_q >= 3) + int(mul_q >= 3) + int(fly_q >= 3)
+		side.call("마을 심부름", tr("%d/5 마침") % done)
+	if fly_q >= 1:
+		side.call("꼬마의 반딧불 병", tr("끝") if fly_q >= 3 else (tr("콩알에게 가져가자") if fly_q == 2 else tr("밤의 늪에서 %d/5") % marsh.caught()))
+	if lake_q >= 4:
+		side.call("섬 밑 물빛 동굴", tr("끝") if grotto_q >= 4 else (tr("상자를 열자") if grotto_q == 3 else tr("섬 남쪽 계단으로")))
+	if forest_q >= 1:
+		side.call("숲의 달 순서 돌", tr("끝") if forest.chest_open else (tr("상자를 열자") if forest.solved else tr("숲 북서쪽 숲터")))
+	if hill_q >= 3:
+		side.call("구름 둔덕", tr("끝") if cloud_q >= 3 else tr("언덕 북쪽 바람구멍으로"))
+	if castle_q >= 1:
+		side.call("한결의 일기", tr("%d/3 읽음") % castle.pages_read())
+	out.append("")
+	out.append(tr("지닌 것"))
+	var keep: Array = []
+	if has_skip: keep.append(tr("물수제비 걸음"))
+	if has_unbrick: keep.append(tr("벽돌 풀기"))
+	if fly_q >= 3: keep.append(tr("반딧불 병"))
+	if has_pearl: keep.append(tr("물빛 진주"))
+	if has_feather: keep.append(tr("바람 깃털"))
+	out.append("  " + (", ".join(keep) if not keep.is_empty() else tr("왕관 하나")))
+	return out
 
 func toast(msg: String) -> void:
 	ui.toast.text = msg
@@ -5378,6 +5462,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				toast("비가 내린다" if raining else "비가 그쳤다")
 			KEY_P: ui.root.visible = not ui.root.visible
 			KEY_H: toggle_help(not ui.help.visible)
+			KEY_Q: toggle_journal(not ui.journal.visible)
 			KEY_E: crown_key()
 			KEY_F9: reset_game()
 			KEY_F8: return_to_start()
