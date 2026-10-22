@@ -1,0 +1,7 @@
+The attached image is our HUD concept (style reference). Use your image generation tool to create ONE PNG and save it as shop_items.png in the current directory.
+Content: four shop item illustrations in one horizontal row of 4 equal square cells, each item drawn as a single object (no frame), polished cozy fantasy RPG item art, 1990s anime cel shading with clean outlines, slight top-down three-quarter view as if lying on a wooden counter:
+1) Healing tonic: a small round glass bottle with green glowing liquid and a cork.
+2) Momentum candy: a wrapped orange swirl candy with a little gold star.
+3) Sharpened blade: a short steel sword with a gold crossguard and blue gem.
+4) Sturdy armor: a small blue-and-white cloth-and-leather vest with gold trim.
+No text, no labels. Background: solid flat pure magenta #FF00FF everywhere outside the objects.

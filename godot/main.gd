@@ -301,6 +301,7 @@ func apply_test_args(args: PackedStringArray) -> void:
 	if sc.has("gold"):
 		player.gold = sc.gold
 	if sc.get("shop", false):
+		story_step = 3
 		toggle_shop(true)
 	if sc.get("scene", false):
 		show_story("res://art/story/06_cave_rival.jpg", STORY.PAINTING)
@@ -866,6 +867,8 @@ const SHOP := [
 func near_shop() -> bool:
 	return Vector2(player.x - shop_pos.x, player.z - shop_pos.z).length() < 1.6
 
+const SHOP_GREET := ["어서 오렴. 천천히 골라 보거라.", "오늘은 뭐가 필요하니?", "늪이 험하지? 약은 넉넉히 챙기렴."]
+
 func toggle_shop(open: bool) -> void:
 	if open and story_step < 3:
 		meet_bori()
@@ -873,18 +876,21 @@ func toggle_shop(open: bool) -> void:
 	shop_open = open
 	ui.shop.visible = open
 	if open:
+		ui.shop_say.text = SHOP_GREET[rng.randi() % SHOP_GREET.size()]
+		ui.shop_keeper.texture = load("res://art/portrait/bori.png")
 		refresh_shop()
 		sfx(660, 0.12, "triangle", 0.2)
 
 func refresh_shop() -> void:
-	ui.shop_gold.text = "가진 금화 ◆ %d" % player.gold
+	ui.shop_gold.text = "◆ %d" % player.gold
 	for i in SHOP.size():
 		ui.shop_btns[i].disabled = player.gold < SHOP[i].price
 
 func buy(i: int) -> void:
 	var it: Dictionary = SHOP[i]
 	if player.gold < it.price:
-		toast("금화가 모자라다")
+		ui.shop_say.text = "금화가 조금 모자라구나. 늪을 한 바퀴 더 돌고 오렴."
+		ui.shop_keeper.texture = load("res://art/portrait/bori_serious.png")
 		return
 	player.gold -= it.price
 	match i:
@@ -894,7 +900,8 @@ func buy(i: int) -> void:
 		3:
 			player.max_hp += 15
 			player.hp += 15
-	toast("%s을(를) 샀다" % it.name)
+	ui.shop_say.text = ["몸조심하렴. 아플 땐 아끼지 말고 마시고.", "달콤하지? 기운이 날 게다.", "날이 잘 섰다. 손 베이지 않게 조심해.", "든든할 게다. 이제 좀 마음이 놓이는구나."][i]
+	ui.shop_keeper.texture = load("res://art/portrait/bori.png")
 	sfx(880, 0.08, "square", 0.15)
 	get_tree().create_timer(0.07).timeout.connect(func(): sfx(1320, 0.12, "square", 0.15))
 	refresh_shop()
@@ -1675,29 +1682,91 @@ func build_hud() -> void:
 	ui.hpt = label(stats, "", Vector2(310, 3), 12)
 	ui.mpt = label(stats, "", Vector2(310, 23), 12)
 
-	# shop window
-	var shop := panel(root, Vector2(-200, -150), Vector2(400, 300), Control.PRESET_CENTER)
+	# shop screen: Bori standing on the left, a display board of item cards on the right,
+	# her line at the bottom; the game stays visible, dimmed, behind
+	var shop := ColorRect.new()
+	shop.color = Color(0.008, 0.016, 0.043, 0.55)
+	shop.set_anchors_preset(Control.PRESET_FULL_RECT)
 	shop.mouse_filter = Control.MOUSE_FILTER_STOP
-	var st := label(shop, "갈대늪 상점", Vector2(0, 10), 20, Color("#f6b951"))
-	st.size = Vector2(400, 26)
+	root.add_child(shop)
+	var keeper := TextureRect.new()
+	keeper.texture = load("res://art/portrait/bori.png")
+	keeper.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	keeper.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
+	keeper.flip_h = true # she faces the board
+	keeper.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	shop.add_child(keeper)
+	place(keeper, Control.PRESET_CENTER_LEFT, Vector2(30, -330), Vector2(440, 600))
+	ui.shop_keeper = keeper
+	var board := Control.new()
+	board.set_script(load("res://frame.gd"))
+	board.kind = "box"
+	board.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	shop.add_child(board)
+	place(board, Control.PRESET_CENTER, Vector2(-160, -270), Vector2(620, 420))
+	var btab := Control.new()
+	btab.set_script(load("res://frame.gd"))
+	btab.kind = "tab"
+	board.add_child(btab)
+	btab.position = Vector2(40, -18)
+	btab.size = Vector2(220, 32)
+	var st := label(btab, "보리 할멈의 상점", Vector2(0, 4), 16, Color("#f6d27a"))
+	st.size = Vector2(220, 24)
 	st.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	ui.shop_gold = label(board, "", Vector2(400, 14), 16, Color("#ffd84a"))
+	ui.shop_gold.size = Vector2(190, 22)
+	ui.shop_gold.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	ui.shop_btns = []
 	for i in SHOP.size():
 		var it: Dictionary = SHOP[i]
-		label(shop, "%d" % (i + 1), Vector2(20, 54 + i * 50), 13, Color("#a99d84"))
-		label(shop, it.name, Vector2(42, 48 + i * 50), 16)
-		label(shop, it.desc, Vector2(42, 70 + i * 50), 12, Color("#a99d84"))
+		var card := Control.new()
+		card.set_script(load("res://frame.gd"))
+		card.kind = "tab"
+		card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		board.add_child(card)
+		card.position = Vector2(30 + (i % 2) * 290, 52 + (i / 2) * 176)
+		card.size = Vector2(270, 160)
+		var icon := TextureRect.new()
+		var ip := "res://art/ui/item_%d.png" % i
+		icon.texture = load(ip) if ResourceLoader.exists(ip) else null
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.position = Vector2(12, 12)
+		icon.size = Vector2(96, 96)
+		card.add_child(icon)
+		label(card, "%d" % (i + 1), Vector2(10, 6), 12, Color("#a99d84"))
+		label(card, it.name, Vector2(118, 18), 17)
+		var dsc := label(card, it.desc, Vector2(118, 46), 13, Color("#a99d84"))
+		dsc.size = Vector2(140, 40)
+		dsc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		var b := Button.new()
-		b.text = "◆ %d" % it.price
+		b.text = "◆ %d  사기" % it.price
 		b.add_theme_font_override("font", ui_font)
-		b.position = Vector2(290, 52 + i * 50)
-		b.size = Vector2(90, 32)
+		b.add_theme_font_size_override("font_size", 15)
+		b.position = Vector2(118, 112)
+		b.size = Vector2(138, 34)
 		var idx_ := i
 		b.pressed.connect(func(): buy(idx_))
-		shop.add_child(b)
+		card.add_child(b)
 		ui.shop_btns.append(b)
-	ui.shop_gold = label(shop, "", Vector2(20, 256), 14, Color("#ffd84a"))
-	label(shop, "Space / Esc 닫기", Vector2(270, 258), 12, Color("#a99d84"))
+	var say := Control.new()
+	say.set_script(load("res://frame.gd"))
+	say.kind = "box"
+	say.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	shop.add_child(say)
+	place(say, Control.PRESET_CENTER_BOTTOM, Vector2(-470, -150), Vector2(940, 100))
+	var stab := Control.new()
+	stab.set_script(load("res://frame.gd"))
+	stab.kind = "tab"
+	say.add_child(stab)
+	stab.position = Vector2(40, -18)
+	stab.size = Vector2(150, 32)
+	var sn := label(stab, "보리 할멈", Vector2(0, 4), 16, Color("#f6d27a"))
+	sn.size = Vector2(150, 24)
+	sn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	ui.shop_say = label(say, "", Vector2(40, 32), 19)
+	ui.shop_say.size = Vector2(860, 40)
+	label(say, "1 → 4 사기  ·  Space / Esc 닫기", Vector2(680, 70), 12, Color("#a99d84"))
 	shop.visible = false
 	ui.shop = shop
 	ui.shop_hint = label(root, "Space  상점 들어가기", Vector2.ZERO, 16, Color("#fff1c8"))
