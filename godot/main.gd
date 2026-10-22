@@ -301,6 +301,7 @@ const SCENES := {
 	"turtle": {"play": true, "village": true, "turtle": true, "hour": 15.0},
 	"hill": {"play": true, "village": true, "hill": true, "hour": 10.0},
 	"kid": {"play": true, "village": true, "kid": true, "hour": 20.5},
+	"grove": {"play": true, "village": true, "forest": true, "grove": true, "hour": 15.0},
 	"scrap": {"play": true, "at": Vector2(42.5, 5.5), "hour": 17.0},
 }
 
@@ -345,6 +346,10 @@ func apply_test_args(args: PackedStringArray) -> void:
 			enter_forest()
 			player.x = forest.walls[0].pos.x - 2.5
 			player.z = forest.walls[0].pos.y
+			if sc.has("grove"):
+				player.x = forest.marks.t.x + 2.0
+				player.z = forest.marks.t.y
+				close_story()
 		if sc.get("mold", false): # the last boss in the heart of the garden
 			night_q = 4
 			forest_q = 3
@@ -1840,6 +1845,9 @@ func interact() -> void:
 	if near_shop():
 		toggle_shop(not shop_open)
 		return
+	if in_forest and forest.solved and not forest.chest_open and Vector2(player.x, player.z).distance_to(forest.marks.c) < 1.6:
+		open_grove_chest()
+		return
 	if in_marsh() and marsh.near_chest(self):
 		marsh.open_chest(self)
 		return
@@ -2536,7 +2544,7 @@ func save_game() -> void:
 			boss_dead = true
 	var d := {"lv": player.lv, "xp": player.xp, "max_hp": player.max_hp, "hp": player.hp, "atk": player.atk,
 		"gold": player.gold, "pots": player.pots, "x": player.x, "z": player.z,
-		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "in_village": in_village, "met": met.keys(), "pips": crown_pips, "errand": errand, "kid_q": kid_q, "doran_q": doran_q, "mul_q": mul_q, "night_q": night_q, "in_forest": in_forest, "in_garden": in_garden, "in_hill": in_hill, "hill_q": hill_q, "mills": hill.mills.map(func(mm): return mm.turning), "in_lake": in_lake, "lake_q": lake_q, "garden_q": garden_q, "forest_q": forest_q, "walls": forest.walls.map(func(w): return w.open), "has_unbrick": has_unbrick, "vlit": village.dark.map(func(d): return d.lit), "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
+		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "in_village": in_village, "met": met.keys(), "pips": crown_pips, "errand": errand, "kid_q": kid_q, "doran_q": doran_q, "mul_q": mul_q, "night_q": night_q, "in_forest": in_forest, "in_garden": in_garden, "in_hill": in_hill, "hill_q": hill_q, "mills": hill.mills.map(func(mm): return mm.turning), "in_lake": in_lake, "lake_q": lake_q, "garden_q": garden_q, "forest_q": forest_q, "walls": forest.walls.map(func(w): return w.open), "stones": forest.stones.map(func(st): return st.phase), "grove": forest.solved, "grove_chest": forest.chest_open, "has_unbrick": has_unbrick, "vlit": village.dark.map(func(d): return d.lit), "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
 		"chests": chests.map(func(c): return c.open), "scraps": marsh.found, "moon_chest": marsh.chest_open}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -2585,6 +2593,14 @@ func load_game() -> void:
 		join_mate()
 	if garden_q >= 2 and garden_q < 5:
 		garden_q = 1 # the mold fight starts over when she walks back in
+	var ph: Array = d.get("stones", [])
+	for i in mini(ph.size(), forest.stones.size()):
+		forest.stones[i].phase = int(ph[i])
+		forest.show_phase(forest.stones[i])
+	if bool(d.get("grove", false)):
+		forest.open_gate()
+	if bool(d.get("grove_chest", false)):
+		forest.open_chest_look()
 	var wo: Array = d.get("walls", [])
 	for i in mini(wo.size(), forest.walls.size()):
 		if wo[i]:
@@ -2983,6 +2999,8 @@ func spend_pips(n: int) -> bool:
 func crown_key() -> void:
 	var me := Vector2(player.x, player.z)
 	if in_forest:
+		if grove_key():
+			return
 		if try_unbrick():
 			return
 	if in_garden and garden_q == 4:
@@ -3369,6 +3387,48 @@ func try_unbrick() -> bool:
 			save_game()
 			return true
 	return false
+
+# the moon-stone grove in the forest's north-west: E turns a stone to the next phase, reads the tablet,
+# or opens the niche chest once the stones read crescent to full from east to west
+func grove_key() -> bool:
+	var me := Vector2(player.x, player.z)
+	if forest.solved and not forest.chest_open and me.distance_to(forest.marks.c) < 1.6:
+		open_grove_chest()
+		return true
+	var near = null # the closest stone within reach
+	for st in forest.stones:
+		if me.distance_to(st.pos) < 1.3 and (near == null or me.distance_to(st.pos) < me.distance_to(near.pos)):
+			near = st
+	var tablet_d := me.distance_to(forest.marks.t)
+	if tablet_d < 1.6 and (near == null or tablet_d < me.distance_to(near.pos)):
+		show_story("", STORY.GROVE_TABLET)
+		return true
+	if near == null:
+		return false
+	near.phase = (near.phase + 1) % 4
+	forest.show_phase(near)
+	sfx(392 + near.phase * 98, 0.15, "triangle", 0.2)
+	burst(Vector3(near.pos.x, 1.3, near.pos.y), Color("#dfe8ff"), 8, 1.0)
+	if not forest.solved and forest.is_solved():
+		forest.open_gate()
+		burst(Vector3(forest.marks.V.x, 0.7, forest.marks.V.y), Color("#8a6a4a"), 36, 3.5)
+		shake = 0.25
+		sfx(196, 0.5, "triangle", 0.3, -60)
+		show_story("", STORY.GROVE_OPEN)
+	save_game()
+	return true
+
+func open_grove_chest() -> void:
+	forest.open_chest_look()
+	player.max_hp += 15
+	player.hp = float(player.max_hp)
+	player.pots += 2
+	player.gold += 120
+	burst(Vector3(forest.marks.c.x, 0.8, forest.marks.c.y), Color("#e8d27a"), 40, 3.0)
+	sfx(784, 0.12, "triangle", 0.25)
+	show_story("", STORY.GROVE_CHEST)
+	toast("최대 체력 +15, 회복약 2개, 금화 120")
+	save_game()
 
 func update_forest() -> void:
 	if forest_q == 1 and not story_open and Vector2(player.x, player.z).distance_to(forest.marks.N) < 6.0:

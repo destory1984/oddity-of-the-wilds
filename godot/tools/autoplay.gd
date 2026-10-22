@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -1005,6 +1005,38 @@ func run() -> void:
 		var kept: bool = main.marsh.count() == 3 and main.marsh.chest_open and not main.marsh.nodes[0].visible
 		calm_enemies(false)
 		check("marsh_scraps", walk_ok and whole and opened and kept, "spots walkable=%s whole map=%s opened=%s (atk +%d) kept after load=%s" % [walk_ok, whole, opened, main.player.atk - atk0, kept])
+	if want.call("forest_grove"):
+		main.in_village = false
+		main.in_lake = false
+		main.in_hill = false
+		main.in_garden = false
+		main.in_forest = true
+		calm_enemies(true)
+		var fx0: int = main.FOREST.FOREST_X
+		var shut: bool = not main.player_can(main.forest.marks.V.x, main.forest.marks.V.y)
+		reset_to(Vector2(fx0 + 2, 5)) # by the tablet
+		tap(KEY_E)
+		await wait(0.2)
+		var read: bool = main.story_open
+		main.close_story()
+		for k in 4:
+			var st: Dictionary = main.forest.stones[k]
+			reset_to(st.pos + Vector2(-1.0 if k == 0 else 0.0, 0.0 if k == 0 else 1.0))
+			for n in (3 - k - st.phase + 8) % 4:
+				tap(KEY_E)
+				await wait(0.15)
+		await wait(0.2)
+		main.close_story()
+		var solved: bool = main.forest.solved and main.player_can(main.forest.marks.V.x, main.forest.marks.V.y)
+		var hp0: int = main.player.max_hp
+		reset_to(main.forest.marks.c + Vector2(-1.0, 0))
+		tap(KEY_E)
+		await wait(0.2)
+		main.close_story()
+		var opened: bool = main.forest.chest_open and main.player.max_hp == hp0 + 15
+		main.in_forest = false
+		calm_enemies(false)
+		check("forest_grove", shut and read and solved and opened, "wall shut=%s tablet read=%s solved=%s phases=%s chest=%s" % [shut, read, solved, main.forest.stones.map(func(s): return s.phase), opened])
 	calm_enemies(false)
 	var failed := results.count(false)
 	print("TESTS %d passed, %d failed" % [results.size() - failed, failed])

@@ -1,6 +1,8 @@
 # 굳은 숲 (story step 10): a separate 36x22 area at x >= FOREST_X, built from blocks like the village.
 # The trees have hardened into grey brick columns. Three brick walls (W) block the path until the crown
 # unwinds them (벽돌 풀기); Noeul waits in the clearing at N for the second duel.
+# North-west grove (side puzzle): four moon stones (1-4) are turned with E; when they read crescent to full
+# from east to west, as the tablet (t) says, the brick wall V opens onto a niche with a moonkeeper chest (c).
 extends RefCounted
 
 const FOREST_X := 180
@@ -8,10 +10,10 @@ const W := 36
 const H := 22
 const ROWS := """####################################
 #TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT#
-#TTTTTTTTTT.......g..T........TTTTT#
-#TTTTTTTTTT.....L....W...L....TTTTT#
-#TTTTTTTTTT..........T........TTTTT#
-#TTTTTTTTTT...TTTTTTTTTTTTT...TTTTT#
+#TT..c..TTT.......g..T........TTTTT#
+#TTTVTTTTTT.....L....W...L....TTTTT#
+#T.1.2.3.4...........T........TTTTT#
+#T.t....L.T...TTTTTTTTTTTTT...TTTTT#
 #TTTTTTTTTT...TTTTTTTTTTTTT...TTTTT#
 #TTTTTTTTTT...TTTTTTTTTTTTT...TTTTT#
 #TTTTTTTT.......TTTTTTTTTTT.g.TTTTT#
@@ -33,6 +35,12 @@ var grid: Array = []
 var marks := {}          # S (entry from the village), N (Noeul's clearing) -> world Vector2
 var walls: Array = []    # [{"pos": Vector2, "node": Node3D, "open": bool}]
 var goblins: Array = []  # world Vector2 where brick goblins stand guard
+var stones: Array = []   # [{"pos": Vector2, "phase": int, "top": MeshInstance3D}], west to east
+const STONE_START := [1, 3, 0, 2] # phases as found; solved reads 3, 2, 1, 0 (full in the west, crescent in the east)
+var solved := false
+var gate: Node3D         # the brick wall V in front of the niche
+var chest: Node3D
+var chest_open := false
 
 func _init() -> void:
 	for line in ROWS.split("\n"):
@@ -57,7 +65,9 @@ func blocked(x: float, z: float) -> bool:
 	var c := char_at(x, z)
 	if c == "W":
 		return not wall_at(x, z).get("open", false)
-	return c == "#" or c == "T"
+	if c == "V":
+		return not solved
+	return c == "#" or c == "T" or c in "1234tc"
 
 func build(m: Node) -> void:
 	var blocks: Array = [] # [Transform3D, Color]
@@ -66,7 +76,7 @@ func build(m: Node) -> void:
 		for x in W:
 			var c: String = grid[z][x]
 			var w := Vector2(FOREST_X + x, z)
-			if c in "SNE":
+			if c in "SNEVtc":
 				marks[c] = w
 			if c == "g":
 				goblins.append(w)
@@ -126,6 +136,64 @@ func build(m: Node) -> void:
 			if grid[z][x] == "W":
 				var p := Vector2(FOREST_X + x, z)
 				walls.append({"pos": p, "node": brick_wall(m, p), "open": false})
+	build_grove(m)
+
+# the moon-stone grove: four stone posts with a glowing moon on top, a tablet, a wall and a chest
+func build_grove(m: Node) -> void:
+	var stone: Material = m.mat_color(Color("#8c8a84"))
+	var moon: Material = m.glow_mat(Color("#f4e7b0"), 0.8)
+	var night: Material = m.mat_color(Color("#1c2338"))
+	for k in 4:
+		var at := Vector2(FOREST_X + 3 + k * 2, 4)
+		var g := Node3D.new()
+		var post: MeshInstance3D = m.box(Vector3(0.5, 1.1, 0.5), stone)
+		post.position = Vector3(0, 0.55, 0)
+		g.add_child(post)
+		var plate: MeshInstance3D = m.box(Vector3(0.66, 0.1, 0.66), night) # the dark side of the moon
+		plate.position = Vector3(0, 1.15, 0)
+		g.add_child(plate)
+		var top: MeshInstance3D = m.box(Vector3(0.6, 0.06, 0.6), moon)
+		top.position = Vector3(0, 1.22, 0)
+		g.add_child(top)
+		g.position = Vector3(at.x, 0, at.y)
+		m.add_child(g)
+		stones.append({"pos": at, "phase": STONE_START[k], "top": top})
+		show_phase(stones[k])
+	var tab: MeshInstance3D = m.box(Vector3(0.9, 0.7, 0.18), m.mat_color(Color("#6e6a60")))
+	tab.position = Vector3(marks.t.x, 0.35, marks.t.y)
+	tab.rotation.x = -0.25
+	m.add_child(tab)
+	gate = brick_wall(m, marks.V)
+	chest = Node3D.new()
+	var lid: Material = m.glow_mat(Color("#e8d27a"), 1.4)
+	for part in [[Vector3(0.8, 0.45, 0.55), Vector3(0, 0.22, 0), m.mat_color(Color("#3a3a5a"))], [Vector3(0.84, 0.1, 0.59), Vector3(0, 0.5, 0), lid]]:
+		var b: MeshInstance3D = m.box(part[0], part[2])
+		b.position = part[1]
+		chest.add_child(b)
+	chest.position = Vector3(marks.c.x, 0, marks.c.y)
+	m.add_child(chest)
+
+# a moon phase is drawn as how much of the top plate is lit: a sliver, a half, three quarters, whole
+func show_phase(st: Dictionary) -> void:
+	var w: float = [0.16, 0.3, 0.45, 0.6][st.phase]
+	var top: MeshInstance3D = st.top
+	top.scale = Vector3(w / 0.6, 1, 1)
+	top.position.x = (0.6 - w) / 2.0 # the lit part grows from the east edge
+
+func is_solved() -> bool:
+	for k in 4:
+		if stones[k].phase != 3 - k:
+			return false
+	return true
+
+func open_gate() -> void:
+	solved = true
+	gate.visible = false
+
+func open_chest_look() -> void:
+	chest_open = true
+	for b in chest.get_children():
+		b.transparency = 0.45
 
 # a wall of studded toy bricks, red and grey, filling one tile of the path
 func brick_wall(m: Node, at: Vector2) -> Node3D:
@@ -162,5 +230,8 @@ func map_tex(width: int) -> ImageTexture:
 				"W": col = Color("#c8322a")
 				"L": col = Color("#ffd060")
 				"N": col = Color("#9a9aa0")
+				"1", "2", "3", "4", "t": col = Color("#8c8a84")
+				"V": col = Color("#c8322a")
+				"c": col = Color("#bcd6ff")
 			img.set_pixel(FOREST_X + x, z, col)
 	return ImageTexture.create_from_image(img)
