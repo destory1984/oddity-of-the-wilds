@@ -1,0 +1,4 @@
+The attached image is our HUD design concept. Use your image generation tool to create ONE image and save it as skill_icons.png in the current directory.
+Content: four game skill icons in a single horizontal row of 4 equal square cells, matching the bottom-right icons of the concept exactly in style: each icon is a glowing emblem inside a diamond frame with thin gold (#E8B018) rim and dark navy glass inside.
+1) Whirl: a blue-white spiral wind slash.  2) Ember: an orange-red flame.  3) Nova: a radiant gold four-point star burst.  4) Tonic: a green heart.
+Crisp, readable at 48 px, no text, no letters, no numbers. Background outside the diamonds: solid flat pure magenta #FF00FF.

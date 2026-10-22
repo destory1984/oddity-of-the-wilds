@@ -1614,13 +1614,26 @@ func build_hud() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud.add_child(root)
 	ui.root = root
+	# the old boxy panels stay in a hidden holder (their labels still carry values); hud.gd draws the HUD
+	var legacy := Control.new()
+	legacy.set_anchors_preset(Control.PRESET_FULL_RECT)
+	legacy.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	legacy.visible = false
+	root.add_child(legacy)
+	ui.legacy = legacy
+	var deco := Control.new()
+	deco.set_script(load("res://hud.gd"))
+	deco.main = self
+	deco.set_anchors_preset(Control.PRESET_FULL_RECT)
+	deco.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(deco)
 
-	var zone := panel(root, Vector2(14, 12), Vector2(190, 58))
+	var zone := panel(legacy, Vector2(14, 12), Vector2(190, 58))
 	label(zone, "◆", Vector2(14, 16), 16, Color("#b9a273"))
 	ui.zone_name = label(zone, "갈대늪", Vector2(42, 6), 19)
 	ui.zone_sub = label(zone, "등불여울 건널목", Vector2(42, 32), 13, Color("#a99d84"))
 
-	var stats := panel(root, Vector2(14, 72), Vector2(396, 92))
+	var stats := panel(legacy, Vector2(14, 72), Vector2(396, 92))
 	label(stats, "레벨", Vector2(14, 8), 11, Color("#a99d84"))
 	ui.lv = label(stats, "1", Vector2(18, 24), 30)
 	for row in [["체력", 10, Color("#d83a44")], ["기세", 30, Color("#f08a2a")], ["기력", 50, Color("#e9d39a")]]:
@@ -1714,7 +1727,7 @@ func build_hud() -> void:
 	sky.main = self
 	sky.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	sky.clip_contents = true
-	root.add_child(sky)
+	legacy.add_child(sky)
 	place(sky, Control.PRESET_TOP_LEFT, Vector2(14, 166), Vector2(190, 64))
 
 	# circular minimap, top right
@@ -1736,7 +1749,7 @@ func build_hud() -> void:
 	mini.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	mini.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var mimg := Image.create(N, N, false, Image.FORMAT_RGBA8)
-	var pal := [Color("#6f93a6"), Color("#d8c896"), Color("#e9d9aa"), Color("#8a5a32")]
+	var pal := [Color("#1d4f7c"), Color("#16302e"), Color("#2c4a48"), Color("#c8962a")]
 	for z in N:
 		for x in N:
 			mimg.set_pixel(x, z, pal[map[idx(x, z)]])
@@ -1746,9 +1759,9 @@ func build_hud() -> void:
 			if not w:
 				for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
 					if map[idx(x + d.x, z + d.y)] == WATER:
-						mimg.set_pixel(x, z, Color("#7a6440"))
+						mimg.set_pixel(x, z, Color("#3fa0c8"))
 				if hgt[idx(x, z)] > 0.5 and (x + z) % 3 == 0:
-					mimg.set_pixel(x, z, Color("#b8a474"))
+					mimg.set_pixel(x, z, Color("#23423e"))
 	mini.map_tex = ImageTexture.create_from_image(mimg)
 	ui.mini = mini
 	mini.main = self
@@ -1761,7 +1774,7 @@ func build_hud() -> void:
 	var icon_cols := [Color("#9fd4ff"), Color("#ff8a2a"), Color("#fff1a0"), Color("#8dff9a")]
 	ui.cd = []
 	for i in 4:
-		var slot := panel(root, Vector2(-290 + i * 70, -86), Vector2(56, 48), Control.PRESET_BOTTOM_RIGHT)
+		var slot := panel(legacy, Vector2(-290 + i * 70, -86), Vector2(56, 48), Control.PRESET_BOTTOM_RIGHT)
 		label(slot, keys_[i], Vector2(3, 1), 10, Color("#e9dfc4"))
 		label(slot, icons[i], Vector2(18, 10), 22, icon_cols[i])
 		var cd := ColorRect.new()
@@ -1769,12 +1782,12 @@ func build_hud() -> void:
 		cd.size = Vector2(56, 0)
 		slot.add_child(cd)
 		ui.cd.append(cd)
-		var n := label(root, names[i], Vector2(0, 0), 12)
+		var n := label(legacy, names[i], Vector2(0, 0), 12)
 		place(n, Control.PRESET_BOTTOM_RIGHT, Vector2(-290 + i * 70, -36), Vector2(56, 20))
 		n.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		if i == 3:
 			ui.pots = n
-	var gold := panel(root, Vector2(-80, -130), Vector2(66, 30), Control.PRESET_BOTTOM_RIGHT)
+	var gold := panel(legacy, Vector2(-80, -130), Vector2(66, 30), Control.PRESET_BOTTOM_RIGHT)
 	ui.gold = label(gold, "◆ 0", Vector2(10, 4), 14, Color("#ffd84a"))
 
 	# controls help, starts hidden; H or the button toggles it
@@ -1889,7 +1902,7 @@ func build_hud() -> void:
 	for c in root.get_children():
 		if c != title:
 			c.visible = false
-	ui.hidden_for_intro = root.get_children().filter(func(c): return c != title and c != ui.help and c != ui.boss and c != ui.shop and c != ui.shop_hint and c != ui.slowmo_tint and c != ui.story and c != ui.quest)
+	ui.hidden_for_intro = root.get_children().filter(func(c): return c != title and c != ui.help and c != ui.boss and c != ui.shop and c != ui.shop_hint and c != ui.slowmo_tint and c != ui.story and c != ui.quest and c != ui.legacy)
 	for k in ["zone", "stats"]:
 		pass
 
@@ -2294,15 +2307,15 @@ var cave_light: OmniLight3D
 # parchment map of the cave, drawn at its world offset so the minimap math stays the same
 func cave_map_tex() -> ImageTexture:
 	var img := Image.create(CAVE_X + CAVE_W, CAVE_H, false, Image.FORMAT_RGBA8)
-	img.fill(Color("#cdbb88"))
+	img.fill(Color(0, 0, 0, 0))
 	for z in CAVE_H:
 		for x in CAVE_W:
 			var c: String = cave_grid[z][x]
-			var col := Color("#3a2e22") if c == "#" else (Color("#6f93a6") if c == "w" else Color("#d8c896"))
+			var col := Color(0, 0, 0, 0) if c == "#" else (Color("#3fe0e0") if c == "w" else Color("#2a5a8a"))
 			if c == "D" and not cave_door_open:
-				col = Color("#8a5a32")
+				col = Color("#c8962a")
 			if c == "E":
-				col = Color("#e8b018")
+				col = Color("#ffd060")
 			img.set_pixel(CAVE_X + x, z, col)
 	return ImageTexture.create_from_image(img)
 var fade_rect: ColorRect

@@ -17,7 +17,7 @@ func _draw() -> void:
 		return
 	var s := size.x / 96.0
 	var c := Vector2(size.x / 2.0, size.y * 0.54)
-	draw_rect(Rect2(Vector2.ZERO, size), Color("#cdbb88"))
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.02, 0.04, 0.09, 0.85))
 	var p: Vector2 = Vector2(main.player.x, main.player.z)
 	var xf := Transform2D(0.0, c) \
 		* Transform2D(0.0, Vector2(1.0, SQUASH), 0.0, Vector2.ZERO) \
@@ -46,7 +46,13 @@ func _draw() -> void:
 	# north badge rides the rim where north lies on screen
 	var n := Vector2(sin(main.cam_yaw), -cos(main.cam_yaw) * SQUASH).normalized()
 	var np := size / 2.0 + n * size.x * 0.42
-	draw_circle(np, 9.0, Color("#efe2bd"))
-	draw_arc(np, 9.0, 0.0, TAU, 20, Color("#b9a273"), 1.0)
-	draw_string(main.ui_font, np + Vector2(-4, 4), "N", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#7a2a1a"))
-	draw_arc(size / 2.0, size.x / 2.0 - 2.0, 0.0, TAU, 64, Color("#b9a273"), 3.0)
+	draw_circle(np, 9.0, Color("#0b1530"))
+	draw_arc(np, 9.0, 0.0, TAU, 20, Color("#e8b018"), 1.0)
+	draw_string(main.ui_font, np + Vector2(-4, 4), "N", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#e8b018"))
+	var cc := size / 2.0
+	draw_arc(cc, size.x / 2.0 - 3.0, 0.0, TAU, 64, Color("#e8b018"), 2.0, true)
+	draw_arc(cc, size.x / 2.0 - 8.0, 0.0, TAU, 64, Color(0.91, 0.69, 0.09, 0.35), 1.0, true)
+	for k in 4: # small gold points at the four compass marks
+		var a := k * PI / 2.0
+		var q := cc + Vector2(cos(a), sin(a)) * (size.x / 2.0 - 3.0)
+		draw_colored_polygon(PackedVector2Array([q + Vector2(0, -5), q + Vector2(5, 0), q + Vector2(0, 5), q + Vector2(-5, 0)]), Color("#e8b018"))
