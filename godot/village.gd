@@ -28,7 +28,7 @@ G=S=========oooooooo===========F
 #....................d...=.....#
 #..............................#
 #..............................#
-################################"""
+################K###############"""
 
 var grid: Array = []
 var marks := {}          # S, G, M -> world Vector2
@@ -41,6 +41,7 @@ const FOLK := [
 	{"id": "mulgyeol", "at": Vector2i(28, 21)},
 ]
 var folk_pos := {}
+var folk_node := {}
 
 func _init() -> void:
 	for line in ROWS.split("\n"):
@@ -67,7 +68,7 @@ func build(m: Node) -> void:
 		for x in W:
 			var c: String = grid[z][x]
 			var w := Vector2(VILLAGE_X + x, z)
-			if c in "SGMF":
+			if c in "SGMFK":
 				marks[c] = w
 			var col := Color("#5e8f30")
 			match c:
@@ -159,6 +160,7 @@ func build(m: Node) -> void:
 		spr.offset = Vector2(0, 85)
 		spr.position = Vector3(w.x, 0, w.y)
 		m.add_child(spr)
+		folk_node[f.id] = spr
 		var tw := spr.create_tween().set_loops() # blink / idle beat every few seconds
 		tw.tween_interval(2.4 + m.rnd(0, 1.2))
 		tw.tween_callback(func(): spr.frame = 1)

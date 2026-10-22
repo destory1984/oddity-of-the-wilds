@@ -114,6 +114,8 @@ func cave_char(x: float, z: float) -> String:
 	return c
 
 func tile_at(x: float, z: float) -> int:
+	if x >= LAKE.LAKE_X - 0.5:
+		return WATER if lake.blocked(x, z) else (SAND if lake.char_at(x, z) in "=PQ" else GRASS)
 	if x >= GARDEN.GARDEN_X - 0.5:
 		return WATER if garden.blocked(x, z) else (SAND if garden.char_at(x, z) == "=" else GRASS)
 	if x >= FOREST.FOREST_X - 0.5:
@@ -246,6 +248,7 @@ func _ready() -> void:
 	village.build(self)
 	forest.build(self)
 	garden.build(self)
+	lake.build(self)
 	build_player()
 	for i in 9:
 		spawn_enemy()
@@ -291,6 +294,7 @@ const SCENES := {
 	"forest": {"play": true, "village": true, "forest": true, "hour": 16.0},
 	"forest_night": {"play": true, "village": true, "forest": true, "hour": 22.0},
 	"mold": {"play": true, "village": true, "mold": true, "hour": 21.0},
+	"turtle": {"play": true, "village": true, "turtle": true, "hour": 15.0},
 	"kid": {"play": true, "village": true, "kid": true, "hour": 20.5},
 }
 
@@ -344,6 +348,18 @@ func apply_test_args(args: PackedStringArray) -> void:
 			spawn_mold()
 			player.x = garden.marks.C.x - 4.5
 			player.z = garden.marks.C.y + 1.5
+		if sc.get("turtle", false): # Sora and Mulgyeol against the brick turtle on the island
+			night_q = 4
+			lake_q = 1
+			enter_lake()
+			lake.thaw()
+			lake_q = 2
+			row_to_island()
+			close_story()
+			spawn_turtle()
+			player.x = lake.marks.T.x + 2.5
+			player.z = lake.marks.T.y + 1.0
+			snap_mate()
 		if sc.get("kid", false): # Kongal's kid goblin trotting after Sora in the south field
 			errand = 3
 			player.x = VILLAGE.VILLAGE_X + 9.0
@@ -781,6 +797,50 @@ var shop_pos := Vector3.ZERO  # in front of the cottage door
 var shop_open := false
 var lanterns: Array = []     # OmniLight3D, brighter after dusk
 var sunbeams: Array = []     # additive light shafts, strongest at golden hour
+
+# one MultiMesh of coloured boxes ([Transform3D, Color] pairs), lit by vertex colour
+func multimesh_of(list: Array) -> MultiMeshInstance3D:
+	var cm := StandardMaterial3D.new()
+	cm.vertex_color_use_as_albedo = true
+	cm.roughness = 0.9
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.mesh = BoxMesh.new()
+	mm.instance_count = list.size()
+	for i in list.size():
+		mm.set_instance_transform(i, list[i][0])
+		mm.set_instance_color(i, (list[i][1] as Color).srgb_to_linear())
+	var mmi := MultiMeshInstance3D.new()
+	mmi.multimesh = mm
+	mmi.material_override = cm
+	add_child(mmi)
+	return mmi
+
+# the same, split into 6x6 chunks so each sees only nearby lights (the web renderer lights a mesh with at most 8)
+func add_chunks(blocks: Array, origin_x: int) -> void:
+	var chunks := {}
+	for bl in blocks:
+		var o: Vector3 = bl[0].origin
+		var key := Vector2i(int(o.x - origin_x) / 6, int(o.z) / 6)
+		if not chunks.has(key):
+			chunks[key] = []
+		chunks[key].append(bl)
+	for key in chunks:
+		multimesh_of(chunks[key])
+
+func folk_sprite(id: String) -> Sprite3D:
+	var spr := Sprite3D.new()
+	spr.texture = load("res://art/folk/%s.png" % id)
+	spr.hframes = 2
+	spr.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+	spr.scale = Vector3(1, 1.0 / cos(0.78), 1)
+	spr.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	spr.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
+	spr.shaded = false
+	spr.pixel_size = 1.75 / 170.0
+	spr.offset = Vector2(0, 85)
+	return spr
 
 func lantern(x: float, z: float, post_mat: Material, glass: Material) -> void:
 	var y := height_at(x, z)
@@ -1403,6 +1463,8 @@ func damage_enemy(e: Dictionary, amt: float, from: Vector2, kb := 4.0, force_cri
 		burst(Vector3(e.x, y + 0.4, e.z), Color("#ff9a4a"), 26, 3.5)
 		if e.get("noeul", false):
 			get_tree().create_timer(1.0).timeout.connect(noeul_turned if e.get("second", false) else noeul_beaten)
+		elif e.get("turtle", false):
+			get_tree().create_timer(1.0).timeout.connect(turtle_beaten)
 		elif e.get("mole", false):
 			player.gold += 150
 			gain_xp(120)
@@ -2257,7 +2319,7 @@ func save_game() -> void:
 			boss_dead = true
 	var d := {"lv": player.lv, "xp": player.xp, "max_hp": player.max_hp, "hp": player.hp, "atk": player.atk,
 		"gold": player.gold, "pots": player.pots, "x": player.x, "z": player.z,
-		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "in_village": in_village, "met": met.keys(), "pips": crown_pips, "errand": errand, "kid_q": kid_q, "doran_q": doran_q, "mul_q": mul_q, "night_q": night_q, "in_forest": in_forest, "in_garden": in_garden, "garden_q": garden_q, "forest_q": forest_q, "walls": forest.walls.map(func(w): return w.open), "has_unbrick": has_unbrick, "vlit": village.dark.map(func(d): return d.lit), "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
+		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "in_village": in_village, "met": met.keys(), "pips": crown_pips, "errand": errand, "kid_q": kid_q, "doran_q": doran_q, "mul_q": mul_q, "night_q": night_q, "in_forest": in_forest, "in_garden": in_garden, "in_lake": in_lake, "lake_q": lake_q, "garden_q": garden_q, "forest_q": forest_q, "walls": forest.walls.map(func(w): return w.open), "has_unbrick": has_unbrick, "vlit": village.dark.map(func(d): return d.lit), "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
 		"chests": chests.map(func(c): return c.open)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -2288,6 +2350,13 @@ func load_game() -> void:
 	night_q = int(d.get("night_q", 0))
 	forest_q = int(d.get("forest_q", 0))
 	garden_q = int(d.get("garden_q", 0))
+	lake_q = int(d.get("lake_q", 0))
+	if lake_q == 3:
+		lake_q = 2 # the turtle fight starts over from the pier
+	if lake_q >= 2:
+		lake.thaw()
+	if lake_q >= 4:
+		join_mate()
 	if garden_q >= 2 and garden_q < 5:
 		garden_q = 1 # the mold fight starts over when she walks back in
 	var wo: Array = d.get("walls", [])
@@ -2323,6 +2392,13 @@ func load_game() -> void:
 		player.z = vz
 		if kid_q > 0:
 			place_kid()
+	if bool(d.get("in_lake", false)):
+		var lx: float = player.x
+		var lz: float = player.z
+		enter_lake()
+		player.x = lx
+		player.z = lz
+		snap_mate()
 	if bool(d.get("in_garden", false)):
 		var gx: float = player.x
 		var gz: float = player.z
@@ -2589,6 +2665,13 @@ var village = VILLAGE.new()
 const FOREST := preload("res://forest.gd")
 var forest = FOREST.new()
 var in_forest := false
+const LAKE := preload("res://lake.gd")
+var lake = LAKE.new()
+var in_lake := false
+var lake_q := 0            # 0 not yet, 1 at the lake, 2 thawed, 3 on the island (turtle), 4 Mulgyeol joined
+var lake_npc: Sprite3D     # Mulgyeol waiting on the pier before he joins
+var mate: Node3D           # Mulgyeol as a companion
+var mate_cd := 0.0
 const GARDEN := preload("res://garden.gd")
 var garden = GARDEN.new()
 var in_garden := false
@@ -2662,6 +2745,8 @@ func crown_key() -> void:
 			return
 	if in_garden and garden_q == 4:
 		final_wind()
+		return
+	if in_lake and lake_key():
 		return
 	if in_village:
 		if me.distance_to(village.marks.M) < 1.8:
@@ -2984,7 +3069,7 @@ func noeul_beaten() -> void:
 	ui.boss.visible = false
 	player.gold += 100
 	gain_xp(150)
-	set_quest("굳은 숲으로 가는 길을 찾자 (다음 장에서 계속)")
+	set_quest("물결과 함께 남쪽 호수를 풀자 (마을 남쪽 문)")
 	show_story("", STORY.NOEUL_LOSES)
 	save_game()
 
@@ -3057,6 +3142,242 @@ func noeul_turned() -> void:
 	show_story("res://art/story/10_jae_turns.jpg", STORY.NOEUL_TURNS)
 	set_quest("정원 한가운데로 가는 길을 찾자 (다음 장에서 계속)")
 	save_game()
+
+# ---- the south lake and Mulgyeol joining (between the lantern night and the forest)
+func enter_lake() -> void:
+	in_village = false
+	in_lake = true
+	player.x = lake.marks.S.x
+	player.z = lake.marks.S.y + 1.2
+	ground_y = 0.0
+	ui.mini.map_tex = lake.map_tex(LAKE.LAKE_X + LAKE.W)
+	ui.zone_name.text = "남쪽 호수"
+	ui.zone_sub.text = "굳은 물가"
+	if lake_q < 3:
+		if lake_npc == null:
+			lake_npc = folk_sprite("mulgyeol")
+			add_child(lake_npc)
+		lake_npc.position = Vector3(lake.marks.P.x + 1.0, 0, lake.marks.P.y)
+		lake_npc.visible = true
+	if lake_q == 0:
+		lake_q = 1
+		show_story("", STORY.LAKE_IN)
+		set_quest("수문의 벽돌을 왕관으로 풀자 (E)")
+	save_game()
+
+func leave_lake() -> void:
+	in_lake = false
+	in_village = true
+	player.x = village.marks.K.x
+	player.z = village.marks.K.y - 1.2
+	ground_y = 0.0
+	ui.mini.map_tex = village.map_tex(VILLAGE.VILLAGE_X + VILLAGE.W)
+	ui.zone_name.text = "등불 마을"
+	ui.zone_sub.text = "남쪽 문"
+	ui.boss.visible = false
+	save_game()
+
+# E at the lake: unwind the sluice, ask Mulgyeol for the boat, or row back from the island
+func lake_key() -> bool:
+	var me := Vector2(player.x, player.z)
+	if lake_q == 1 and me.distance_to(lake.marks.D) < 1.6:
+		if spend_pips(unbrick_cost()):
+			lake.thaw()
+			lake_q = 2
+			burst(Vector3(lake.marks.D.x, 0.6, lake.marks.D.y), Color("#9fd4ff"), 40, 4.0)
+			shake = 0.3
+			sfx(196, 0.6, "triangle", 0.3, -60)
+			ui.mini.map_tex = lake.map_tex(LAKE.LAKE_X + LAKE.W)
+			show_story("", STORY.LAKE_THAW)
+			set_quest("부두의 물결에게 말을 걸자 (E)")
+			save_game()
+		return true
+	if lake_q == 2 and lake_npc != null and me.distance_to(Vector2(lake_npc.position.x, lake_npc.position.z)) < 1.6:
+		fade_then(row_to_island)
+		return true
+	if lake_q >= 4 and me.distance_to(lake.marks.Q) < 1.6:
+		fade_then(func():
+			player.x = lake.marks.P.x
+			player.z = lake.marks.P.y - 1.0
+			snap_mate())
+		return true
+	if lake_q >= 4 and me.distance_to(lake.marks.P) < 1.6:
+		fade_then(func():
+			player.x = lake.marks.Q.x
+			player.z = lake.marks.Q.y + 1.0
+			snap_mate())
+		return true
+	return false
+
+func row_to_island() -> void:
+	lake_q = 3
+	lake_npc.visible = false
+	join_mate()
+	player.x = lake.marks.Q.x
+	player.z = lake.marks.Q.y + 1.0
+	snap_mate()
+	show_story("", STORY.BOAT)
+	after_story = spawn_turtle
+	set_quest("섬의 벽돌 거북을 물리치자")
+	save_game()
+
+func spawn_turtle() -> void:
+	if enemies.any(func(e): return e.get("turtle", false) and not e.dead):
+		return
+	var at: Vector2 = lake.marks.T
+	var root := Node3D.new()
+	var shell: Material = mat_color(Color("#5f7a52"))
+	var stud: Material = mat_color(Color("#7a9a62"))
+	var skin: Material = mat_color(Color("#8a8a70"))
+	var body := Node3D.new()
+	body.name = "body"
+	root.add_child(body)
+	for part in [[Vector3(2.0, 0.9, 2.4), Vector3(0, 0.75, 0), shell], [Vector3(1.6, 0.4, 2.0), Vector3(0, 1.35, 0), shell],
+			[Vector3(0.7, 0.6, 0.8), Vector3(0, 0.6, 1.5), skin],
+			[Vector3(0.5, 0.5, 0.5), Vector3(-0.9, 0.25, 0.9), skin], [Vector3(0.5, 0.5, 0.5), Vector3(0.9, 0.25, 0.9), skin],
+			[Vector3(0.5, 0.5, 0.5), Vector3(-0.9, 0.25, -0.9), skin], [Vector3(0.5, 0.5, 0.5), Vector3(0.9, 0.25, -0.9), skin]]:
+		var b := box(part[0], part[2])
+		b.position = part[1]
+		body.add_child(b)
+	for k in 4: # studs on the shell
+		var s := box(Vector3(0.3, 0.16, 0.3), stud)
+		s.position = Vector3(-0.4 + (k % 2) * 0.8, 1.6, -0.4 + (k / 2) * 0.8)
+		body.add_child(s)
+	for side in [-0.18, 0.18]:
+		var eye := box(Vector3(0.12, 0.12, 0.05), glow_mat(Color("#ffb040"), 2.0))
+		eye.position = Vector3(side, 0.75, 1.92)
+		body.add_child(eye)
+	add_child(root)
+	enemies.append({"x": at.x, "z": at.y, "hp": 700.0, "max_hp": 700, "node": root, "shadow": blob(1.6), "t": 0.0,
+		"atk_cd": 2.0, "hurt": 0.0, "kx": 0.0, "kz": 0.0, "wx": at.x, "wz": at.y, "dead": false, "respawn": 0.0,
+		"turtle": true, "cave": true, "wind": 0.0, "dash": 0.0, "dir": Vector2.ZERO, "stun": 0.0, "next": "stomp", "spins": 0})
+
+# the brick turtle: a stomp ring around itself, then a spinning shell charge (twice below half HP);
+# hitting the island's edge leaves it stunned for a moment
+func update_turtle(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
+	var node: Node3D = e.node
+	var body: Node3D = node.get_node("body")
+	ui.boss.visible = d < 12.0
+	ui.boss_name.text = "벽돌 거북"
+	ui.boss_bar.size.x = 420.0 * maxf(0.0, e.hp) / e.max_hp
+	e.t += dt
+	e.hurt -= dt
+	e.stun -= dt
+	body.scale = Vector3.ONE * (1.06 if e.hurt > 0.0 else 1.0)
+	if e.dash > 0.0:
+		e.dash -= dt
+		body.rotation.y += dt * 14.0
+		var nx: float = e.x + e.dir.x * 7.5 * dt
+		var nz: float = e.z + e.dir.y * 7.5 * dt
+		if walkable(nx, nz):
+			e.x = nx
+			e.z = nz
+			if Vector2(player.x - e.x, player.z - e.z).length() < 1.4:
+				player_hit(22, Vector2(e.x, e.z) - e.dir, e)
+		else:
+			e.dash = 0.0
+			e.stun = 1.6
+			shake = 0.3
+			sfx(80, 0.3, "square", 0.3, -40)
+			burst(Vector3(e.x, 0.6, e.z), Color("#7a9a62"), 20, 3.0)
+		if e.dash <= 0.0 and e.spins > 0:
+			e.spins -= 1
+			e.wind = 0.5
+			e.dir = to / maxf(d, 0.01)
+	elif e.stun > 0.0:
+		pass
+	elif e.wind > 0.0:
+		e.wind -= dt
+		if e.wind <= 0.0:
+			if e.next == "stomp":
+				burst(Vector3(e.x, 0.3, e.z), Color("#8a8a70"), 30, 3.5)
+				if d < 2.6:
+					player_hit(18, Vector2(e.x, e.z), e)
+				shake = 0.25
+				sfx(70, 0.3, "square", 0.25, -30)
+				e.next = "spin"
+			else:
+				e.dash = 1.1
+				e.next = "stomp"
+			e.atk_cd = 1.8
+	elif d < 10.0:
+		e.atk_cd -= dt
+		if e.atk_cd <= 0.0:
+			if e.next == "stomp":
+				e.wind = 0.9
+				warn_ring(Vector3(e.x, 0.0, e.z), 2.6, 0.9)
+			else:
+				e.wind = 0.8
+				e.dir = to / maxf(d, 0.01)
+				e.spins = 1 if e.hp < e.max_hp / 2.0 else 0
+				pop_num(Vector3(e.x, 2.4, e.z), "!", Color("#ff5a4a"))
+				sfx(140, 0.5, "sawtooth", 0.2, 120)
+		elif d > 1.8:
+			var nx: float = e.x + to.x / d * 1.0 * dt
+			var nz: float = e.z + to.y / d * 1.0 * dt
+			if walkable(nx, e.z): e.x = nx
+			if walkable(e.x, nz): e.z = nz
+			body.rotation.y = lerp_angle(body.rotation.y, atan2(to.x, to.y), dt * 3.0)
+	node.position = Vector3(e.x, 0, e.z)
+	e.shadow.position = Vector3(e.x, 0.02, e.z)
+
+func turtle_beaten() -> void:
+	lake_q = 4
+	ui.boss.visible = false
+	player.gold += 200
+	gain_xp(200)
+	show_story("", STORY.ISLAND_HOME)
+	set_quest("물결과 함께 마을 동쪽 문으로, 굳은 숲에 가자")
+	save_game()
+
+# ---- Mulgyeol, the companion: trots after Sora and pokes the nearest enemy with his pole
+func join_mate() -> void:
+	if mate != null:
+		return
+	mate = Node3D.new()
+	mate.add_child(folk_sprite("mulgyeol"))
+	add_child(mate)
+	if village.folk_node.has("mulgyeol"):
+		village.folk_node.mulgyeol.visible = false
+		var at: Vector2 = village.folk_pos.mulgyeol
+		rocks = rocks.filter(func(r): return Vector2(r.x, r.z).distance_to(at) > 0.1)
+	snap_mate()
+
+func snap_mate() -> void:
+	if mate != null:
+		mate.position = Vector3(player.x - 0.9, 0, player.z + 0.5)
+
+func update_mate(dt: float) -> void:
+	if mate == null:
+		return
+	mate.visible = not in_cave
+	var me := Vector3(player.x, 0, player.z)
+	if mate.position.distance_to(me) > 8.0:
+		snap_mate()
+	var spr: Sprite3D = mate.get_child(0)
+	mate_cd -= dt
+	var target = null
+	var best := 5.0
+	for e in enemies:
+		if not e.dead and Vector2(e.x, e.z).distance_to(Vector2(mate.position.x, mate.position.z)) < best:
+			best = Vector2(e.x, e.z).distance_to(Vector2(mate.position.x, mate.position.z))
+			target = e
+	var goal := me + Vector3(-0.9, 0, 0.5)
+	if target != null:
+		goal = Vector3(target.x, 0, target.z)
+	var to := goal - mate.position
+	var stop := 1.4 if target != null else 0.3
+	if to.length() > stop:
+		mate.position += to.normalized() * minf(to.length() - stop, dt * 5.5)
+		mate.position.y = absf(sin(t * 11.0)) * 0.06
+		spr.flip_h = to.x < 0.0
+	else:
+		mate.position.y = 0.0
+	spr.frame = 1 if fmod(t, 3.0) < 0.3 else 0
+	if target != null and best < 1.9 and mate_cd <= 0.0 and not story_open:
+		mate_cd = 1.0
+		damage_enemy(target, player.atk * 0.6, Vector2(mate.position.x, mate.position.z), 3.0)
+		burst(Vector3(target.x, 0.8, target.z), Color("#7fd8d0"), 8, 1.6)
 
 # ---- the heart of the garden (story steps 11 and 12)
 func enter_garden() -> void:
@@ -3776,15 +4097,15 @@ func _process(dt: float) -> void:
 	update_enemies(dt * (SLOWMO if slowmo > 0 else 1.0), gy)
 	if not in_cave and story_step >= 5 and cave_pos.x > 0 and Vector2(player.x, player.z).distance_to(cave_pos) < 1.2 and fade_rect.color.a == 0.0:
 		fade_then(enter_cave)
-	if not in_cave and not in_village and story_step >= 7 and player.x > 46.5 and player.z > 17.5 and player.z < 23.5 and fade_rect.color.a == 0.0:
+	if not in_cave and not in_village and story_step >= 7 and player.x > 46.5 and player.x < CAVE_X - 0.5 and player.z > 17.5 and player.z < 23.5 and fade_rect.color.a == 0.0:
 		fade_then(enter_village)
 	if in_village and Vector2(player.x, player.z).distance_to(village.marks.G) < 0.9 and fade_rect.color.a == 0.0:
 		fade_then(leave_village)
 	if in_village and Vector2(player.x, player.z).distance_to(village.marks.F) < 0.9 and fade_rect.color.a == 0.0:
-		if night_q >= 4:
+		if lake_q >= 4:
 			fade_then(enter_forest)
 		elif toast_t <= 0.0:
-			toast("동쪽 숲길은 회색 벽돌로 막혀 있다")
+			toast("동쪽 숲길은 회색 벽돌로 막혀 있다" if night_q < 4 else "물결 없이 혼자 가지 않기로 했다. 남쪽 호수로 가자")
 	if in_forest and Vector2(player.x, player.z).distance_to(forest.marks.S) < 0.9 and fade_rect.color.a == 0.0:
 		fade_then(leave_forest)
 	if in_forest:
@@ -3798,6 +4119,14 @@ func _process(dt: float) -> void:
 		fade_then(leave_garden)
 	if in_garden:
 		update_garden(dt)
+	if in_village and Vector2(player.x, player.z).distance_to(village.marks.K) < 0.9 and fade_rect.color.a == 0.0:
+		if night_q >= 4:
+			fade_then(enter_lake)
+		elif toast_t <= 0.0:
+			toast("남쪽 호수는 굳어 있다. 아직 갈 수 없다")
+	if in_lake and Vector2(player.x, player.z).distance_to(lake.marks.S) < 0.9 and fade_rect.color.a == 0.0:
+		fade_then(leave_lake)
+	update_mate(dt)
 	update_pips(dt)
 	update_kid(dt)
 	update_oar()
@@ -3911,6 +4240,9 @@ func update_enemies(dt: float, gy: float) -> void:
 			continue
 		if e.get("mold", false):
 			update_mold(e, dt, d, to)
+			continue
+		if e.get("turtle", false):
+			update_turtle(e, dt, d, to)
 			continue
 		if d < 7 and not intro and e.get("archer", false):
 			if d < 4.0:
@@ -4182,6 +4514,18 @@ func faint() -> void:
 					e.dead = true
 					e.node.queue_free()
 					e.shadow.queue_free()
+	if in_lake:
+		in_lake = false
+		in_village = true
+		if lake_q == 3:
+			for e in enemies:
+				if e.get("turtle", false) and not e.dead:
+					e.hp = float(e.max_hp)
+					e.x = e.wx
+					e.z = e.wz
+			lake_q = 2 # row out again from the pier
+			if lake_npc != null:
+				lake_npc.visible = true
 	if in_village or in_forest:
 		in_forest = false
 		in_village = true

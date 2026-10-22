@@ -8,7 +8,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "forest", "garden_end", "village_exit", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "garden_end", "village_exit", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -742,8 +742,44 @@ func run() -> void:
 		var said: String = main.ui.story_text.text
 		main.close_story()
 		check("folk_again", said.contains("배달을 마쳤"), "Doran after the letter: %s" % said.left(30))
+	if want.call("lake"):
+		main.night_q = 4
+		main.lake_q = 0
+		main.hour = 22.0
+		reset_to(main.village.marks.K + Vector2(0, -0.3))
+		await wait(1.5)
+		var entered: bool = main.in_lake and main.lake_q == 1
+		main.close_story()
+		main.crown_pips = 8
+		reset_to(main.lake.marks.D + Vector2(1.0, 0))
+		tap(KEY_E)
+		await wait(0.2)
+		var thawed: bool = main.lake_q == 2 and main.lake.thawed and main.crown_pips == 6
+		main.close_story()
+		reset_to(Vector2(main.lake_npc.position.x - 1.0, main.lake_npc.position.z))
+		tap(KEY_E)
+		await wait(1.5)
+		var rowed: bool = main.lake_q == 3 and main.mate != null and main.player.z > 13.0
+		main.close_story()
+		await wait(0.3)
+		var turtle: Array = main.enemies.filter(func(e): return e.get("turtle", false) and not e.dead)
+		if turtle.size() == 1:
+			main.player.inv = 9.0
+			main.damage_enemy(turtle[0], 10000.0, Vector2(main.player.x, main.player.z))
+			await wait(1.4)
+		var joined: bool = main.lake_q == 4
+		main.close_story()
+		reset_to(main.lake.marks.Q + Vector2(0, 1.0))
+		tap(KEY_E)
+		await wait(1.5)
+		var back: bool = main.player.z < 5.0
+		check("lake", entered and thawed and rowed and turtle.size() == 1 and joined and back,
+			"entered=%s thawed=%s rowed=%s turtle=%d joined=%s rowed back=%s" % [entered, thawed, rowed, turtle.size(), joined, back])
+		reset_to(main.lake.marks.S + Vector2(0, 0.3))
+		await wait(1.5)
 	if want.call("forest"):
 		main.night_q = 4
+		main.lake_q = 4
 		main.forest_q = 0
 		main.hour = 22.0
 		reset_to(main.village.marks.F + Vector2(-0.3, 0))
