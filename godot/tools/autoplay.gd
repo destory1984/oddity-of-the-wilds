@@ -9,7 +9,7 @@ var only := "all"
 var results: Array = []
 
 const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
-	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "skill_cost", "goblin_telegraph", "boss_phase2"]
+	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
 	run.call_deferred()
@@ -312,6 +312,68 @@ func run() -> void:
 		gob.x = 2.0
 		gob.z = 2.0
 		gob.node.visible = false
+	if want.call("level_moves"):
+		calm_enemies(false)
+		var gob = main.enemies.filter(func(e): return not e.get("boss", false) and not e.dead and e.x < 50.0)[0]
+		calm_enemies(true)
+		gob.node.visible = true
+		var lv0: int = main.player.lv
+		var ghp0: float = gob.hp
+		main.player.combo_t = 0.0
+		# five-hit chain at Lv6: the fifth swing is the slam
+		main.player.lv = 6
+		reset_to(Vector2(30, 30))
+		gob.x = 31.0
+		gob.z = 30.0
+		gob.hp = 99999.0
+		gob.atk_cd = 99.0
+		var combos: Array = []
+		for k in 5:
+			main.player.atk_cd = 0.0
+			main.player.face = Vector2(1, 0)
+			main.attack()
+			combos.append(main.player.combo)
+			await wait(0.1)
+		var chain: bool = combos == [0, 1, 2, 3, 4]
+		# dash slash at Lv3: running with Shift
+		main.player.lv = 3
+		reset_to(Vector2(26, 30))
+		gob.x = 27.5
+		gob.z = 30.0
+		var hp1: float = gob.hp
+		main.player.sp = 100.0
+		main.player.face = Vector2(1, 0)
+		main.player.vx = 6.0
+		main.player.vz = 0.0
+		main.player.atk_cd = 0.0
+		main.fake_keys[KEY_SHIFT] = true
+		main.attack()
+		main.fake_keys.clear()
+		var dashed: bool = main.player.x > 27.5 and gob.hp < hp1
+		# charged slash at Lv4: guard a second, then J
+		main.player.lv = 4
+		reset_to(Vector2(30, 30))
+		gob.x = 31.2
+		gob.z = 30.0
+		main.player.face = Vector2(1, 0)
+		main.fake_keys[KEY_L] = true
+		await wait(1.15)
+		var hp2: float = gob.hp
+		main.player.atk_cd = 0.0
+		main.attack()
+		main.fake_keys.clear()
+		var charged: bool = hp2 - gob.hp >= main.player.atk * 2.5
+		check("level_moves", chain and dashed and charged, "5-hit chain=%s %s dash moved and hit=%s charged cut=%.0f" % [chain, str(combos), dashed, hp2 - gob.hp])
+		main.player.lv = lv0
+		gob.hp = ghp0
+		gob.atk_cd = 1.0
+		gob.stun = 0.0
+		gob.wind = 0.0
+		gob.kx = 0.0
+		gob.kz = 0.0
+		gob.x = 2.0
+		gob.z = 2.0
+		gob.node.visible = false
 	if want.call("skill_cost"):
 		main.player.mp = 20.0
 		main.player.cds = [0.0, 0.0, 0.0, 0.0]
@@ -321,6 +383,8 @@ func run() -> void:
 		main.use_skill(0)
 		check("skill_cost", spent_none and main.player.mp == 10.0, "whirl needs 30 momentum: at 20 nothing, at 40 left %d" % int(main.player.mp))
 	if want.call("goblin_telegraph"):
+		main.mate_cd = 9.0 # companions (from the lake and forest tests) would hit it and cut the wind-up short
+		main.mate2_cd = 9.0
 		calm_enemies(false)
 		var gob = main.enemies.filter(func(e): return not e.get("boss", false) and not e.dead)[0]
 		calm_enemies(true)
@@ -328,6 +392,9 @@ func run() -> void:
 		reset_to(Vector2(30, 30))
 		gob.x = 30.8
 		gob.z = 30.0
+		gob.hurt = 0.0
+		gob.kx = 0.0
+		gob.kz = 0.0
 		gob.atk_cd = 0.0
 		gob.wind = 0.0
 		await wait(0.25)

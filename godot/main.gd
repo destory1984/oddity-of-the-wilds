@@ -1129,6 +1129,8 @@ func build_player() -> void:
 	var ch := straight.get_height() / 4.0
 	hero.pixel_size = 1.65 / ch
 	hero.offset = Vector2(0, ch / 2.0)
+	walk_px = hero.pixel_size
+	walk_off = hero.offset
 	add_child(hero)
 	hero_shadow = blob(0.9)
 	set_hero_frame("down", 0)
@@ -1140,6 +1142,47 @@ func set_hero_frame(dir: String, frame: int) -> void:
 	var ch := tex.get_height() / 4.0
 	hero.texture = tex
 	hero.region_rect = Rect2(frame * cw, e[1] * ch, cw, ch)
+	hero.pixel_size = walk_px
+	hero.offset = walk_off
+
+# ---- standing still: Sora turns to the viewer, breathes, and now and then does something of her own
+# (front-facing 4-frame loops from the Space Oddity sprites, 192x256 cells, art/sora/idle/<name>.png)
+const IDLE_ACTS := ["rest-yawn", "rest-wave", "rest-snack", "rest-nod", "rest-stretch", "rest-comb",
+	"rest-pinwheel", "rest-yoyo", "rest-plush", "rest-tea"]
+const IDLE_LONG := ["rest-snack", "rest-tea", "rest-nod", "rest-yoyo"] # these play twice as long
+var walk_px := 0.0
+var walk_off := Vector2.ZERO
+var idle_t := 0.0
+var idle_name := ""
+var idle_k := 0.0
+var idle_left := 0.0
+var idle_tex := {}
+
+func set_hero_idle(name: String, frame: int) -> void:
+	if not idle_tex.has(name):
+		idle_tex[name] = load("res://art/sora/idle/%s.png" % name)
+	hero.texture = idle_tex[name]
+	hero.region_rect = Rect2(frame * 192, 0, 192, 256)
+	hero.pixel_size = walk_px * 298.0 / 244.0 # the idle cells draw her a little smaller than the walk sheet
+	hero.offset = Vector2(0, 121) # her feet sit 7 px above the cell's bottom edge
+
+func update_idle(dt: float) -> void:
+	if idle_name == "": # just stopped: breathe, facing the viewer
+		idle_name = "idle"
+		idle_k = 0.0
+		idle_left = rnd(3.0, 6.0)
+	idle_k += dt * 5.0
+	idle_left -= dt
+	if idle_left <= 0.0:
+		var calm: bool = nearest_enemy(7.0) == null
+		if idle_name == "idle" and calm:
+			idle_name = IDLE_ACTS.pick_random()
+			idle_left = 3.2 if idle_name in IDLE_LONG else 1.6
+		else:
+			idle_name = "idle"
+			idle_left = rnd(3.0, 6.0)
+		idle_k = 0.0
+	set_hero_idle(idle_name, int(idle_k) % 4)
 
 # ---------------------------------------------------------------- enemies
 # LEGO-style brick goblin: plastic boxes with studs on top faces
@@ -1520,7 +1563,7 @@ func gain_xp(n: int) -> void:
 		player.atk += 3
 		player.hp = float(player.max_hp)
 		ui.banner_title.text = tr("레벨 %d") % player.lv
-		ui.banner_sub.text = "최대 체력 +12 · 공격력 +3"
+		ui.banner_sub.text = LV_MOVES.get(player.lv, "최대 체력 +12 · 공격력 +3")
 		ui.banner.modulate.a = 1.0
 		banner_t = 2.5
 		pillar(Vector3(player.x, height_at(player.x, player.z), player.z))
@@ -1539,37 +1582,132 @@ func nearest_enemy(range_: float):
 				best = e
 	return best
 
+# moves that open with level (the banner names them when they arrive)
+const LV_MOVES := {
+	2: "새 기술: 4타 연속기 (J를 네 번, 넷째 타는 한 바퀴 베기)",
+	3: "새 기술: 달려 베기 (Shift로 달리며 J)",
+	4: "새 기술: 모아 베기 (L로 막으며 1초 모은 뒤 J)",
+	6: "새 기술: 5타 마무리 (다섯째 타는 땅 내려찍기)",
+	8: "새 기술: 빛 칼날 (연속기 마지막 타가 빛 칼날을 날린다)",
+}
+
+func combo_len() -> int:
+	return 3 + (1 if player.lv >= 2 else 0) + (1 if player.lv >= 6 else 0)
+
+# one swing of the combo; the last swing of the chain is the finisher:
+# 3 hits: a heavy cut; 4 hits: a full spin; 5 hits: a ground slam
 func attack() -> void:
 	if player.atk_cd > 0 or player.dodge > 0:
+		return
+	if player.lv >= 4 and guarding and t - guard_since >= 1.0:
+		charged_slash()
+		return
+	if player.lv >= 3 and key_down(KEY_SHIFT) and Vector2(player.vx, player.vz).length() > 4.0 and player.sp >= 15.0:
+		dash_slash()
 		return
 	var tg = nearest_enemy(2.2)
 	if tg != null:
 		player.face = Vector2(tg.x - player.x, tg.z - player.z).normalized()
-	player.combo = (player.combo + 1) % 3 if player.combo_t > 0 else 0
+	var n := combo_len()
+	player.combo = (player.combo + 1) % n if player.combo_t > 0 else 0
 	player.combo_t = 0.6
-	player.atk_cd = 0.38 if player.combo == 2 else 0.24
+	var last: bool = player.combo == n - 1
+	var spin: bool = last and n == 4 or player.combo == 3 and n == 5
+	var slam: bool = last and n == 5
+	player.atk_cd = 0.38 if last else (0.3 if spin else 0.24)
 	var f: Vector2 = player.face
-	var ang := -atan2(f.y, f.x) - 0.9 * (-1.0 if player.combo == 1 else 1.0) + 0.9
-	slash_fx(Vector3(player.x + f.x * 0.5, height_at(player.x, player.z), player.z + f.y * 0.5), ang, false)
+	var here := Vector3(player.x, height_at(player.x, player.z), player.z)
+	if spin or slam:
+		slash_fx(here, 0.0, true)
+	else:
+		var ang := -atan2(f.y, f.x) - 0.9 * (-1.0 if player.combo == 1 else 1.0) + 0.9
+		slash_fx(Vector3(player.x + f.x * 0.5, here.y, player.z + f.y * 0.5), ang, false)
+	var reach := 2.6 if slam else (2.0 if spin else 1.7)
+	var mult: float = 2.4 if slam else (1.6 if spin else ([1.0, 1.15, 1.4][mini(player.combo, 2)] if not last else 1.8))
 	var hit_any := false
 	for e in enemies:
 		if e.dead:
 			continue
 		var d := Vector2(e.x - player.x, e.z - player.z)
-		if d.length() < 1.7 and d.normalized().dot(f) > -0.1:
-			var mult: float = [1.0, 1.15, 1.8][player.combo]
+		if d.length() < reach and (spin or slam or d.normalized().dot(f) > -0.1):
 			var countering := counter_t > 0.0
-			damage_enemy(e, player.atk * (2.5 if countering else mult), Vector2(player.x, player.z), 7.0 if player.combo == 2 else 3.0,
-				countering, 0.14 if countering else (0.09 if player.combo == 2 else 0.05))
+			damage_enemy(e, player.atk * (2.5 if countering else mult), Vector2(player.x, player.z), 7.0 if last else 3.0,
+				countering, 0.14 if countering else (0.09 if last else 0.05))
 			player.mp = minf(player.max_mp, player.mp + 5.0)
 			last_hit_t = t
 			hit_any = true
 	if hit_any and counter_t > 0.0:
 		counter_t = 0.0
-	var lunge := 4.0 if player.combo == 2 else 2.0
+	if slam:
+		shake = maxf(shake, 0.3)
+		burst(here + Vector3(0, 0.2, 0), Color("#d8c8a0"), 30, 3.5)
+	if last and player.lv >= 8:
+		light_blade(f)
+	var lunge := 4.0 if last else 2.0
 	player.vx += f.x * lunge
 	player.vz += f.y * lunge
 	sfx(180.0 + player.combo * 60.0, 0.07, "sawtooth", 0.12, 300.0)
+
+# Lv3: running with Shift, J dashes 3 m ahead and cuts everything along the way
+func dash_slash() -> void:
+	player.sp -= 15.0
+	player.combo = 0
+	player.combo_t = 0.0
+	player.atk_cd = 0.4
+	var f: Vector2 = player.face
+	var start := Vector2(player.x, player.z)
+	var end := start
+	for k in 12: # stop short of walls and water
+		var nxt := start + f * (0.25 * (k + 1))
+		if not player_can(nxt.x, nxt.y):
+			break
+		end = nxt
+	for e in enemies:
+		if e.dead:
+			continue
+		var p := Vector2(e.x, e.z)
+		var along := clampf((p - start).dot(f), 0.0, start.distance_to(end))
+		if p.distance_to(start + f * along) < 1.1:
+			damage_enemy(e, player.atk * 1.5, start, 5.0, false, 0.07)
+			player.mp = minf(player.max_mp, player.mp + 5.0)
+			last_hit_t = t
+	player.x = end.x
+	player.z = end.y
+	player.vx = f.x * 3.0
+	player.vz = f.y * 3.0
+	var ang := -atan2(f.y, f.x)
+	slash_fx(Vector3(end.x, height_at(end.x, end.y), end.y), ang, false)
+	burst(Vector3((start.x + end.x) / 2.0, 0.6, (start.y + end.y) / 2.0), Color("#bfe7ff"), 16, 2.5)
+	sfx(260, 0.12, "sawtooth", 0.15, 600)
+
+# Lv4: guard for a second to gather light, then J: a wide, heavy cut in front
+func charged_slash() -> void:
+	guard_since = t
+	player.combo = 0
+	player.atk_cd = 0.5
+	var f: Vector2 = player.face
+	var here := Vector3(player.x, height_at(player.x, player.z), player.z)
+	slash_fx(here + Vector3(f.x * 0.8, 0, f.y * 0.8), -atan2(f.y, f.x), true)
+	for e in enemies:
+		if e.dead:
+			continue
+		var d := Vector2(e.x - player.x, e.z - player.z)
+		if d.length() < 2.8 and d.normalized().dot(f) > 0.2:
+			damage_enemy(e, player.atk * 3.0, Vector2(player.x, player.z), 10.0, true, 0.14)
+			last_hit_t = t
+	shake = maxf(shake, 0.35)
+	burst(here + Vector3(f.x, 0.8, f.y), Color("#fff1a0"), 30, 3.5)
+	sfx(330, 0.3, "sawtooth", 0.25, -200)
+
+# Lv8: the finisher sends a blade of light forward (it flies like the ember bolt)
+func light_blade(f: Vector2) -> void:
+	var b := MeshInstance3D.new()
+	b.mesh = ring_mesh(0.3, 0.6, -0.9, 1.8)
+	b.material_override = glow_mat(Color("#dff4ff"), 4.0)
+	b.position = Vector3(player.x, height_at(player.x, player.z) + 0.6, player.z)
+	b.rotation.y = atan2(f.x, f.y) + PI / 2
+	add_child(b)
+	projectiles.append({"node": b, "v": f * 12.0, "life": 0.7})
 
 const SKILL_MP := [30, 15, 60]
 const SKILL_CD := [3.0, 1.2, 6.0]
@@ -2046,7 +2184,7 @@ func build_hud() -> void:
 	var help := panel(root, Vector2(14, -448), Vector2(340, 434), Control.PRESET_BOTTOM_LEFT)
 	help.mouse_filter = Control.MOUSE_FILTER_STOP
 	label(help, "조작법", Vector2(14, 8), 12, Color("#a99d84"))
-	var rows := [["WASD / 방향키", "이동"], ["Shift", "달리기"], ["J / 왼쪽 클릭", "공격 (연속기)"], ["K / 오른쪽 클릭", "구르기 (때맞추면 섬광)"], ["L / 가운데 클릭", "막기 (때맞추면 반격)"],
+	var rows := [["WASD / 방향키", "이동"], ["Shift", "달리기"], ["J / 왼쪽 클릭", "공격 (연속기)"], ["K / 오른쪽 클릭", "구르기 (때맞추면 섬광)"], ["L / 가운데 클릭", "막기 (때맞추면 반격, Lv4부터 1초 모아 J)"],
 		["U I O / 1 2 3", "스킬 (기세 30·15·60)"], ["4", "회복약"], ["Space", "상자 열기, 들어가기"], ["E", "왕관 만지기"], ["Z X / 휠", "확대·축소"], ["T R P", "3시간 뒤로 / 비 / 사진"], ["F8", "처음 자리로 (진행은 그대로)"], ["F9", "처음부터 (저장 지우기)"], ["H", "조작법 숨기기"]]
 	for i in rows.size():
 		label(help, rows[i][0], Vector2(14, 34 + i * 27), 13, Color("#e9dfc4"))
@@ -4347,6 +4485,8 @@ func _process(dt: float) -> void:
 	if g_now and not guarding:
 		guard_since = t
 	guarding = g_now
+	if guarding and player.lv >= 4 and t - guard_since >= 1.0 and int(t * 10.0) != int((t - dt) * 10.0):
+		burst(Vector3(player.x, 1.0, player.z), Color("#fff1a0"), 3, 1.0) # light gathered: J for a charged cut
 	counter_t -= dt
 	flash_cd -= dt
 	slowmo -= dt
@@ -4367,7 +4507,13 @@ func _process(dt: float) -> void:
 	var moving := Vector2(player.vx, player.vz).length() > 0.4
 	player.anim += dt * (12.0 if running else 8.0)
 	var frame := int(player.anim) % 4 if moving else 0
-	set_hero_frame(player.dir, frame)
+	var still: bool = not moving and player.atk_cd <= 0.0 and player.dodge <= 0.0 and not guarding and player.hurt_t <= 0.0
+	idle_t = idle_t + dt if still else 0.0
+	if idle_t > 0.6:
+		update_idle(dt)
+	else:
+		idle_name = ""
+		set_hero_frame(player.dir, frame)
 	# feet touch the ground on frames 0 and 2 of the walk cycle
 	if moving and frame != step_frame and frame % 2 == 0 and player.dodge <= 0:
 		footstep()
