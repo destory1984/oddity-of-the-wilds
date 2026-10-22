@@ -3177,6 +3177,9 @@ func show_line(line: String) -> void:
 		parts = PackedStringArray(["", "", line])
 	ui.story_who.text = parts[0]
 	var f := parts[1]
+	if f == "-": # narration that also sends the other speaker off stage
+		f = ""
+		ui.por_right.texture = null
 	var is_sora := parts[0] == "소라"
 	var path := "res://art/ui/face_sora_%s.png" % f if is_sora else "res://art/ui/face_%s.png" % f
 	ui.story_face.texture = load(path) if f != "" and ResourceLoader.exists(path) else null
