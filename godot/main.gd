@@ -1734,7 +1734,7 @@ func build_hud() -> void:
 	board.add_child(btab)
 	btab.position = Vector2(40, -18)
 	btab.size = Vector2(220, 32)
-	var st := label(btab, "보리 할멈의 상점", Vector2(0, 4), 16, Color("#f6d27a"))
+	var st := label(btab, "보리 할머니의 상점", Vector2(0, 4), 16, Color("#f6d27a"))
 	st.size = Vector2(220, 24)
 	st.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ui.shop_gold = label(board, "", Vector2(400, 14), 16, Color("#ffd84a"))
@@ -1785,7 +1785,7 @@ func build_hud() -> void:
 	say.add_child(stab)
 	stab.position = Vector2(40, -18)
 	stab.size = Vector2(150, 32)
-	var sn := label(stab, "보리 할멈", Vector2(0, 4), 16, Color("#f6d27a"))
+	var sn := label(stab, "보리 할머니", Vector2(0, 4), 16, Color("#f6d27a"))
 	sn.size = Vector2(150, 24)
 	sn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ui.shop_say = label(say, "", Vector2(40, 32), 19)
