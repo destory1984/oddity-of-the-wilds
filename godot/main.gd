@@ -1110,8 +1110,8 @@ func build_player() -> void:
 		"atk_cd": 0.0, "combo": 0, "combo_t": 0.0, "dodge": 0.0, "dvx": 0.0, "dvz": 0.0, "inv": 0.0, "cds": [0.0, 0.0, 0.0, 0.0], "hurt_t": 0.0,
 	}
 	# Sora walk sheets: 4 frames per row; straight rows front, left, right, away; diagonal rows dl, dr, ul, ur
-	var straight: Texture2D = load("res://art/sora/sora-v2-walk-cut.png")
-	var diag: Texture2D = load("res://art/sora/sora-v2-diag-cut.png")
+	var straight: Texture2D = load("res://art/sora/sora-v3-walk.png")
+	var diag: Texture2D = load("res://art/sora/sora-v3-diag.png")
 	for d in [["down", 0], ["left", 1], ["side", 2], ["up", 3]]:
 		hero_tex[d[0]] = [straight, d[1]]
 	for d in [["downleft", 0], ["downright", 1], ["upleft", 2], ["upright", 3]]:
@@ -1126,9 +1126,9 @@ func build_player() -> void:
 	hero.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 	hero.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
 	hero.shaded = false
-	var ch := straight.get_height() / 4.0
-	hero.pixel_size = 1.65 / ch
-	hero.offset = Vector2(0, ch / 2.0)
+	# 192x256 cells like the idle sprites; she stands about 244 px tall with her feet 7 px above the cell bottom
+	hero.pixel_size = 1.58 / 244.0
+	hero.offset = Vector2(0, 121)
 	walk_px = hero.pixel_size
 	walk_off = hero.offset
 	add_child(hero)
@@ -1147,9 +1147,16 @@ func set_hero_frame(dir: String, frame: int) -> void:
 
 # ---- standing still: Sora turns to the viewer, breathes, and now and then does something of her own
 # (front-facing 4-frame loops from the Space Oddity sprites, 192x256 cells, art/sora/idle/<name>.png)
-const IDLE_ACTS := ["rest-yawn", "rest-wave", "rest-snack", "rest-nod", "rest-stretch", "rest-comb",
-	"rest-pinwheel", "rest-yoyo", "rest-plush", "rest-tea"]
-const IDLE_LONG := ["rest-snack", "rest-tea", "rest-nod", "rest-yoyo"] # these play twice as long
+const IDLE_ACTS := [
+	"cheer-big", "hot-wipe", "rest-bubble", "rest-cheer", "rest-clap", "rest-comb", "rest-count", "rest-crane",
+	"rest-draw", "rest-float", "rest-gum", "rest-hop", "rest-juggle", "rest-knit", "rest-letter", "rest-look",
+	"rest-map", "rest-music", "rest-nod", "rest-note", "rest-photo", "rest-pinwheel", "rest-plush", "rest-ribbon",
+	"rest-rope", "rest-scope", "rest-sit", "rest-sleep", "rest-snack", "rest-socks", "rest-spin", "rest-star",
+	"rest-stretch", "rest-string", "rest-sway", "rest-tea", "rest-tilt", "rest-umbrella", "rest-water",
+	"rest-wave", "rest-wave2", "rest-yawn", "rest-yoyo", "see-aurora", "see-hush", "see-point", "see-snap",
+	"see-up", "see-wow"
+]
+const IDLE_LONG := ["rest-snack", "rest-tea", "rest-water", "rest-nod", "rest-sleep", "rest-yoyo", "rest-juggle", "rest-knit", "rest-draw", "rest-music", "rest-string"] # these play twice as long
 var walk_px := 0.0
 var walk_off := Vector2.ZERO
 var idle_t := 0.0
@@ -1163,21 +1170,21 @@ func set_hero_idle(name: String, frame: int) -> void:
 		idle_tex[name] = load("res://art/sora/idle/%s.png" % name)
 	hero.texture = idle_tex[name]
 	hero.region_rect = Rect2(frame * 192, 0, 192, 256)
-	hero.pixel_size = walk_px * 298.0 / 244.0 # the idle cells draw her a little smaller than the walk sheet
-	hero.offset = Vector2(0, 121) # her feet sit 7 px above the cell's bottom edge
+	hero.pixel_size = walk_px # same cell size and scale as the walk sheets
+	hero.offset = walk_off
 
 func update_idle(dt: float) -> void:
 	if idle_name == "": # just stopped: breathe, facing the viewer
 		idle_name = "idle"
 		idle_k = 0.0
 		idle_left = rnd(3.0, 6.0)
-	idle_k += dt * 5.0
+	idle_k += dt * (1.4 if idle_name == "idle" else 1.8) # slow, calm frames: breathing 1.4 per second, actions 1.8
 	idle_left -= dt
 	if idle_left <= 0.0:
 		var calm: bool = nearest_enemy(7.0) == null
 		if idle_name == "idle" and calm:
 			idle_name = IDLE_ACTS.pick_random()
-			idle_left = 3.2 if idle_name in IDLE_LONG else 1.6
+			idle_left = 8.9 if idle_name in IDLE_LONG else 4.45 # two or four loops of four frames
 		else:
 			idle_name = "idle"
 			idle_left = rnd(3.0, 6.0)
@@ -1274,7 +1281,7 @@ func spawn_boss() -> void:
 		spot = Vector2(rnd(6, 20), rnd(3, 6))
 	var node := make_monster(true)
 	add_child(node)
-	var hp := 800
+	var hp := 950
 	enemies.append({"x": spot.x, "z": spot.y, "hp": float(hp), "max_hp": hp, "node": node, "shadow": blob(2.4), "t": 0.0,
 		"atk_cd": 2.0, "hurt": 0.0, "kx": 0.0, "kz": 0.0, "wx": spot.x, "wz": spot.y, "dead": false, "respawn": 0.0,
 		"boss": true, "home": spot, "stomp": 0.0, "swing": 0.0, "stun": 0.0, "phase": 1, "roar": 0.0, "wave_r": -1.0, "face": Vector2(0, 1)})
@@ -2205,6 +2212,15 @@ func build_hud() -> void:
 	hint.pressed.connect(func(): toggle_help(true))
 	root.add_child(hint)
 	ui.hint = hint
+	# sound on/off, next to the controls button (M does the same)
+	var snd := Button.new()
+	snd.add_theme_font_override("font", ui_font)
+	place(snd, Control.PRESET_BOTTOM_LEFT, Vector2(152, -44), Vector2(110, 30))
+	snd.focus_mode = Control.FOCUS_NONE
+	snd.pressed.connect(toggle_sound)
+	root.add_child(snd)
+	ui.sound_btn = snd
+	refresh_sound_btn()
 
 	ui.toast = label(root, "", Vector2(0, 0), 20)
 	place(ui.toast, Control.PRESET_CENTER_BOTTOM, Vector2(-300, -220), Vector2(600, 30))
@@ -3180,7 +3196,7 @@ func spawn_noeul_duel(second := false) -> void:
 	var node := Node3D.new()
 	node.add_child(noeul_sprite())
 	add_child(node)
-	var hp := 640.0 if second else 420.0
+	var hp := 830.0 if second else 550.0
 	enemies.append({"x": at.x, "z": at.y, "hp": hp, "max_hp": int(hp), "node": node, "shadow": blob(0.8), "t": 0.0,
 		"atk_cd": 2.0, "hurt": 0.0, "kx": 0.0, "kz": 0.0, "wx": at.x, "wz": at.y, "dead": false, "respawn": 0.0,
 		"noeul": true, "second": second, "cave": true, "wind": 0.0, "dash": 0.0, "dir": Vector2.ZERO, "stun": 0.0, "next": "dash", "rings": []})
@@ -3225,7 +3241,7 @@ func update_noeul(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
 						player_hit(16, r, e)
 				sfx(110, 0.25, "square", 0.2, -40)
 				e.next = "dash"
-			e.atk_cd = 1.3
+			e.atk_cd = 1.15
 	elif awake:
 		spr.frame = 0
 		e.atk_cd -= dt
@@ -3438,7 +3454,7 @@ func spawn_turtle() -> void:
 		eye.position = Vector3(side, 0.75, 1.92)
 		body.add_child(eye)
 	add_child(root)
-	enemies.append({"x": at.x, "z": at.y, "hp": 700.0, "max_hp": 700, "node": root, "shadow": blob(1.6), "t": 0.0,
+	enemies.append({"x": at.x, "z": at.y, "hp": 900.0, "max_hp": 900, "node": root, "shadow": blob(1.6), "t": 0.0,
 		"atk_cd": 2.0, "hurt": 0.0, "kx": 0.0, "kz": 0.0, "wx": at.x, "wz": at.y, "dead": false, "respawn": 0.0,
 		"turtle": true, "cave": true, "wind": 0.0, "dash": 0.0, "dir": Vector2.ZERO, "stun": 0.0, "next": "stomp", "spins": 0})
 
@@ -3489,7 +3505,7 @@ func update_turtle(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
 			else:
 				e.dash = 1.1
 				e.next = "stomp"
-			e.atk_cd = 1.8
+			e.atk_cd = 1.6
 	elif d < 10.0:
 		e.atk_cd -= dt
 		if e.atk_cd <= 0.0:
@@ -3720,7 +3736,7 @@ func spawn_hawk() -> void:
 		body.add_child(eye)
 	root.scale = Vector3.ONE * 1.4
 	add_child(root)
-	enemies.append({"x": at.x, "z": at.y, "hp": 600.0, "max_hp": 600, "node": root, "shadow": blob(1.2), "t": 0.0,
+	enemies.append({"x": at.x, "z": at.y, "hp": 780.0, "max_hp": 780, "node": root, "shadow": blob(1.2), "t": 0.0,
 		"atk_cd": 2.5, "hurt": 0.0, "kx": 0.0, "kz": 0.0, "wx": at.x, "wz": at.y, "dead": false, "respawn": 0.0,
 		"hawk": true, "cave": true, "air": true, "y": 2.8, "wind": 0.0, "dash": 0.0, "dir": Vector2.ZERO,
 		"stun": 0.0, "target": Vector2.ZERO, "egg_cd": 1.5, "eggs": []})
@@ -3760,7 +3776,7 @@ func update_hawk(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
 		e.y = minf(2.8, e.y + dt * 3.0)
 		if e.y >= 2.8:
 			e.air = true
-			e.atk_cd = 2.6
+			e.atk_cd = 2.3
 	elif e.wind > 0.0:
 		e.wind -= dt
 		if e.wind <= 0.0:
@@ -3849,7 +3865,7 @@ func spawn_mold() -> void:
 		return
 	var c: Vector2 = garden.marks.C
 	var node: Node3D = garden.mold(self)
-	enemies.append({"x": c.x, "z": c.y, "hp": 1300.0, "max_hp": 1300, "node": node, "shadow": blob(2.2), "t": 0.0,
+	enemies.append({"x": c.x, "z": c.y, "hp": 1700.0, "max_hp": 1700, "node": node, "shadow": blob(2.2), "t": 0.0,
 		"atk_cd": 2.5, "hurt": 0.0, "kx": 0.0, "kz": 0.0, "wx": c.x, "wz": c.y, "dead": false, "respawn": 0.0,
 		"mold": true, "cave": true, "wind": 0.0, "stun": 0.0, "next": 0, "rings": [], "locked": false})
 
@@ -3887,7 +3903,7 @@ func update_mold(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
 					player_hit(18 + 4 * ph, r, e)
 			shake = 0.2
 			sfx(70, 0.3, "square", 0.25, -30)
-			e.atk_cd = 2.2 - 0.4 * ph
+			e.atk_cd = 2.0 - 0.4 * ph
 	else:
 		e.atk_cd -= dt
 		if e.atk_cd <= 0.0:
@@ -4297,6 +4313,15 @@ func close_story() -> void:
 	tw.tween_property(ui.story, "modulate:a", 0.0, 0.5)
 	tw.tween_callback(func(): ui.story.visible = false)
 
+func toggle_sound() -> void:
+	muted = not muted
+	toast("소리 끔" if muted else "소리 켬")
+	refresh_sound_btn()
+
+func refresh_sound_btn() -> void:
+	ui.sound_btn.text = "♪  소리 끔" if muted else "♪  소리 켬"
+	ui.sound_btn.modulate = Color(0.6, 0.6, 0.65) if muted else Color.WHITE
+
 func toggle_help(show: bool) -> void:
 	ui.help.visible = show
 	ui.hint.visible = not show
@@ -4385,9 +4410,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_E: crown_key()
 			KEY_F9: reset_game()
 			KEY_F8: return_to_start()
-			KEY_M:
-				muted = not muted
-				toast("소리 끔" if muted else "소리 켬")
+			KEY_M: toggle_sound()
 
 # ---------------------------------------------------------------- loop
 func _process(dt: float) -> void:
@@ -5079,7 +5102,7 @@ func spawn_mole() -> void:
 		wheel.position = Vector3(side, 0.12, 0.18)
 		g.add_child(wheel)
 	add_child(node)
-	enemies.append({"x": b.x, "z": b.y, "hp": 500.0, "max_hp": 500, "node": node, "shadow": blob(1.8), "t": 0.0,
+	enemies.append({"x": b.x, "z": b.y, "hp": 650.0, "max_hp": 650, "node": node, "shadow": blob(1.8), "t": 0.0,
 		"atk_cd": 2.0, "hurt": 0.0, "kx": 0.0, "kz": 0.0, "wx": b.x, "wz": b.y, "dead": false, "respawn": 0.0,
 		"mole": true, "cave": true, "wind": 0.0, "dash": 0.0, "dir": Vector2.ZERO, "stun": 0.0, "next": "charge", "rings": []})
 
@@ -5123,7 +5146,7 @@ func update_mole(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
 						player_hit(18, r, e)
 				sfx(70, 0.25, "square", 0.25, -30)
 				e.next = "charge"
-			e.atk_cd = 1.6
+			e.atk_cd = 1.4
 	elif awake:
 		e.atk_cd -= dt
 		if e.atk_cd <= 0.0:

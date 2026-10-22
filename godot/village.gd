@@ -170,6 +170,12 @@ func build(m: Node) -> void:
 	simji_node = simji(m)
 	simji_node.position = Vector3(marks.M.x, 0, marks.M.y)
 	m.add_child(simji_node)
+	var spr: Sprite3D = simji_node.get_child(0)
+	var tw := spr.create_tween().set_loops() # he blinks now and then
+	tw.tween_interval(3.0)
+	tw.tween_callback(func(): spr.frame = 1)
+	tw.tween_interval(0.35)
+	tw.tween_callback(func(): spr.frame = 0)
 	m.rocks.append({"x": marks.M.x, "z": marks.M.y, "r": 0.5})
 
 # Kongal's friend: a little green brick goblin with the red scarf she knitted (errand 2)
@@ -221,28 +227,26 @@ func house(m: Node, at: Vector3) -> void:
 	win.position = Vector3(0.6, 0.85, 0.92)
 	g.add_child(win)
 
-# a tall old lamplighter built from blocks: grey coat, white beard, brass pole
+# the tall old lamplighter: GPT pixel sprite (two idle frames) and the glow of his own lamp
 func simji(m: Node) -> Node3D:
 	var g := Node3D.new()
-	var coat: Material = m.mat_color(Color("#2f3f7a"))
-	for part in [[Vector3(0.45, 0.9, 0.35), Vector3(0, 0.45, 0), coat],
-			[Vector3(0.36, 0.34, 0.34), Vector3(0, 1.08, 0), m.mat_color(Color("#f1c08f"))],
-			[Vector3(0.3, 0.3, 0.1), Vector3(0, 0.92, 0.18), m.mat_color(Color("#f4f4f4"))],
-			[Vector3(0.4, 0.12, 0.4), Vector3(0, 1.3, 0), m.mat_color(Color("#e8e8e8"))],
-			[Vector3(0.06, 1.8, 0.06), Vector3(0.35, 0.9, 0), m.mat_color(Color("#c8962a"))]]:
-		var b: MeshInstance3D = m.box(part[0], part[2])
-		b.position = part[1]
-		g.add_child(b)
-	var lamp: MeshInstance3D = m.box(Vector3(0.16, 0.2, 0.16), m.glow_mat(Color("#ffc46a"), 3.0))
-	lamp.position = Vector3(0.35, 1.85, 0)
-	g.add_child(lamp)
+	var spr := Sprite3D.new()
+	spr.texture = load("res://art/folk/simji.png")
+	spr.hframes = 2
+	spr.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+	spr.scale = Vector3(1, 1.0 / cos(0.78), 1)
+	spr.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	spr.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
+	spr.shaded = false
+	spr.pixel_size = 2.1 / 200.0
+	spr.offset = Vector2(0, 100)
+	g.add_child(spr)
 	var glow := OmniLight3D.new() # his own lamp lights him up at night
 	glow.light_color = Color("#ffd8a0")
 	glow.light_energy = 1.4
 	glow.omni_range = 2.5
-	glow.position = Vector3(0.2, 1.6, 0.4)
+	glow.position = Vector3(-0.3, 1.9, 0.4)
 	g.add_child(glow)
-	g.scale = Vector3.ONE * 1.25
 	return g
 
 func map_tex(width: int) -> ImageTexture:

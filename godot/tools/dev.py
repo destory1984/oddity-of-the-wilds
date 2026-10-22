@@ -187,6 +187,8 @@ def ship(message):
             shutil.copy2(f, SITE / f.name)
         except PermissionError:
             raise SystemExit(f"{SITE / f.name} is locked; stop the preview server that serves the site folder and retry")
+    # the picture shown when the page link is shared (og:image in export_presets.cfg head_include)
+    shutil.copy2(ROOT / "art" / "ui" / "portrait.png", SITE / "og.png")
     # project source under godot/, exactly what is committed here
     dst = SITE / "godot"
     if dst.exists():

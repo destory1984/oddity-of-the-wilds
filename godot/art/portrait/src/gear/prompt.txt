@@ -1,0 +1,12 @@
+Attached: (1) our existing shop item icons (potion, candy, sword, armor) — match their painted-icon style, outline, lighting and size exactly.
+Use your image generation tool to create ONE PNG and save it as gear.png in the current directory.
+Content: one row of 7 equal square cells, each one centered item icon, same style and scale as image (1):
+1. "Wind Sword": a slim, light curved silver sword with a pale green wrapped grip and a small feather charm, wisps of wind.
+2. "Rock Sword": a broad, heavy sword whose blade is chunky grey stone bricks, brown leather grip.
+3. "Ember Sword": a sword with a dark red blade glowing orange at the edge, little embers.
+4. "Momentum Charm": a round gold charm with an orange flame-like spiral gem on a red cord.
+5. "Wind Charm": a round silver charm with a pale green swirl gem on a teal cord.
+6. "Life Charm": a heart-shaped green gem charm on a gold chain.
+7. "Moonlight Charm": a small crescent moon charm of pale blue glass with tiny stars, on a navy cord.
+No text, no grid lines. Background: solid flat pure magenta #FF00FF.
+When done, reply with only the file path.

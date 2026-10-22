@@ -1,0 +1,9 @@
+Attached: (1) and (2) are Sora's in-game idle sprite frames (192x256 cells). Their pixel-art style, line weight, palette, outline, chibi proportions and SIZE are exactly what to match. (3) Sora's official turnaround for the back and side views.
+Sora: lavender-silver short wavy hair, small gold crown with a blue gem, blue ribbon with gold diamonds on ONE side of her head (her left), gold diamond earrings, white dress with blue panels and gold trim, detached white sleeves with blue cuffs, blue tassels ending in gold diamonds, white stockings, blue boots.
+Draw ONE PNG: a grid of 4 rows x 4 columns of equal cells, each cell the same size and framing as image (1), the character the same height as in image (1).
+Each row is a 4-frame WALK CYCLE that loops: frame 1 right foot forward / left arm forward, frame 2 passing (legs together, body slightly up), frame 3 left foot forward / right arm forward, frame 4 passing. Clear, readable steps: legs alternate visibly, arms swing naturally and loosely with open relaxed hands (NOT fists held out in front), hair, ribbon and tassels bounce slightly with each step. Feet on one baseline near the bottom of each cell.
+ANATOMY: two arms, two legs, natural spine. MODESTY: wholesome; underwear is never visible; the skirt stays down over the thighs; no low angles.
+No text, no grid lines. Background: solid flat pure magenta #FF00FF.
+When done, reply with only the file path.
+Save it as walk_diag.png in the current directory.
+Rows (three-quarter views): 1 walking toward the viewer and to the left (front-left). 2 toward the viewer and to the right (front-right). 3 away from the viewer and to the left (back-left). 4 away from the viewer and to the right (back-right).
