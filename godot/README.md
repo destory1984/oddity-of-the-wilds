@@ -1,7 +1,9 @@
-# The Crown Oddity (Godot 4)
+# The Crown Oddity (Godot 4.7 원본)
 
-브라우저 데모(`oddity-of-the-wilds`, Three.js)를 Godot 4.7로 옮긴 판이다.
-씬 파일은 거의 비어 있고, 지형, 풀, 나무, 소라, 괴물, 상태창, 미니맵을 모두 `main.gd` 가 코드로 만든다.
+이 폴더는 게임의 Godot 프로젝트 원본이다. 웹으로 내보낸 결과는 저장소 맨 위에 있다.
+씬 파일은 거의 비어 있고, 지형, 집, 나무, 소라, 주민, 괴물, 보스, 상태창, 미니맵을 모두 코드가 만든다.
+
+처음에는 Three.js 한 파일로 만든 브라우저 데모(Oddity of the Wilds)였고, Godot으로 옮긴 뒤 이름을 The Crown Oddity로 바꿨다.
 
 ## 실행
 
@@ -11,30 +13,58 @@ Godot 4.7에서 이 폴더를 열고 F5를 누른다. 명령줄로는 다음과 
 Godot_v4.7.2-stable_win64.exe --path .
 ```
 
-- `-- --play` 를 붙이면 타이틀 화면을 건너뛴다.
-- `-- --shot` 을 붙이면 4초 뒤 `shot.png` 를 저장하고 끝난다. 화면 확인용이다.
+`--` 뒤에 붙이는 시험용 인자:
 
-웹으로도 내보낼 수 있게 렌더러는 GL Compatibility를 쓴다.
+| 인자 | 하는 일 |
+|---|---|
+| `--scene=이름` | 정해 둔 장면으로 바로 간다 (start, village, forest, hill, turtle, mold 등 23개) |
+| `--shot=파일.png` | 장면을 띄우고 몇 초 뒤 화면을 저장하고 끝난다 |
+| `--hour=22` | 시각을 정한다 |
+| `--pseudo` | 번역 표를 거친 글을 [대괄호]로 감싼다 |
+
+웹으로 내보낼 수 있게 렌더러는 GL Compatibility를 쓴다. 웹 렌더러는 물체 하나에 빛을 8개까지만 받으므로, 바닥은 6x6칸씩 나눠 그린다.
 
 ## 파일
 
 | 파일 | 하는 일 |
 |---|---|
-| `main.gd` | 지도 생성, 지형과 소품, 소라, 괴물, 전투, 스킬, 카메라, 상태창 |
-| `minimap.gd` | 카메라 방향으로 돌고 납작하게 눕힌 둥근 양피지 미니맵 |
-| `shaders/block.gdshader` | 지형 블록 (윗면 무늬, 옆면 흙색) |
-| `shaders/grass.gdshader` | 바람에 흔들리는 풀과 부들 |
-| `shaders/water.gdshader` | 흐르는 물 무늬 |
-| `shaders/tiltshift.gdshader` | 화면 위아래 흐림, 따뜻한 색보정, 가장자리 어둡게 |
+| `main.gd` | 갈대늪 지도, 소라, 전투와 기술, 괴물과 보스 7마리, 동료, 이야기 흐름, 저장, 카메라, 화면 |
+| `village.gd` | 등불 마을 (32x24칸), 주민, 꼬마 고블린 |
+| `lake.gd` | 남쪽 호수와 섬 (30x24칸), 수문, 물결의 오두막 |
+| `forest.gd` | 굳은 숲 (36x22칸), 벽돌 벽 3개 |
+| `hill.gd` | 바람 언덕 (34x24칸), 풍차 3개, 바람 다리 |
+| `garden.gd` | 정원 한가운데 (반지름 9.5칸), 등불 기둥 8개, 굳은달 거푸집 |
+| `story_lines.gd` | 모든 대사. 한 줄은 `"말하는이|얼굴|대사"` 꼴이다 |
+| `hud.gd`, `frame.gd`, `minimap.gd` | 상태창, 금테 틀, 미니맵 |
+| `shaders/` | 지형 블록, 흔들리는 풀, 물, 틸트시프트, 동굴 |
+| `i18n/text.csv` | 번역 표. 화면 글 약 360줄. 지금은 한국어 칸만 채웠다 |
+| `art/` | 소라 걷기와 쉬는 몸짓, 주민과 노을의 픽셀 그림, 초상화, 이야기 삽화 12장, 제목 그림 |
+| `tools/dev.py` | 검사, 화면 찍기, 자동 시험, 웹 내보내기, 배포를 한 번에 하는 도구 |
+| `tools/autoplay.gd` | 자동 시험 59개. 처음 깨어나기부터 끝 장면까지 따라간다 |
 
-## 웹판과 다른 점
+## 개발 도구
 
-- 글꼴은 파일을 넣지 않고 운영체제 글꼴(SystemFont)을 쓴다. 윈도에서는 맑은 고딕으로 나온다.
-- 빛번짐은 Godot의 Glow, 반딧불과 비는 CPUParticles3D로 했다.
+```
+python tools/dev.py check
+```
+
+```
+python tools/dev.py test
+```
+
+```
+python tools/dev.py shot village
+```
+
+- `check`: 스크립트 오류와 번역 표가 코드와 맞는지 본다.
+- `test`: 자동 시험 59개를 돌린다. 약 4분 걸린다.
+- `shot`: 장면 하나를 찍어 `shots/` 에 저장한다.
+- 한국어 글을 넣거나 고치면 `python tools/i18n.py` 로 번역 표를 다시 만든다.
 
 ## 라이선스
 
 - 코드: MIT 라이선스.
-- 소라 캐릭터(`art/sora/` 의 디자인과 모든 그림): destory1984의 것이다(All rights reserved). 허락 없이 복사, 수정, 배포, 다른 작품에 쓰기를 할 수 없다.
+- 소라 캐릭터(디자인과 모든 그림)와 제목 그림: destory1984의 것이다(All rights reserved). 허락 없이 복사, 수정, 배포, 다른 작품에 쓰기를 할 수 없다.
+- 글꼴: Pretendard, SIL 오픈 폰트 라이선스 1.1.
 
 전체 문구는 `LICENSE` 에 있다.
