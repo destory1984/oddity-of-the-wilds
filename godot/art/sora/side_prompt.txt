@@ -1,0 +1,6 @@
+Attached: (1) Sora's official turnaround, (2) our in-game DIAGONAL walk sheet whose pixel style, size and proportions are correct, (3) Sora's face sheet (keep exactly this face: side-swept wavy bangs, big round deep-blue eyes, soft cheeks).
+Use your image generation tool to create ONE PNG and save it as sora-side.png in the current directory.
+Content: a single row of 4 equal cells: Sora walking to the RIGHT in clean side profile view (her face in profile, looking right), 4-frame walk cycle, drawn in exactly the same pixel-art style, line weight, palette and chibi proportions as image (2). Wavy side-swept bangs (not a straight blunt fringe), crown with blue gem, blue ribbon on her left side with gold diamonds, white dress with blue panels and gold trim, detached white sleeves with blue cuffs, white stockings, blue boots. Arms relaxed and swinging naturally with open hands (no stiff fists), legs alternating, feet on one baseline near the bottom of each cell.
+ANATOMY: two arms, two legs, natural. Wholesome.
+No text, no grid lines. Background: solid flat pure magenta #FF00FF.
+When done, reply with only the file path.

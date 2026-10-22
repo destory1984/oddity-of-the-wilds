@@ -8,7 +8,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "start_key", "bridges", "shop_buy", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -143,6 +143,28 @@ func run() -> void:
 		await wait(0.2)
 		check("shop_buy", frozen and opened and main.player.pots == pots + 1 and main.player.gold == 70 and not main.shop_open,
 			"clock frozen=%s opened=%s pots %d->%d gold 100->%d closed=%s" % [frozen, opened, pots, main.player.pots, main.player.gold, not main.shop_open])
+	if want.call("shop_click"):
+		reset_to(Vector2(main.shop_pos.x, main.shop_pos.z))
+		main.story_step = 3
+		main.player.gold = 100
+		var p0: int = main.player.pots
+		main.toggle_shop(true)
+		await wait(0.3)
+		var btn: Button = main.ui.shop_btns[0]
+		var at: Vector2 = btn.get_parent().get_global_rect().get_center()
+		var e := InputEventMouseButton.new()
+		e.button_index = MOUSE_BUTTON_LEFT
+		e.position = at
+		e.global_position = at
+		e.pressed = true
+		Input.parse_input_event(e)
+		var u := e.duplicate()
+		u.pressed = false
+		Input.parse_input_event(u)
+		await wait(0.3)
+		check("shop_click", main.player.pots == p0 + 1, "clicking the first card's button buys it: pots %d->%d, button at %s disabled=%s" % [p0, main.player.pots, at, btn.disabled])
+		main.toggle_shop(false)
+		await wait(0.2)
 	if want.call("footsteps"):
 		reset_to(main.START)
 		main.sfx_log.clear()

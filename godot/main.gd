@@ -2683,6 +2683,22 @@ func start_game(with_story := true) -> void:
 # ---------------------------------------------------------------- input
 # the title screen listens before any control can swallow the click or key
 func _input(event: InputEvent) -> void:
+	# shop cards: a left click anywhere on a card buys it (handled here so no overlay can swallow it)
+	if shop_open and event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		for i in ui.shop_btns.size():
+			var card: Control = ui.shop_btns[i].get_parent()
+			if card.get_global_rect().has_point(event.position):
+				buy(i)
+				get_viewport().set_input_as_handled()
+				return
+	# shop cards: a left click anywhere on a card buys it (handled here so no overlay can swallow it)
+	if shop_open and event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		for i in ui.shop_btns.size():
+			var card: Control = ui.shop_btns[i].get_parent()
+			if card.get_global_rect().has_point(event.position):
+				buy(i)
+				get_viewport().set_input_as_handled()
+				return
 	if story_open and ((event is InputEventKey and event.pressed and not event.echo) or (event is InputEventMouseButton and event.pressed)):
 		next_story()
 		get_viewport().set_input_as_handled()
