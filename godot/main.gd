@@ -1133,8 +1133,28 @@ func build_player() -> void:
 	walk_px = hero.pixel_size
 	walk_off = hero.offset
 	add_child(hero)
+	# a faint see-through copy drawn over everything, so Sora stays readable behind roofs and trees
+	hero_ghost = Sprite3D.new()
+	hero_ghost.region_enabled = true
+	hero_ghost.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	hero_ghost.shaded = false
+	hero_ghost.no_depth_test = true
+	hero_ghost.alpha_cut = SpriteBase3D.ALPHA_CUT_DISABLED
+	hero_ghost.modulate = Color(0.75, 0.82, 1.0, 0.35)
+	hero_ghost.render_priority = -1
+	hero_ghost.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+	hero.add_child(hero_ghost)
 	hero_shadow = blob(0.9)
 	set_hero_frame("down", 0)
+
+var hero_ghost: Sprite3D
+
+func sync_ghost() -> void:
+	hero_ghost.texture = hero.texture
+	hero_ghost.region_rect = hero.region_rect
+	hero_ghost.pixel_size = hero.pixel_size
+	hero_ghost.offset = hero.offset
+	hero_ghost.flip_h = hero.flip_h
 
 func set_hero_frame(dir: String, frame: int) -> void:
 	var e: Array = hero_tex[dir]
@@ -1165,6 +1185,7 @@ var idle_name := ""
 var idle_k := 0.0
 var idle_left := 0.0
 var idle_tex := {}
+var last_input_t := 0.0  # rest actions start only after 10 s without a key or click
 
 func set_hero_idle(name: String, frame: int) -> void:
 	if not idle_tex.has(name):
@@ -1183,12 +1204,12 @@ func update_idle(dt: float) -> void:
 	idle_left -= dt
 	if idle_left <= 0.0:
 		var calm: bool = nearest_enemy(7.0) == null
-		if idle_name == "idle" and calm:
+		if idle_name == "idle" and calm and t - last_input_t >= 10.0:
 			idle_name = IDLE_ACTS.pick_random()
 			idle_left = 8.9 if idle_name in IDLE_LONG else 4.45 # two or four loops of four frames
 		else:
 			idle_name = "idle"
-			idle_left = rnd(3.0, 6.0)
+			idle_left = rnd(2.0, 4.0)
 		idle_k = 0.0
 	set_hero_idle(idle_name, int(idle_k) % 4)
 
@@ -4350,6 +4371,8 @@ func start_game(with_story := true) -> void:
 # ---------------------------------------------------------------- input
 # the title screen listens before any control can swallow the click or key
 func _input(event: InputEvent) -> void:
+	if (event is InputEventKey or event is InputEventMouseButton) and event.pressed:
+		last_input_t = t
 	# shop cards: a left click anywhere on a card buys it (handled here so no overlay can swallow it)
 	if shop_open and event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		for i in ui.shop_btns.size():
@@ -4538,6 +4561,7 @@ func _process(dt: float) -> void:
 	else:
 		idle_name = ""
 		set_hero_frame(player.dir, frame)
+	sync_ghost()
 	# feet touch the ground on frames 0 and 2 of the walk cycle
 	if moving and frame != step_frame and frame % 2 == 0 and player.dodge <= 0:
 		footstep()
