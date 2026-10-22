@@ -8,7 +8,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "village_exit", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -510,6 +510,95 @@ func run() -> void:
 		release()
 		await wait(0.2)
 		check("water_skip", main.player.x > 27.0, "with Shift held Sora runs across the river: x 19.0 -> %.1f" % main.player.x)
+	# ---- village (story step 8)
+	if want.call("village_enter"):
+		main.in_cave = false
+		main.in_village = false
+		main.story_step = 7
+		main.errand = 0
+		main.has_skip = true
+		reset_to(Vector2(43.0, 20.0)) # east shore, then skip over the edge water with Shift
+		main.player.sp = 100.0
+		hold_world(Vector2(1, 0))
+		main.fake_keys[KEY_SHIFT] = true
+		await wait(1.6)
+		release()
+		await wait(0.6)
+		var talk: bool = main.story_open
+		main.close_story()
+		await wait(0.6)
+		check("village_enter", main.in_village and main.story_step == 8 and talk, "east edge -> village=%s step=%d arrival talk=%s" % [main.in_village, main.story_step, talk])
+	if want.call("village_layout"):
+		var lamps: int = main.lanterns.filter(func(l): return l.position.x > 130.0).size()
+		check("village_layout", lamps == 12 and main.village.dark.size() == 3 and main.walkable(main.village.marks.M.x - 1.5, main.village.marks.M.y),
+			"12 lanterns (%d), 3 dark (%d), square walkable" % [lamps, main.village.dark.size()])
+	if want.call("simji_talk"):
+		main.in_village = true
+		main.errand = 0
+		reset_to(main.village.marks.M + Vector2(-1.2, 0))
+		tap(KEY_E)
+		await wait(0.3)
+		var talk: bool = main.story_open
+		main.close_story()
+		await wait(0.6)
+		check("simji_talk", talk and main.errand == 1 and main.ui.quest.text.contains("0/3"), "talk=%s errand=%d quest=%s" % [talk, main.errand, main.ui.quest.text])
+	if want.call("lamp_cost_night"):
+		main.hour = 23.0
+		main.crown_pips = 7
+		var d0: Dictionary = main.village.dark[0]
+		var n0: int = main.enemies.size()
+		reset_to(d0.pos + Vector2(-1.0, 0))
+		tap(KEY_E)
+		await wait(1.3)
+		check("lamp_cost_night", d0.lit and main.crown_pips == 6 and main.enemies.size() == n0 + 1, "lit=%s pips 7->%d goblin woke=%s" % [d0.lit, main.crown_pips, main.enemies.size() == n0 + 1])
+	if want.call("lamp_cost_day"):
+		main.hour = 13.0
+		main.crown_pips = 6
+		var d1: Dictionary = main.village.dark[1]
+		reset_to(d1.pos + Vector2(-1.0, 0))
+		tap(KEY_E)
+		await wait(0.3)
+		check("lamp_cost_day", d1.lit and main.crown_pips == 4, "by day a lantern costs 2: pips 6->%d" % main.crown_pips)
+	if want.call("lamp_no_pips"):
+		main.crown_pips = 0
+		var d2: Dictionary = main.village.dark[2]
+		reset_to(d2.pos + Vector2(-1.0, 0))
+		tap(KEY_E)
+		await wait(0.3)
+		check("lamp_no_pips", not d2.lit and main.crown_pips == 0, "with no pips the lantern stays dark=%s" % (not d2.lit))
+	if want.call("pip_rest"):
+		calm_enemies(true)
+		for e in main.enemies:
+			if e.get("cave", false) and not e.get("mole", false):
+				e.x = 2.0
+				e.z = 2.0
+		main.hour = 23.0
+		main.crown_pips = 0
+		var lit_lamp = main.lanterns.filter(func(l): return l.position.x > 130.0 and not l.get_meta("dark", false))[0]
+		reset_to(Vector2(lit_lamp.position.x + 0.4, lit_lamp.position.z + 1.0))
+		await wait(21.0)
+		check("pip_rest", main.crown_pips == 2, "21 s resting by a lit lantern at night: pips 0->%d" % main.crown_pips)
+	if want.call("errand_done"):
+		main.crown_pips = 3
+		main.hour = 23.0
+		var d2: Dictionary = main.village.dark[2]
+		reset_to(d2.pos + Vector2(-1.0, 0))
+		tap(KEY_E)
+		await wait(0.3)
+		var g0: int = main.player.gold
+		var p0: int = main.player.pots
+		reset_to(main.village.marks.M + Vector2(-1.2, 0))
+		tap(KEY_E)
+		await wait(0.3)
+		main.close_story()
+		await wait(0.6)
+		check("errand_done", main.errand == 3 and main.crown_pips == 8 and main.player.gold == g0 + 60 and main.player.pots == p0 + 1,
+			"errand=%d pips=%d gold +%d pots +%d" % [main.errand, main.crown_pips, main.player.gold - g0, main.player.pots - p0])
+	if want.call("village_exit"):
+		reset_to(main.village.marks.G + Vector2(0.6, 0))
+		main.player.x = main.village.marks.G.x + 0.3
+		await wait(1.2)
+		check("village_exit", not main.in_village and main.player.x < 48.0, "west gate -> outside=%s x=%.1f" % [not main.in_village, main.player.x])
 	calm_enemies(false)
 	var failed := results.count(false)
 	print("TESTS %d passed, %d failed" % [results.size() - failed, failed])

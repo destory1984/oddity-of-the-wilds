@@ -62,8 +62,22 @@ func _draw() -> void:
 	bar(Vector2(x0, 78), 230, p.sp / 100.0, Color("#f2e2b0"), "기력", "%d/100" % int(p.sp))
 	var need: int = p.lv * 25
 	bar(Vector2(x0, 100), 230, float(p.xp) / need, Color("#8de07a"), "경험", "%d/%d" % [p.xp, need])
+	# crown moon gauge: 8 small diamonds
+	text(Vector2(x0 - 44, 129), "달빛", 11, DIM)
+	for i in 8:
+		var pc := Vector2(x0 + 8 + i * 16, 124)
+		var full: bool = i < main.crown_pips
+		var flash: bool = main.pip_flash > 0.0 and i == main.crown_pips
+		if full:
+			diamond(pc, 6, Color("#9fd4ff"))
+		elif flash:
+			diamond(pc, 6, Color.WHITE)
+		else:
+			draw_polyline(PackedVector2Array([pc + Vector2(0, -6), pc + Vector2(6, 0), pc + Vector2(0, 6), pc + Vector2(-6, 0), pc + Vector2(0, -6)]), Color("#6a6050"), 1.0)
+	if main.rest_t > 0.0 and main.crown_pips < 8: # the next pip glows in while resting
+		diamond(Vector2(x0 + 8 + main.crown_pips * 16, 124), 6 * main.rest_t / 10.0, Color("#9fd4ff"))
 	# ---- sun / moon dial hanging under the portrait
-	var dc := Vector2(70, 206)
+	var dc := Vector2(70, 222)
 	for i in 14:
 		var a0 := PI + PI * i / 14.0
 		var pt := dc + Vector2(cos(a0) * 58, sin(a0) * 32)
@@ -83,8 +97,8 @@ func _draw() -> void:
 		if ph.x < 0.98:
 			draw_circle(sp + Vector2(5.5 * 2.0 * ph.x * ph.y, -0.5), 5.4, Color("#0b1530"))
 	# zone name, small, under the dial
-	text(Vector2(22, 238), main.ui.zone_name.text, 14, TEXT)
-	text(Vector2(22, 256), main.ui.zone_sub.text, 11, DIM)
+	text(Vector2(22, 254), main.ui.zone_name.text, 14, TEXT)
+	text(Vector2(22, 272), main.ui.zone_sub.text, 11, DIM)
 	# ---- quest ornaments
 	if main.ui.quest.visible:
 		var cx := vs.x / 2.0

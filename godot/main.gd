@@ -114,6 +114,8 @@ func cave_char(x: float, z: float) -> String:
 	return c
 
 func tile_at(x: float, z: float) -> int:
+	if x >= VILLAGE.VILLAGE_X - 0.5:
+		return WATER if village.blocked(x, z) else (SAND if village.char_at(x, z) == "=" else GRASS)
 	if x >= CAVE_X - 0.5:
 		var c := cave_char(x, z)
 		return WATER if c == "#" or c == "D" else (SAND if c == "w" else GRASS)
@@ -162,7 +164,7 @@ var skipping := false
 
 func player_can(x: float, z: float) -> bool:
 	if not walkable(x, z):
-		if skipping and x < CAVE_X - 0.5 and tile_at(x, z) == WATER and x > 1.0 and z > 1.0 and x < N - 2.0 and z < N - 2.0:
+		if skipping and x < CAVE_X - 0.5 and tile_at(x, z) == WATER and x > 1.0 and z > 1.0 and z < N - 2.0 and (x < N - 2.0 or (z > 17.5 and z < 23.5)):
 			return true
 		return false
 	if x >= CAVE_X - 0.5:
@@ -233,6 +235,7 @@ func _ready() -> void:
 	build_cottage()
 	darken_first_lamp()
 	build_cave()
+	village.build(self)
 	build_player()
 	for i in 9:
 		spawn_enemy()
@@ -273,6 +276,8 @@ const SCENES := {
 	"talk": {"play": true, "talk": true},
 	"mole": {"play": true, "mole": true},
 	"scene": {"play": true, "scene": true},
+	"village": {"play": true, "village": true},
+	"village_night": {"play": true, "village": true, "hour": 22.0},
 }
 
 func apply_test_args(args: PackedStringArray) -> void:
@@ -304,6 +309,12 @@ func apply_test_args(args: PackedStringArray) -> void:
 	if sc.get("shop", false):
 		story_step = 3
 		toggle_shop(true)
+	if sc.get("village", false):
+		story_step = 7
+		errand = 1
+		enter_village()
+		player.x = village.marks.M.x - 2.0
+		player.z = village.marks.M.y + 1.0
 	if sc.get("scene", false):
 		show_story("res://art/story/06_cave_rival.jpg", STORY.PAINTING)
 		for k in 6:
@@ -955,7 +966,7 @@ func build_lights() -> void:
 
 func update_lights() -> void:
 	for l in lanterns:
-		if l == dark_lamp:
+		if l == dark_lamp or l.get_meta("dark", false):
 			l.light_energy = 0.0
 			continue
 		l.light_energy = (0.6 + night * 2.4) * (1.0 + sin(t * 9.0 + l.position.x) * 0.05)
@@ -2083,7 +2094,7 @@ var dark_glass_mat: Material = null
 func darken_first_lamp() -> void:
 	var best: OmniLight3D = null
 	for l in lanterns:
-		if not l.has_meta("glass"): # street lanterns only, not the cottage door lamp
+		if not l.has_meta("glass") or l.position.x > 100.0: # marsh street lanterns only
 			continue
 		if best == null or Vector2(l.position.x, l.position.z).distance_to(START) < Vector2(best.position.x, best.position.z).distance_to(START):
 			best = l
@@ -2107,6 +2118,8 @@ func touch_crown() -> void:
 	burst(Vector3(player.x, ground_y + 1.6, player.z), Color("#9fd4ff"), 14, 1.5)
 	sfx(523, 0.4, "sine", 0.3, 300)
 	story_step = 2
+	crown_pips = maxi(0, crown_pips - 1)
+	pip_flash = 0.3
 	set_quest("")
 	save_game()
 	show_story("res://art/story/02_lantern.jpg", STORY.LANTERN)
@@ -2199,7 +2212,7 @@ func save_game() -> void:
 			boss_dead = true
 	var d := {"lv": player.lv, "xp": player.xp, "max_hp": player.max_hp, "hp": player.hp, "atk": player.atk,
 		"gold": player.gold, "pots": player.pots, "x": player.x, "z": player.z,
-		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
+		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "in_village": in_village, "pips": crown_pips, "errand": errand, "vlit": village.dark.map(func(d): return d.lit), "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
 		"chests": chests.map(func(c): return c.open)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -2222,6 +2235,24 @@ func load_game() -> void:
 	day = int(d.get("day", day))
 	story_step = int(d.get("story", 0))
 	var was_in_cave := bool(d.get("in_cave", false))
+	crown_pips = int(d.get("pips", 8))
+	errand = int(d.get("errand", 0))
+	var vlit: Array = d.get("vlit", [])
+	for i in mini(vlit.size(), village.dark.size()):
+		if vlit[i]:
+			var vd: Dictionary = village.dark[i]
+			vd.lit = true
+			vd.light.set_meta("dark", false)
+			vd.glass.material_override = vd.glass.get_meta("lit_mat")
+	if bool(d.get("in_village", false)):
+		var vx: float = player.x
+		var vz: float = player.z
+		var e0 := errand
+		errand = maxi(errand, 1) # do not replay the arrival scene
+		enter_village()
+		errand = e0
+		player.x = vx
+		player.z = vz
 	has_skip = bool(d.get("has_skip", false))
 	cave_exit_seen = bool(d.get("cave_exit_seen", false))
 	var opened: Array = d.get("chests", [])
@@ -2469,6 +2500,129 @@ func build_cave() -> void:
 	add_child(cave_light)
 
 var cave_light: OmniLight3D
+
+# ---------------------------------------------------------------- village (story step 8)
+const VILLAGE := preload("res://village.gd")
+var village = VILLAGE.new()
+var in_village := false
+var crown_pips := 8        # the crown's moon gauge, 0..8
+var pip_flash := 0.0
+var rest_t := 0.0
+var errand := 0            # 0 not given, 1 lighting lanterns, 2 lanterns done, 3 rewarded
+
+func enter_village() -> void:
+	in_village = true
+	story_step = maxi(story_step, 8)
+	var sp: Vector2 = village.marks.S
+	player.x = sp.x
+	player.z = sp.y
+	ground_y = 0.0
+	if not ui.has("outside_map"):
+		ui.outside_map = ui.mini.map_tex
+	ui.mini.map_tex = village.map_tex(VILLAGE.VILLAGE_X + VILLAGE.W)
+	ui.zone_name.text = "등불 마을"
+	ui.zone_sub.text = "돌 광장"
+	save_game()
+	if errand == 0:
+		set_quest("광장의 등불지기에게 말을 걸자 (E)")
+		show_story("", STORY.VILLAGE)
+
+func leave_village() -> void:
+	in_village = false
+	player.x = 44.0
+	player.z = 20.0
+	ground_y = height_at(player.x, player.z)
+	if ui.has("outside_map"):
+		ui.mini.map_tex = ui.outside_map
+	ui.zone_name.text = "갈대늪"
+	ui.zone_sub.text = "동쪽 물가"
+	save_game()
+
+func lamp_cost() -> int:
+	return 1 if (hour >= 19.0 or hour < 5.0) else 2 # the crown is half as strong by day
+
+func spend_pips(n: int) -> bool:
+	if crown_pips < n:
+		toast("눈금이 모자라. 밤에 켜진 등불 곁에서 쉬자")
+		return false
+	crown_pips -= n
+	pip_flash = 0.3
+	return true
+
+# E key: talk to Simji, light a dark village lantern, or (in the marsh opening) touch the crown
+func crown_key() -> void:
+	var me := Vector2(player.x, player.z)
+	if in_village:
+		if me.distance_to(village.marks.M) < 1.8:
+			if errand == 0:
+				errand = 1
+				show_story("", STORY.SIMJI)
+				set_quest("동쪽 끝 꺼진 등불을 왕관으로 켜자 (E) 0/3")
+			elif errand == 2:
+				errand = 3
+				crown_pips = 8
+				player.gold += 60
+				player.pots += 1
+				show_story("", STORY.SIMJI_DONE)
+				set_quest("마을 사람들에게 말을 걸어 보자 (다음 장에서 계속)")
+			save_game()
+			return
+		if errand == 1:
+			for d in village.dark:
+				if not d.lit and me.distance_to(d.pos) < 1.6:
+					if not spend_pips(lamp_cost()):
+						return
+					light_village_lamp(d)
+					return
+	touch_crown()
+
+func light_village_lamp(d: Dictionary) -> void:
+	d.lit = true
+	d.light.set_meta("dark", false)
+	d.glass.material_override = d.glass.get_meta("lit_mat")
+	burst(d.light.position, Color("#ffc46a"), 24, 2.5)
+	burst(Vector3(player.x, 1.6, player.z), Color("#9fd4ff"), 14, 1.5)
+	sfx(523, 0.4, "sine", 0.3, 300)
+	var n: int = village.lit_count()
+	if n >= 3:
+		errand = 2
+		set_quest("등불지기 심지에게 돌아가자")
+	else:
+		set_quest("동쪽 끝 꺼진 등불을 왕관으로 켜자 (E) %d/3" % n)
+	var at: Vector2 = d.brick
+	get_tree().create_timer(1.0).timeout.connect(func():
+		spawn_enemy(at)
+		var g: Dictionary = enemies[enemies.size() - 1]
+		g.cave = true # village goblins do not come back
+		burst(Vector3(at.x, 0.4, at.y), Color("#c9a066"), 20, 2.0)
+		pop_num(Vector3(at.x, 1.3, at.y), "!", Color("#ff5a4a")))
+	save_game()
+
+# rest beside a lit lantern at night with no monster near: one pip every 10 s
+func update_pips(dt: float) -> void:
+	pip_flash -= dt
+	var night_now := hour >= 19.0 or hour < 5.0
+	if crown_pips >= 8 or not night_now:
+		rest_t = 0.0
+		return
+	var me := Vector3(player.x, 0, player.z)
+	var near_lamp := false
+	for l in lanterns:
+		if not l.get_meta("dark", false) and l != dark_lamp and Vector2(l.position.x - me.x, l.position.z - me.z).length() < 2.0:
+			near_lamp = true
+	var calm := true
+	for e in enemies:
+		if not e.dead and Vector2(e.x - me.x, e.z - me.z).length() < 6.0:
+			calm = false
+	if near_lamp and calm and Vector2(player.vx, player.vz).length() < 0.3:
+		rest_t += dt
+		if rest_t >= 10.0:
+			rest_t = 0.0
+			crown_pips += 1
+			burst(Vector3(player.x, ground_y + 1.6, player.z), Color("#9fd4ff"), 10, 1.2)
+			sfx(880, 0.15, "sine", 0.15)
+	else:
+		rest_t = 0.0
 
 # parchment map of the cave, drawn at its world offset so the minimap math stays the same
 func cave_map_tex() -> ImageTexture:
@@ -2756,7 +2910,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				toast("비가 내린다" if raining else "비가 그쳤다")
 			KEY_P: ui.root.visible = not ui.root.visible
 			KEY_H: toggle_help(not ui.help.visible)
-			KEY_E: touch_crown()
+			KEY_E: crown_key()
 			KEY_F9: reset_game()
 			KEY_F8: return_to_start()
 			KEY_M:
@@ -2886,6 +3040,11 @@ func _process(dt: float) -> void:
 	update_enemies(dt * (SLOWMO if slowmo > 0 else 1.0), gy)
 	if not in_cave and story_step >= 5 and cave_pos.x > 0 and Vector2(player.x, player.z).distance_to(cave_pos) < 1.2 and fade_rect.color.a == 0.0:
 		fade_then(enter_cave)
+	if not in_cave and not in_village and story_step >= 7 and player.x > 46.5 and player.z > 17.5 and player.z < 23.5 and fade_rect.color.a == 0.0:
+		fade_then(enter_village)
+	if in_village and Vector2(player.x, player.z).distance_to(village.marks.G) < 0.9 and fade_rect.color.a == 0.0:
+		fade_then(leave_village)
+	update_pips(dt)
 	if in_cave:
 		check_painting()
 	if in_cave and not has_skip and Vector2(player.x, player.z).distance_to(cave_marks.E) < 1.6 and toast_t <= 0.0:
