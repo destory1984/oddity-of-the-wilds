@@ -28,8 +28,11 @@
   #arc { position:absolute; left:18px; right:18px; top:14px; height:84px; border:1px dashed rgba(239,230,207,.35); border-radius:50%; }
   #horizon { position:absolute; left:8px; right:8px; bottom:6px; height:1px; background:linear-gradient(90deg,transparent,#b9a273,transparent); }
   #sun { position:absolute; width:22px; height:22px; margin:-11px 0 0 -11px; border-radius:50%; transition:left 1.5s, top 1.5s, background 1.5s, box-shadow 1.5s; }
-  #mini { right:14px; top:84px; width:186px; height:186px; padding:0; }
-  #mini canvas { width:100%; height:100%; image-rendering:pixelated; }
+  #mini { right:14px; top:84px; width:186px; height:186px; padding:0; border-radius:50%; overflow:hidden;
+    border:3px double #b9a273; box-shadow:0 4px 18px rgba(0,0,0,.5), inset 0 0 18px rgba(60,40,10,.6); }
+  #mini canvas { width:100%; height:100%; image-rendering:pixelated; border-radius:50%; }
+  #mini b { position:absolute; transform:translate(-50%,-50%); font-size:11px; font-weight:800; color:#7a2a1a;
+    background:#efe2bd; border:1px solid #b9a273; border-radius:50%; width:18px; height:18px; line-height:17px; text-align:center; }
   #controls { left:14px; bottom:14px; padding:10px 16px; font-size:15px; }
   #controls h4 { margin:0 0 6px; font-size:11px; letter-spacing:2px; color:var(--dim); }
   #controls div { display:grid; grid-template-columns:110px 1fr; gap:4px 12px; align-items:center; }
@@ -94,7 +97,7 @@
   </div>
 </div>
 <div class="hud panel" id="clock"><div id="sky"></div><div id="arc"></div><div id="sun"></div><div id="horizon"></div></div>
-<div class="hud panel" id="mini"><canvas id="minimap" width="96" height="96"></canvas></div>
+<div class="hud panel" id="mini"><canvas id="minimap" width="96" height="96"></canvas><b>N</b></div>
 <div class="hud panel" id="controls">
   <button id="helpx" title="닫기">✕</button>
   <h4>조작법</h4>
@@ -555,7 +558,7 @@ new THREE.TextureLoader().load('art/sora/sora-walk-cut.png', (t) => {
   const cols = [0, 1, 2, 3];
   heroFrames.down = cols.map(i => cut(0, i)); heroFrames.left = cols.map(i => cut(1, i));
   heroFrames.side = cols.map(i => cut(2, i)); heroFrames.up = cols.map(i => cut(3, i));
-  heroSprite.scale.set(1.15, 1.63, 1); heroSprite.center.set(.5, .01);
+  heroSprite.scale.set(1.1, 1.65, 1); heroSprite.center.set(.5, .01);
 });
 const heroShadow = blob(0.9);
 const heroLight = new THREE.PointLight(0xffd59a, 0.0, 6); scene.add(heroLight);
@@ -863,24 +866,33 @@ addEventListener('resize', () => {
 });
 
 // ---------- minimap ----------
-const mm = $('minimap').getContext('2d');
+const mm = $('minimap').getContext('2d'), mmNorth = document.querySelector('#mini b');
 const mmBase = document.createElement('canvas'); mmBase.width = mmBase.height = N;
 {
   const g = mmBase.getContext('2d');
   for (let z = 0; z < N; z++) for (let x = 0; x < N; x++)
-    px(g, x, z, 1, 1, ['#3f6f9a', '#4f7f3a', '#c9a066', '#a8743f'][map[idx(x, z)]]);
+    px(g, x, z, 1, 1, ['#6f93a6', '#d8c896', '#e9d9aa', '#8a5a32'][map[idx(x, z)]]);
 }
+// quarter-view minimap: rotated with the camera and squashed like the ground plane on screen
+const MM_ZOOM = 3.2, MM_SQUASH = .62;
 function drawMinimap() {
   mm.imageSmoothingEnabled = false;
-  mm.drawImage(mmBase, 0, 0, 96, 96);
-  const s = 96 / N;
-  for (const e of enemies) if (!e.dead) px(mm, e.x * s - 1, e.z * s - 1, 2, 2, '#ff6a4a');
-  for (const c of chests) if (!c.open) px(mm, c.x * s - 1, c.z * s - 1, 2, 2, '#ffd84a');
-  // tiny person: dark outline, orange tunic, skin head, auburn hair
-  const ux = Math.round(player.x * s), uy = Math.round(player.z * s);
+  px(mm, 0, 0, 96, 96, '#cdbb88');
+  mm.save();
+  mm.translate(48, 52); mm.scale(1, MM_SQUASH); mm.rotate(camYaw); mm.scale(MM_ZOOM, MM_ZOOM);
+  mm.translate(-player.x - .5, -player.z - .5);
+  mm.drawImage(mmBase, 0, 0);
+  for (const e of enemies) if (!e.dead) { px(mm, e.x - .2, e.z - .2, 1.4, 1.4, '#3a1a10'); px(mm, e.x + .1, e.z + .1, .8, .8, '#d8402a'); }
+  for (const c of chests) if (!c.open) { px(mm, c.x - .2, c.z + .3, 1.4, .5, '#b07a12'); px(mm, c.x + .25, c.z - .2, .5, 1.4, '#b07a12'); }
+  mm.restore();
+  // tiny person stays upright in the middle
+  const ux = 48, uy = 52;
   px(mm, ux - 3, uy - 6, 7, 10, '#1a1410');
-  px(mm, ux - 1, uy - 5, 3, 3, '#f1c08f'); px(mm, ux - 2, uy - 6, 5, 1, '#a0482a'); px(mm, ux - 2, uy - 5, 1, 2, '#a0482a');
-  px(mm, ux - 2, uy - 2, 5, 3, '#ff8a2e'); px(mm, ux - 2, uy + 1, 2, 2, '#2f6f68'); px(mm, ux + 1, uy + 1, 2, 2, '#2f6f68');
+  px(mm, ux - 1, uy - 5, 3, 3, '#f1c08f'); px(mm, ux - 2, uy - 6, 5, 1, '#d8dcf0'); px(mm, ux - 2, uy - 5, 1, 2, '#d8dcf0');
+  px(mm, ux - 2, uy - 2, 5, 3, '#2f4fa8'); px(mm, ux - 2, uy + 1, 2, 2, '#f4f4f4'); px(mm, ux + 1, uy + 1, 2, 2, '#f4f4f4');
+  // north badge rides the rim in the direction north lies on screen
+  const nx = Math.sin(camYaw), nz = -Math.cos(camYaw) * MM_SQUASH, nl = Math.hypot(nx, nz) || 1;
+  mmNorth.style.left = (50 + nx / nl * 42) + '%'; mmNorth.style.top = (50 + nz / nl * 42) + '%';
 }
 
 // ---------- main loop ----------

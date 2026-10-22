@@ -1,4 +1,4 @@
-The attached image is the sprite sheet of an existing pixel-art character named Sora (4 columns x 4 rows; rows are front, left, right, away; she is drawn flying/floating).
+The first attached image is the sprite sheet of an existing pixel-art character named Sora (4 columns x 4 rows; rows are front, left, right, away; she is drawn flying/floating).
 Use your image generation tool to create ONE new PNG image and save it as sora-walk.png in the current directory.
 
 Draw the SAME character (same face, silver hair, crown, outfit, colors and pixel-art style, same proportions) WALKING ON THE GROUND for a cozy top-down action RPG.
@@ -7,7 +7,8 @@ Draw the SAME character (same face, silver hair, crown, outfit, colors and pixel
   - Row 2: facing left (side view), 4-frame walk cycle.
   - Row 3: facing right (side view), 4-frame walk cycle.
   - Row 4: facing away (walking up, back view), 4-frame walk cycle.
-- Upright walking pose with feet touching the ground, legs alternating, a small arm swing. Not flying, not lying down.
+- The second attached image is Sora standing: copy her ARMS exactly from it. Both arms must be clearly visible in every frame: long blue-and-white sleeves with gold diamond trims, hands showing, held a little away from the body (not hidden behind the dress, not stubby fists).
+- Upright walking pose with feet touching the ground, legs alternating, both arms swinging forward and back opposite to the legs. Not flying, not lying down.
 - Crisp hard pixel edges, limited palette, no text, no labels, no grid lines.
 - Background: solid flat pure magenta #FF00FF everywhere outside the character. No ground shadow.
 When done, reply with only the file path.
