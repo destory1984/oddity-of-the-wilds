@@ -1,0 +1,6 @@
+Attached: (1) our in-game DIAGONAL walk sheet of the heroine Sora, whose pixel style, size and chibi proportions are correct, (2) Doran the village postman, (3) Kongal the little girl with her brick-goblin doll, (4) Mulgyeol the otter boatman.
+Use your image generation tool to create ONE PNG and save it as folk.png in the current directory.
+Content: a grid of 3 rows x 2 columns of equal cells. Row 1 Doran, row 2 Kongal, row 3 Mulgyeol. Column 1: standing idle facing the viewer at a 3/4 angle. Column 2: the same pose with a small idle change (blink or breathing bob, Kongal hugging her doll tighter, Mulgyeol tapping his oar). Keep each character's colours, outfit and props exactly as in their reference sheet, but drawn in exactly the same pixel-art style, line weight, palette softness and chibi proportions as image (1). Feet on one baseline near the bottom of each cell.
+ANATOMY: two arms, two legs, natural. Wholesome.
+No text, no grid lines. Background: solid flat pure magenta #FF00FF.
+When done, reply with only the file path.

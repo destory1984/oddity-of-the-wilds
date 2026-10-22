@@ -207,6 +207,7 @@ func glow_mat(c: Color, energy := 3.0) -> StandardMaterial3D:
 
 # ---------------------------------------------------------------- setup
 func _ready() -> void:
+	get_viewport().size_changed.connect(func(): if ui.has("story_cap"): fit_story())
 	rng.seed = 7
 	# Pretendard ships as unicode-range pieces; chain them as fallbacks so web builds (no system fonts) get Hangul
 	var sys := SystemFont.new()
@@ -2032,6 +2033,8 @@ func build_hud() -> void:
 	cap_hint.size = Vector2(20, 18)
 	ui.story_tab = tab
 	ui.story_frame = pic_frame
+	ui.story_cap = cap
+	ui.story_hint = cap_hint
 	story.visible = false
 	ui.story = story
 	ui.story_img = img
@@ -2776,6 +2779,7 @@ var typing := 0.0 # characters shown so far, for the typewriter reveal
 var talk_mode := false
 
 func show_story(path: String, lines: Array) -> void:
+	fit_story()
 	story_lines = lines.duplicate()
 	var tex: Texture2D = load(path) if path != "" else null
 	ui.story_img.texture = tex
@@ -3096,6 +3100,8 @@ func _process(dt: float) -> void:
 	if toast_t <= 0: ui.toast.modulate.a = maxf(0, ui.toast.modulate.a - dt * 3)
 	ui.lv.text = str(player.lv)
 	var narrow := get_viewport().get_visible_rect().size.x < 1180.0
+	if ui.story.visible:
+		fit_story()
 	ui.quest.offset_top = (200.0 if ui.boss.visible else 150.0) if narrow else 62.0
 	ui.boss.offset_top = 140.0 if narrow else 14.0
 	ui.boss.offset_bottom = ui.boss.offset_top + 40.0
@@ -3114,6 +3120,22 @@ func _process(dt: float) -> void:
 	for i in 3:
 		ui.cd[i].size.y = 48.0 * player.cds[i] / SKILL_CD[i]
 	ui.cd[3].size.y = 48.0 * player.cds[3] / 2.0
+
+# keep the story picture and dialogue box off the screen edges on narrow windows
+const STORY_MARGIN := 28.0
+func fit_story() -> void:
+	var vw := get_viewport().get_visible_rect().size.x
+	var pw := minf(896.0, vw - 2.0 * (STORY_MARGIN + 12.0)) # the frame draws 10px outside its rect
+	var ph := pw * 504.0 / 896.0
+	ui.story_frame.offset_left = -pw / 2.0
+	ui.story_frame.offset_right = pw / 2.0
+	ui.story_frame.offset_top = -78.0 - ph / 2.0
+	ui.story_frame.offset_bottom = -78.0 + ph / 2.0
+	var cw := minf(940.0, vw - 2.0 * STORY_MARGIN)
+	ui.story_cap.offset_left = -cw / 2.0
+	ui.story_cap.offset_right = cw / 2.0
+	ui.story_text.size.x = cw - ui.story_text.position.x - 40.0
+	ui.story_hint.position.x = cw - 35.0
 
 func update_enemies(dt: float, gy: float) -> void:
 	for e in enemies.duplicate():
