@@ -8,7 +8,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "village_exit", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "village_exit", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -682,6 +682,52 @@ func run() -> void:
 		for e in main.enemies.filter(func(e): return not e.dead and e.x < 20.0 and e.z < 20.0):
 			e.dead = true
 			e.node.visible = false
+	if want.call("lantern_night"):
+		main.mul_q = 3
+		main.night_q = 0
+		main.hour = 22.0
+		reset_to(main.village.marks.M + Vector2(-1.2, 0))
+		await wait(0.3)
+		var dark: int = main.village_lamps().filter(func(l): return not l.visible).size()
+		var started: bool = main.night_q == 1 and dark == main.village_lamps().size()
+		main.close_story()
+		await wait(0.2)
+		for i in 80: # stay just behind Noeul until he turns at the end of his path
+			if main.night_q != 1:
+				break
+			var np: Vector3 = main.noeul_node.position
+			reset_to(Vector2(np.x - 1.2, np.z))
+			main.player.inv = 5.0
+			await wait(0.1)
+		var fell: bool = main.night_q == 2
+		main.close_story()
+		await wait(0.3)
+		var lit: int = main.village_lamps().filter(func(l): return l.visible).size()
+		var rose: bool = main.night_q == 3 and lit == main.village_lamps().size()
+		main.close_story()
+		await wait(0.3)
+		var duel: Array = main.enemies.filter(func(e): return e.get("noeul", false) and not e.dead)
+		var spawned: bool = duel.size() == 1
+		if spawned:
+			var e: Dictionary = duel[0]
+			reset_to(Vector2(e.x - 1.5, e.z))
+			main.player.inv = 9.0
+			await wait(0.5)
+			main.damage_enemy(e, 10000.0, Vector2(main.player.x, main.player.z))
+			await wait(1.4)
+		main.close_story()
+		check("lantern_night", started and fell and rose and spawned and main.night_q == 4 and main.has_unbrick,
+			"started=%s (dark %d) fell=%s rose=%s (lit %d) duel=%s night_q=%d unbrick=%s" % [started, dark, fell, rose, lit, spawned, main.night_q, main.has_unbrick])
+		main.hour = 12.0
+	if want.call("folk_again"):
+		main.met["doran"] = true
+		main.doran_q = 3
+		reset_to(main.village.folk_pos.doran + Vector2(1.0, 0))
+		tap(KEY_E)
+		await wait(0.3)
+		var said: String = main.ui.story_text.text
+		main.close_story()
+		check("folk_again", said.contains("배달을 마쳤"), "Doran after the letter: %s" % said.left(30))
 	if want.call("village_exit"):
 		reset_to(main.village.marks.G + Vector2(0.6, 0))
 		main.player.x = main.village.marks.G.x + 0.3

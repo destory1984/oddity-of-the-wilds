@@ -1,0 +1,6 @@
+Attached: (1) our in-game pixel sprite sheet of villagers (pixel style, line weight, palette softness and chibi proportions are correct), (2) the character design sheet of Noeul, a rival boy: short spiky ash-black hair, amber eyes, pale face, long hooded grey cloak whose hem crumbles into grey bricks.
+Use your image generation tool to create ONE PNG and save it as noeul.png in the current directory.
+Content: one row of 3 equal cells of Noeul, full body, three-quarter view facing the viewer: cell 1 standing with arms crossed, smug; cell 2 running (cloak flowing behind, one leg forward); cell 3 casting: one hand thrust forward releasing a puff of grey brick dust. Keep his design exactly as in image (2), but drawn in exactly the same pixel-art style and chibi proportions as image (1). Feet on one baseline near the bottom of each cell.
+ANATOMY: two arms, two legs, natural. Wholesome.
+No text, no grid lines. Background: solid flat pure magenta #FF00FF.
+When done, reply with only the file path.

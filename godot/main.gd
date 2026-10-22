@@ -1374,7 +1374,9 @@ func damage_enemy(e: Dictionary, amt: float, from: Vector2, kb := 4.0, force_cri
 		e.node.queue_free()
 		e.shadow.queue_free()
 		burst(Vector3(e.x, y + 0.4, e.z), Color("#ff9a4a"), 26, 3.5)
-		if e.get("mole", false):
+		if e.get("noeul", false):
+			get_tree().create_timer(1.0).timeout.connect(noeul_beaten)
+		elif e.get("mole", false):
 			player.gold += 150
 			gain_xp(120)
 			get_tree().create_timer(1.2).timeout.connect(mole_defeated)
@@ -2228,7 +2230,7 @@ func save_game() -> void:
 			boss_dead = true
 	var d := {"lv": player.lv, "xp": player.xp, "max_hp": player.max_hp, "hp": player.hp, "atk": player.atk,
 		"gold": player.gold, "pots": player.pots, "x": player.x, "z": player.z,
-		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "in_village": in_village, "met": met.keys(), "pips": crown_pips, "errand": errand, "kid_q": kid_q, "doran_q": doran_q, "mul_q": mul_q, "vlit": village.dark.map(func(d): return d.lit), "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
+		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "in_village": in_village, "met": met.keys(), "pips": crown_pips, "errand": errand, "kid_q": kid_q, "doran_q": doran_q, "mul_q": mul_q, "night_q": night_q, "has_unbrick": has_unbrick, "vlit": village.dark.map(func(d): return d.lit), "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
 		"chests": chests.map(func(c): return c.open)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -2256,6 +2258,12 @@ func load_game() -> void:
 	kid_q = int(d.get("kid_q", 0))
 	doran_q = int(d.get("doran_q", 0))
 	mul_q = int(d.get("mul_q", 0))
+	night_q = int(d.get("night_q", 0))
+	has_unbrick = bool(d.get("has_unbrick", false))
+	if night_q == 1 or night_q == 2:
+		night_q = 0 # a chase cut short by quitting starts over the next night
+	if night_q == 3:
+		spawn_noeul_duel()
 	if mul_q == 1:
 		place_oar()
 	for id in d.get("met", []):
@@ -2540,6 +2548,13 @@ var kid_node: Node3D
 var mul_q := 0             # Mulgyeol's oar: 0 not given, 1 fetch it from the NW pond, 2 carrying it, 3 returned
 var oar_node: Node3D
 const OAR_AT := Vector2(9.0, 11.0) # middle of the north-west marsh pond, reachable only by water skip
+var night_q := 0           # the lantern night: 0 not yet, 1 chasing Noeul, 2 fell, 3 duel, 4 won
+var has_unbrick := false   # crown power 3 (벽돌 풀기), granted after the duel
+var noeul_node: Node3D     # Noeul during the chase (the duel uses an enemy entry)
+var noeul_way := 0
+var after_story := Callable() # runs once when the current story closes
+const NOEUL_WAY := [Vector2(16, 6), Vector2(20, 6), Vector2(24, 7), Vector2(27, 10), Vector2(28, 15), Vector2(29, 18)]
+const NOEUL_DUEL_AT := Vector2(28, 12)
 var doran_q := 0           # Doran's letter: 0 not given, 1 read it with the crown, 2 carry it to Bori, 3 delivered
 
 func enter_village() -> void:
@@ -2610,7 +2625,7 @@ func crown_key() -> void:
 				if id == "doran" and kid_q >= 3 and doran_q < 2:
 					doran_errand()
 					return
-				show_story("", STORY.FOLK[id])
+				folk_talk(id)
 				met[id] = true
 				save_game()
 				return
@@ -2638,8 +2653,17 @@ func kongal_errand() -> void:
 		set_quest("우편배달부 도란에게 말을 걸어 보자 (E)")
 		place_kid()
 	else:
-		show_story("", STORY.FOLK.kongal)
+		folk_talk("kongal")
 	save_game()
+
+# first meeting: the long introduction; afterwards a short line that follows their errand
+func folk_talk(id: String) -> void:
+	if not met.has(id):
+		show_story("", STORY.FOLK[id])
+		return
+	var q := {"doran": doran_q, "kongal": kid_q, "mulgyeol": mul_q}[id] as int
+	var key := id + ("_done" if q >= 3 else ("_carry" if id == "doran" and q == 2 else ("_search" if q == 1 and id != "doran" else "_wait")))
+	show_story("", STORY.FOLK_AGAIN[key])
 
 # errand 3: the crown loosens the first line of Doran's century-old letter; it is for Bori
 func doran_errand() -> void:
@@ -2677,9 +2701,9 @@ func mulgyeol_errand() -> void:
 		mul_q = 3
 		player.gold += 50
 		show_story("", STORY.MUL_DONE)
-		set_quest("마을 심부름을 모두 마쳤다 (다음 장에서 계속)")
+		set_quest("마을 심부름을 모두 마쳤다. 밤이 되면 마을에서 쉬자")
 	else:
-		show_story("", STORY.FOLK.mulgyeol)
+		folk_talk("mulgyeol")
 	save_game()
 
 func place_oar() -> void:
@@ -2715,6 +2739,189 @@ func update_oar() -> void:
 		for at in [Vector2(6, 15), Vector2(12, 15)]: # the bricks on the shore wake up
 			spawn_enemy(at)
 		save_game()
+
+# ---- the lantern night (story step 9)
+func noeul_sprite() -> Sprite3D:
+	var spr := Sprite3D.new() # GPT pixel sprite: 0 arms crossed, 1 running, 2 casting
+	spr.texture = load("res://art/folk/noeul.png")
+	spr.hframes = 3
+	spr.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+	spr.scale = Vector3(1, 1.0 / cos(0.78), 1)
+	spr.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	spr.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
+	spr.shaded = false
+	spr.pixel_size = 1.8 / 180.0
+	spr.offset = Vector2(0, 90)
+	return spr
+
+func village_lamps() -> Array:
+	return lanterns.filter(func(l): return l.position.x > VILLAGE.VILLAGE_X - 1.0)
+
+func set_village_lamps(on: bool) -> void:
+	for l in village_lamps():
+		var g: MeshInstance3D = l.get_meta("glass")
+		if not g.has_meta("lit_mat"):
+			g.set_meta("lit_mat", g.material_override)
+		g.material_override = g.get_meta("lit_mat") if on else mat_color(Color("#3a3428"))
+		l.visible = on
+		l.set_meta("dark", not on)
+	if on:
+		for d in village.dark:
+			d.lit = true
+
+func start_night() -> void:
+	night_q = 1
+	story_step = maxi(story_step, 9)
+	set_village_lamps(false)
+	noeul_way = 0
+	if noeul_node == null:
+		noeul_node = Node3D.new()
+		noeul_node.add_child(noeul_sprite())
+		add_child(noeul_node)
+	var p: Vector2 = NOEUL_WAY[0]
+	noeul_node.position = Vector3(VILLAGE.VILLAGE_X + p.x, 0, p.y)
+	noeul_node.visible = true
+	show_story("", STORY.NOEUL_COMES)
+	set_quest("등불을 끈 노을을 쫓자 (Shift로 달리기)")
+	save_game()
+
+# Noeul keeps a few steps ahead of Sora along the path; at the last point he turns and she falls
+func update_night(dt: float) -> void:
+	var night_now := hour >= 19.0 or hour < 5.0
+	if in_village and night_q == 0 and mul_q == 3 and night_now and not story_open and fade_rect.color.a == 0.0:
+		start_night()
+	if night_q != 1 or noeul_node == null or story_open:
+		return
+	var me := Vector2(player.x, player.z)
+	var at := Vector2(noeul_node.position.x, noeul_node.position.z)
+	var spr: Sprite3D = noeul_node.get_child(0)
+	var last := noeul_way >= NOEUL_WAY.size() - 1
+	if not last and me.distance_to(at) < 4.5:
+		var w: Vector2 = NOEUL_WAY[noeul_way + 1] + Vector2(VILLAGE.VILLAGE_X, 0)
+		var step := w - at
+		if step.length() < 0.2:
+			noeul_way += 1
+		else:
+			at += step.normalized() * minf(step.length(), dt * 4.8)
+		spr.frame = 1
+		spr.flip_h = step.x < 0.0
+	else:
+		spr.frame = 0
+	noeul_node.position = Vector3(at.x, 0, at.y)
+	if last and me.distance_to(at) < 1.8:
+		night_fall()
+
+func night_fall() -> void:
+	night_q = 2
+	noeul_node.get_child(0).frame = 2
+	burst(noeul_node.position + Vector3(0, 1.0, 0), Color("#8a8a8a"), 30, 3.0)
+	shake = 0.3
+	sfx(90, 0.5, "sawtooth", 0.25, -40)
+	show_story("res://art/story/08_dark_night.jpg", STORY.NIGHT_FALL)
+	after_story = rise_together
+	save_game()
+
+func rise_together() -> void:
+	noeul_node.visible = false
+	player.x = village.marks.M.x - 1.5
+	player.z = village.marks.M.y + 1.5
+	player.hp = float(player.max_hp)
+	crown_pips = 8
+	set_village_lamps(true)
+	burst(Vector3(player.x, 1.6, player.z), Color("#ffc46a"), 40, 4.0)
+	night_q = 3
+	show_story("res://art/story/09_rise_together.jpg", STORY.RISE_TOGETHER)
+	after_story = spawn_noeul_duel
+	set_quest("동쪽 들판의 노을과 겨루자")
+	save_game()
+
+func spawn_noeul_duel() -> void:
+	if enemies.any(func(e): return e.get("noeul", false) and not e.dead):
+		return
+	var at: Vector2 = NOEUL_DUEL_AT + Vector2(VILLAGE.VILLAGE_X, 0)
+	var node := Node3D.new()
+	node.add_child(noeul_sprite())
+	add_child(node)
+	enemies.append({"x": at.x, "z": at.y, "hp": 420.0, "max_hp": 420, "node": node, "shadow": blob(0.8), "t": 0.0,
+		"atk_cd": 2.0, "hurt": 0.0, "kx": 0.0, "kz": 0.0, "wx": at.x, "wz": at.y, "dead": false, "respawn": 0.0,
+		"noeul": true, "cave": true, "wind": 0.0, "dash": 0.0, "dir": Vector2.ZERO, "stun": 0.0, "next": "dash", "rings": []})
+
+# Noeul's duel: a quick telegraphed dash, then rings of brick dust around Sora; below half HP, three rings
+func update_noeul(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
+	var node: Node3D = e.node
+	var spr: Sprite3D = node.get_child(0)
+	var awake := d < 9.0
+	ui.boss.visible = awake or (ui.boss.visible and d < 13.0)
+	ui.boss_name.text = "노을"
+	ui.boss_bar.size.x = 420.0 * maxf(0.0, e.hp) / e.max_hp
+	e.t += dt
+	e.hurt -= dt
+	e.stun -= dt
+	spr.modulate = Color(1.6, 1.4, 1.4) if e.hurt > 0.0 else Color.WHITE
+	if e.dash > 0.0:
+		e.dash -= dt
+		var nx: float = e.x + e.dir.x * 11.0 * dt
+		var nz: float = e.z + e.dir.y * 11.0 * dt
+		if walkable(nx, nz):
+			e.x = nx
+			e.z = nz
+			if Vector2(player.x - e.x, player.z - e.z).length() < 0.9:
+				player_hit(20, Vector2(e.x, e.z) - e.dir, e)
+		else:
+			e.dash = 0.0
+		spr.frame = 1
+	elif e.stun > 0.0:
+		spr.frame = 0
+	elif e.wind > 0.0:
+		e.wind -= dt
+		spr.frame = 2 if e.next == "dust" else 1
+		if e.wind <= 0.0:
+			if e.next == "dash":
+				e.dash = 0.45
+				e.next = "dust"
+			else:
+				for r in e.rings:
+					burst(Vector3(r.x, 0.3, r.y), Color("#9a9a9a"), 18, 3.0)
+					if Vector2(player.x, player.z).distance_to(r) < 1.2:
+						player_hit(16, r, e)
+				sfx(110, 0.25, "square", 0.2, -40)
+				e.next = "dash"
+			e.atk_cd = 1.3
+	elif awake:
+		spr.frame = 0
+		e.atk_cd -= dt
+		if e.atk_cd <= 0.0:
+			if e.next == "dash":
+				e.wind = 0.55
+				e.dir = to / maxf(d, 0.01)
+				pop_num(Vector3(e.x, 2.4, e.z), "!", Color("#ff5a4a"))
+				sfx(160, 0.4, "sawtooth", 0.2, 160)
+			else:
+				e.wind = 0.8
+				e.rings = [Vector2(player.x, player.z)]
+				if e.hp < e.max_hp / 2.0:
+					for k in 2:
+						e.rings.append(Vector2(player.x, player.z) + Vector2(rnd(-2.2, 2.2), rnd(-2.2, 2.2)))
+				for r in e.rings:
+					warn_ring(Vector3(r.x, 0.0, r.y), 1.2, 0.8)
+		elif d < 3.0: # keeps his distance
+			var nx: float = e.x - to.x / d * 2.0 * dt
+			var nz: float = e.z - to.y / d * 2.0 * dt
+			if walkable(nx, e.z): e.x = nx
+			if walkable(e.x, nz): e.z = nz
+	spr.flip_h = (e.dir.x if e.dash > 0.0 else to.x) < 0.0
+	node.position = Vector3(e.x, 0, e.z)
+	e.shadow.position = Vector3(e.x, 0.02, e.z)
+
+func noeul_beaten() -> void:
+	night_q = 4
+	has_unbrick = true
+	ui.boss.visible = false
+	player.gold += 100
+	gain_xp(150)
+	set_quest("굳은 숲으로 가는 길을 찾자 (다음 장에서 계속)")
+	show_story("", STORY.NOEUL_LOSES)
+	save_game()
 
 # put the kid goblin where kid_q says: in the field with guards, or beside Kongal
 func place_kid() -> void:
@@ -3001,6 +3208,10 @@ func next_story() -> void:
 
 func close_story() -> void:
 	story_open = false
+	if after_story.is_valid():
+		var f := after_story
+		after_story = Callable()
+		f.call_deferred()
 	if story_step == 0 and not intro:
 		begin_opening()
 	var tw := create_tween()
@@ -3230,6 +3441,7 @@ func _process(dt: float) -> void:
 	update_pips(dt)
 	update_kid(dt)
 	update_oar()
+	update_night(dt)
 	if in_cave:
 		check_painting()
 	if in_cave and not has_skip and Vector2(player.x, player.z).distance_to(cave_marks.E) < 1.6 and toast_t <= 0.0:
@@ -3333,6 +3545,9 @@ func update_enemies(dt: float, gy: float) -> void:
 			continue
 		if e.get("mole", false):
 			update_mole(e, dt, d, to)
+			continue
+		if e.get("noeul", false):
+			update_noeul(e, dt, d, to)
 			continue
 		if d < 7 and not intro and e.get("archer", false):
 			if d < 4.0:
