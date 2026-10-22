@@ -40,7 +40,7 @@ python -m http.server 8765
 
 ## 그림과 글꼴
 
-- 주인공은 소라다(`art/sora/`). 소라의 디자인과 그림은 저작권자가 모든 권리를 가진다(All rights reserved). MIT 라이선스에 들어가지 않으므로 따로 쓸 수 없다.
+- 주인공은 소라다(`art/sora/`). 걷기 그림(`sora-walk.png`)은 GPT 이미지 생성(Codex CLI)에 소라 그림판을 참고로 주고 그렸다. 주문 문구는 `art/sora/walk_prompt.txt` 에 있다.
 - 예전 주인공 그림(`art/hero_sheet.png`)은 GPT 이미지 생성(Codex CLI)으로 그렸다. 주문 문구는 `art/prompt.txt` 에 있다.
   `art/cut.py` 가 분홍 배경을 지우고 4x3칸으로 다시 잘라 `hero.png` 를 만든다.
 - 괴물은 코드에서 레고 블록을 쌓아 만든다.
@@ -49,4 +49,8 @@ python -m http.server 8765
 
 ## 라이선스
 
-코드는 MIT, 글꼴은 SIL 오픈 폰트 라이선스 1.1, 소라 그림은 All rights reserved다. 자세한 내용은 `LICENSE` 에 있다.
+- 코드: MIT 라이선스. 마음대로 고치고 써도 된다.
+- 소라 캐릭터(`art/sora/` 의 디자인과 모든 그림, 거기서 새로 그린 걷기 그림 포함): destory1984의 것이다. 모든 권리를 가진다(All rights reserved). MIT에 들어가지 않으므로 허락 없이 복사, 수정, 배포, 다른 작품에 쓰기를 할 수 없다. 코드를 가져다 쓰려면 캐릭터를 자기 것으로 바꿔야 한다.
+- 글꼴(`fonts/`): SIL 오픈 폰트 라이선스 1.1.
+
+전체 문구는 `LICENSE` 에 있다.

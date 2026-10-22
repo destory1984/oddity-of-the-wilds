@@ -1,6 +1,8 @@
 This repository has three parts with different terms.
 
-1. Code (index.html, art/cut.py and other source files)
+1. Source code
+   Everything in this repository is licensed under the MIT License below,
+   except the material listed in parts 2 and 3.
 
 MIT License
 
@@ -24,13 +26,15 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-2. Sora character art (everything under art/sora/)
-
-Copyright (c) 2026 destory1984. All rights reserved.
-
-The design and artwork of the character Sora are not covered by the MIT
-License above. You may not copy, modify, redistribute or reuse them without
-written permission from the copyright holder.
+2. Reserved: all rights reserved, NOT licensed under the MIT License
+   - The pixel-art character "Sora" (소라): its design and every drawing of it
+     in art/sora/, including drawings newly made from it (such as
+     sora-walk.png).
+   Copyright (c) 2026 destory1984. All rights reserved.
+   You may view this material here, but you may not copy, modify, publish or
+   sell it, or use it in your own work, without written permission from the
+   copyright holder. Forks that reuse the MIT-licensed code must replace the
+   character with their own.
 
 3. Fonts (everything under fonts/)
 

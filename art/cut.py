@@ -1,7 +1,10 @@
-# Key out the magenta background of art/hero_sheet.png and repack the 4x3 grid
-# into hero.png with equal cells, feet on a shared baseline.
+# Key out the magenta background of a GPT sprite sheet and repack its grid
+# with equal cells, feet on a shared baseline.
+# usage: python art/cut.py SRC DST COLS ROWS  (default: the old hero sheet, 4x3)
+import sys
 from PIL import Image
-im = Image.open('art/hero_sheet.png').convert('RGBA')
+src, dst, COLS, ROWS = (sys.argv[1:3] + [int(v) for v in sys.argv[3:5]]) if len(sys.argv) > 4 else ('art/hero_sheet.png', 'hero.png', 4, 3)
+im = Image.open(src).convert('RGBA')
 W, H = im.size
 px = im.load()
 for y in range(H):
@@ -9,16 +12,15 @@ for y in range(H):
         r, g, b, a = px[x, y]
         if r > 150 and b > 150 and g < 120 and abs(r - b) < 90:
             px[x, y] = (0, 0, 0, 0)
-cw, ch = W / 4, H / 3
-cells = [im.crop((round(c * cw), round(r * ch), round((c + 1) * cw), round((r + 1) * ch))) for r in range(3) for c in range(4)]
+cw, ch = W / COLS, H / ROWS
+cells = [im.crop((round(c * cw), round(r * ch), round((c + 1) * cw), round((r + 1) * ch))) for r in range(ROWS) for c in range(COLS)]
 boxes = [c.getbbox() for c in cells]
 w = max(b[2] - b[0] for b in boxes); h = max(b[3] - b[1] for b in boxes)
 CW, CH = w + 8, h + 4
-out = Image.new('RGBA', (CW * 4, CH * 3))
+out = Image.new('RGBA', (CW * COLS, CH * ROWS))
 for i, (c, b) in enumerate(zip(cells, boxes)):
     part = c.crop(b)
-    cx = (b[0] + b[2]) / 2
-    x = round(CW / 2 - (cx - b[0])) if False else (CW - (b[2] - b[0])) // 2
-    out.paste(part, ((i % 4) * CW + x, (i // 4) * CH + CH - 2 - part.height))
-out.save('hero.png')
+    x = (CW - (b[2] - b[0])) // 2
+    out.paste(part, ((i % COLS) * CW + x, (i // COLS) * CH + CH - 2 - part.height))
+out.save(dst)
 print(out.size, CW, CH)
