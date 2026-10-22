@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -1037,6 +1037,45 @@ func run() -> void:
 		main.in_forest = false
 		calm_enemies(false)
 		check("forest_grove", shut and read and solved and opened, "wall shut=%s tablet read=%s solved=%s phases=%s chest=%s" % [shut, read, solved, main.forest.stones.map(func(s): return s.phase), opened])
+	if want.call("firefly_errand"):
+		main.errand = 3
+		main.kid_q = 3
+		main.doran_q = 3
+		main.fly_q = 0
+		main.met["kongal"] = true
+		main.in_village = true
+		main.in_forest = false
+		calm_enemies(true)
+		var kp: Vector2 = main.village.folk_pos.kongal
+		reset_to(kp + Vector2(-1.0, 0))
+		tap(KEY_E)
+		await wait(0.3)
+		main.close_story()
+		var asked: bool = main.fly_q == 1
+		main.in_village = false
+		main.hour = 13.0
+		await wait(0.2)
+		var hidden_by_day: bool = not main.marsh.flies[0].node.visible
+		main.hour = 22.0
+		await wait(0.2)
+		var walk_ok := true
+		for f in main.marsh.flies:
+			walk_ok = walk_ok and main.player_can(f.home.x, f.home.y)
+		for i in 5:
+			var n: Node3D = main.marsh.flies[i].node
+			reset_to(Vector2(n.position.x, n.position.z))
+			await wait(0.15)
+		var full: bool = main.fly_q == 2
+		main.in_village = true
+		var g0: int = main.player.gold
+		reset_to(kp + Vector2(-1.0, 0))
+		tap(KEY_E)
+		await wait(0.3)
+		main.close_story()
+		var lent: bool = main.fly_q == 3 and main.jar_node != null and main.player.gold == g0 + 30
+		main.in_village = false
+		calm_enemies(false)
+		check("firefly_errand", asked and hidden_by_day and walk_ok and full and lent, "asked=%s hidden by day=%s spots walkable=%s caught=%d lent jar=%s" % [asked, hidden_by_day, walk_ok, main.marsh.caught(), lent])
 	calm_enemies(false)
 	var failed := results.count(false)
 	print("TESTS %d passed, %d failed" % [results.size() - failed, failed])

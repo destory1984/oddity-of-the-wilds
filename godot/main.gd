@@ -302,6 +302,7 @@ const SCENES := {
 	"hill": {"play": true, "village": true, "hill": true, "hour": 10.0},
 	"kid": {"play": true, "village": true, "kid": true, "hour": 20.5},
 	"grove": {"play": true, "village": true, "forest": true, "grove": true, "hour": 15.0},
+	"flies": {"play": true, "at": Vector2(8, 23), "hour": 22.5, "flies": true},
 	"scrap": {"play": true, "at": Vector2(42.5, 5.5), "hour": 17.0},
 }
 
@@ -329,6 +330,10 @@ func apply_test_args(args: PackedStringArray) -> void:
 		player.x = at.x
 		player.z = at.y
 		ground_y = height_at(at.x, at.y)
+	if sc.has("flies"): # night fireflies over the marsh, and the lent jar already glowing
+		fly_q = 1
+		marsh.flies_on = true
+		build_jar()
 	if sc.has("gold"):
 		player.gold = sc.gold
 	if sc.get("shop", false):
@@ -2545,7 +2550,8 @@ func save_game() -> void:
 	var d := {"lv": player.lv, "xp": player.xp, "max_hp": player.max_hp, "hp": player.hp, "atk": player.atk,
 		"gold": player.gold, "pots": player.pots, "x": player.x, "z": player.z,
 		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "in_village": in_village, "met": met.keys(), "pips": crown_pips, "errand": errand, "kid_q": kid_q, "doran_q": doran_q, "mul_q": mul_q, "night_q": night_q, "in_forest": in_forest, "in_garden": in_garden, "in_hill": in_hill, "hill_q": hill_q, "mills": hill.mills.map(func(mm): return mm.turning), "in_lake": in_lake, "lake_q": lake_q, "garden_q": garden_q, "forest_q": forest_q, "walls": forest.walls.map(func(w): return w.open), "stones": forest.stones.map(func(st): return st.phase), "grove": forest.solved, "grove_chest": forest.chest_open, "has_unbrick": has_unbrick, "vlit": village.dark.map(func(d): return d.lit), "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
-		"chests": chests.map(func(c): return c.open), "scraps": marsh.found, "moon_chest": marsh.chest_open}
+		"chests": chests.map(func(c): return c.open), "scraps": marsh.found, "moon_chest": marsh.chest_open,
+		"fly_q": fly_q, "flies": marsh.flies.map(func(f): return f.caught)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify(d))
@@ -2663,6 +2669,13 @@ func load_game() -> void:
 	has_skip = bool(d.get("has_skip", false))
 	cave_exit_seen = bool(d.get("cave_exit_seen", false))
 	marsh.restore(d.get("scraps", []), bool(d.get("moon_chest", false)))
+	fly_q = int(d.get("fly_q", 0))
+	var fc: Array = d.get("flies", [])
+	for i in mini(fc.size(), marsh.flies.size()):
+		marsh.flies[i].caught = bool(fc[i])
+	marsh.flies_on = fly_q == 1
+	if fly_q >= 3:
+		build_jar()
 	var opened: Array = d.get("chests", [])
 	for i in mini(opened.size(), chests.size()):
 		if opened[i]:
@@ -2944,6 +2957,8 @@ var met := {}               # villagers already greeted
 var errand := 0            # 0 not given, 1 lighting lanterns, 2 lanterns done, 3 rewarded
 var kid_q := 0             # Kongal's errand: 0 not given, 1 find the kid goblin, 2 it follows Sora, 3 home
 var kid_node: Node3D
+var fly_q := 0             # errand 5, the kid's firefly jar: 0 not given, 1 catching, 2 caught five, 3 jar lent to Sora
+var jar_node: Node3D       # Sora's firefly jar, a little glow at her side after dark once fly_q is 3
 var mul_q := 0             # Mulgyeol's oar: 0 not given, 1 fetch it from the NW pond, 2 carrying it, 3 returned
 var oar_node: Node3D
 const OAR_AT := Vector2(9.0, 11.0) # middle of the north-west marsh pond, reachable only by water skip
@@ -3027,7 +3042,7 @@ func crown_key() -> void:
 			return
 		for id in village.folk_pos:
 			if me.distance_to(village.folk_pos[id]) < 1.6:
-				if id == "kongal" and errand >= 3 and kid_q != 1:
+				if id == "kongal" and errand >= 3 and kid_q != 1 and (kid_q != 3 or doran_q < 3 or fly_q < 3):
 					kongal_errand()
 					return
 				if id == "mulgyeol" and doran_q >= 3 and mul_q != 1:
@@ -3063,6 +3078,17 @@ func kongal_errand() -> void:
 		show_story("", STORY.KONGAL_DONE)
 		set_quest("우편배달부 도란에게 말을 걸어 보자 (E)")
 		place_kid()
+	elif kid_q >= 3 and doran_q >= 3 and fly_q == 0:
+		fly_q = 1
+		marsh.flies_on = true
+		show_story("", STORY.FLY_ASK)
+	elif fly_q == 1:
+		show_story("", STORY.FOLK_AGAIN.kongal_fly)
+	elif fly_q == 2:
+		fly_q = 3
+		player.gold += 30
+		show_story("", STORY.FLY_DONE)
+		build_jar()
 	else:
 		folk_talk("kongal")
 	save_game()
@@ -4131,6 +4157,20 @@ func place_kid() -> void:
 			var k: Vector2 = village.folk_pos.kongal
 			kid_node.position = Vector3(k.x + 0.7, 0, k.y + 0.3)
 
+# the lent firefly jar glows at Sora's side after dark and works like a lantern for resting:
+# at night the crown's pips refill anywhere calm, one every 20 s (10 s beside a real lantern).
+# It has no OmniLight on purpose: the marsh ground is one mesh and the web renderer lights a mesh with at most 8.
+func build_jar() -> void:
+	if jar_node != null:
+		return
+	jar_node = Node3D.new()
+	var glass: MeshInstance3D = box(Vector3(0.16, 0.2, 0.16), glow_mat(Color("#d8ff7a"), 3.0))
+	jar_node.add_child(glass)
+	var lid: MeshInstance3D = box(Vector3(0.18, 0.05, 0.18), mat_color(Color("#7a5a32")))
+	lid.position = Vector3(0, 0.12, 0)
+	jar_node.add_child(lid)
+	add_child(jar_node)
+
 func update_kid(dt: float) -> void:
 	if kid_node == null or not in_village:
 		return
@@ -4193,9 +4233,10 @@ func update_pips(dt: float) -> void:
 	for e in enemies:
 		if not e.dead and Vector2(e.x - me.x, e.z - me.z).length() < 6.0:
 			calm = false
-	if near_lamp and calm and Vector2(player.vx, player.vz).length() < 0.3:
+	var jar := fly_q >= 3
+	if (near_lamp or jar) and calm and Vector2(player.vx, player.vz).length() < 0.3:
 		rest_t += dt
-		if rest_t >= 10.0:
+		if rest_t >= (10.0 if near_lamp else 20.0):
 			rest_t = 0.0
 			crown_pips += 1
 			burst(Vector3(player.x, ground_y + 1.6, player.z), Color("#9fd4ff"), 10, 1.2)
@@ -4701,6 +4742,10 @@ func _process(dt: float) -> void:
 	update_oar()
 	if in_marsh() and not intro:
 		marsh.update(self)
+	marsh.update_flies(self, in_marsh() and (hour >= 19.0 or hour < 5.0))
+	if jar_node != null:
+		jar_node.visible = night > 0.5
+		jar_node.position = Vector3(player.x + 0.35, ground_y + 0.55 + sin(t * 2.0) * 0.04, player.z + 0.1)
 	update_night(dt)
 	if in_cave:
 		check_painting()

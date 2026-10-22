@@ -1,6 +1,9 @@
 # 갈대늪 side quest (chapter 1): three scraps of the moonkeepers' old map lie in far corners of the marsh.
-# Walking over a scrap picks it up. With all three the map shows where a moonkeeper buried a chest;
+# Walking over a scrap picks it up. Nothing here carries an OmniLight3D: the marsh ground is one mesh and the
+# web renderer lights a mesh with at most 8 lights, so glow comes from emissive materials and bloom only.
+# With all three the map shows where a moonkeeper buried a chest;
 # the chest rises out of the ground there and Space opens it for a lasting reward.
+# Errand 5 (Kongal's kid): fireflies come out over the marsh at night; catch five to fill the kid's jar.
 extends RefCounted
 
 const STORY := preload("res://story_lines.gd")
@@ -15,6 +18,11 @@ var found := [false, false, false]
 var nodes: Array = []
 var chest: Node3D
 var chest_open := false
+
+const FLIES := [Vector2(6, 24), Vector2(14, 30), Vector2(34, 33), Vector2(38, 21), Vector2(19, 13), Vector2(11, 41)]
+const FLIES_NEEDED := 5
+var flies: Array = []      # [{"home": Vector2, "node": Node3D, "caught": bool}]
+var flies_on := false      # Sora is on the firefly errand
 
 func count() -> int:
 	return found.filter(func(f): return f).size()
@@ -31,12 +39,6 @@ func build(m: Node) -> void:
 		var mark: MeshInstance3D = m.box(Vector3(0.14, 0.035, 0.14), ink) # the crescent mark, a dark square from above
 		mark.position = Vector3(0.1, 0.01, -0.06)
 		g.add_child(mark)
-		var glint := OmniLight3D.new() # a warm glint so it can be spotted in the reeds
-		glint.light_color = Color("#ffe2a0")
-		glint.light_energy = 1.4
-		glint.omni_range = 2.6
-		glint.position = Vector3(0, 0.7, 0)
-		g.add_child(glint)
 		g.position = Vector3(p.x, m.height_at(p.x, p.y) + 0.25, p.y)
 		g.rotation = Vector3(0.5, 0.4 + i, 0) # tipped toward the camera
 		m.add_child(g)
@@ -49,15 +51,45 @@ func build(m: Node) -> void:
 		var b: MeshInstance3D = m.box(part[0], part[2])
 		b.position = part[1]
 		chest.add_child(b)
-	var beam := OmniLight3D.new()
-	beam.light_color = Color("#bcd6ff")
-	beam.light_energy = 2.0
-	beam.omni_range = 4.0
-	beam.position = Vector3(0, 1.2, 0)
-	chest.add_child(beam)
 	chest.position = Vector3(CHEST_AT.x, m.height_at(CHEST_AT.x, CHEST_AT.y), CHEST_AT.y)
 	chest.visible = false
 	m.add_child(chest)
+	var fly_mat: Material = m.glow_mat(Color("#b8f040"), 1.6) # green, not white, so they stand out from the drifting motes
+	for p in FLIES:
+		var f := Node3D.new()
+		var dot: MeshInstance3D = m.box(Vector3(0.16, 0.16, 0.16), fly_mat)
+		f.add_child(dot)
+		f.visible = false
+		m.add_child(f)
+		flies.append({"home": p, "node": f, "caught": false})
+
+func caught() -> int:
+	return flies.filter(func(f): return f.caught).size()
+
+# fireflies drift in slow loops around their spot; only at night and only while the errand is on
+func update_flies(m: Node, night_now: bool) -> void:
+	for i in flies.size():
+		var f: Dictionary = flies[i]
+		var n: Node3D = f.node
+		n.visible = flies_on and night_now and not f.caught
+		if not n.visible:
+			continue
+		var a: float = m.t * 0.7 + i * 1.3
+		var at: Vector2 = f.home + Vector2(cos(a), sin(a * 1.3)) * 1.2
+		n.position = Vector3(at.x, m.height_at(at.x, at.y) + 0.8 + sin(m.t * 3.0 + i) * 0.2, at.y)
+		if Vector2(m.player.x, m.player.z).distance_to(at) < 1.0:
+			f.caught = true
+			n.visible = false
+			m.burst(n.position, Color("#d8ff7a"), 10, 1.0)
+			m.sfx(1046 + caught() * 60, 0.12, "triangle", 0.18)
+			var k := caught()
+			if k >= FLIES_NEEDED:
+				flies_on = false
+				m.fly_q = 2
+				m.toast("반딧불을 모두 잡았다. 마을의 콩알에게 가져가자")
+			else:
+				m.toast(m.tr("반딧불 %d/%d") % [k, FLIES_NEEDED])
+			m.save_game()
 
 # after a load: hide the scraps already taken, raise the chest if the map is whole
 func restore(saved_found: Array, saved_open: bool) -> void:
@@ -73,8 +105,6 @@ func open_look() -> void:
 	for b in chest.get_children():
 		if b is MeshInstance3D:
 			b.transparency = 0.45
-		if b is OmniLight3D:
-			b.visible = false
 
 # called every frame while Sora is outside in the marsh
 func update(m: Node) -> void:
