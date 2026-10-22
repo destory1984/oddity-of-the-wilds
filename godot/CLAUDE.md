@@ -47,3 +47,12 @@ Godot 창이 멈춰 남으면 다음 실행이 조용히 실패한다. `python t
 - 스프라이트는 `BILLBOARD_FIXED_Y` 에 세로 `1/cos(카메라 기울기)` 배. 카메라를 정면으로 보게 하면 발이 땅에 묻힌다.
 - 효과음은 `sfx()` 로 코드에서 합성한다. 숫자는 `dev.py sound` 로 보지만 듣기 좋은지는 사용자에게 들어 봐 달라고 말한다.
 - 시험에서 키를 누른 것처럼 하려면 `Input.is_key_pressed` 대신 `key_down()` 을 쓴다. 그래야 `fake_keys` 로 누를 수 있다.
+
+## Text and languages
+
+- All player-facing text goes through `i18n/text.csv` (columns: keys, ko, en, ja, zh_CN). The key is the Korean text itself.
+- After adding or changing Korean text, run `python tools/i18n.py`. `dev.py check` fails while the table is out of date.
+- Labels and buttons translate on their own. Strings with `%` need `tr("...") % x`, so the template is looked up before the numbers go in. Text drawn with `draw_string` (hud.gd `text()`) calls `tr()` itself.
+- Story lines `"speaker|face|text"` give two keys: speaker and text.
+- `python tools/dev.py shot SCENE --pseudo` wraps translated text in [brackets]. Text without brackets skipped the table.
+- A language is added to project.godot only once its column has text. Japanese and Chinese also need a font with those glyphs (Pretendard has Korean and Latin only).

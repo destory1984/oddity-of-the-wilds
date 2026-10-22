@@ -49,6 +49,11 @@ def kill():
 
 def check():
     kill()
+    tr = run([sys.executable, str(ROOT / "tools" / "i18n.py"), "--check"])
+    if tr.returncode:
+        print(tr.stdout.strip())
+        print("CHECK FAILED")
+        return 1
     r = run([str(GODOT_CLI), "--headless", "--path", ".", "--quit-after", "20"], timeout=90)
     errors = [l for l in (r.stdout + r.stderr).splitlines() if "SCRIPT ERROR" in l or "Parse Error" in l or re.search(r"^\s+at: ", l)]
     if errors:
@@ -209,6 +214,7 @@ def main():
     ap.add_argument("names", nargs="*")
     ap.add_argument("-m", "--message")
     ap.add_argument("--hour")
+    ap.add_argument("--pseudo", action="store_true", help="shot: pseudo-translate text to spot strings missing from i18n/text.csv")
     ap.add_argument("--day")
     a = ap.parse_args()
     if a.cmd == "kill":
@@ -220,7 +226,7 @@ def main():
         print("\n".join(scene_names()))
         return 0
     if a.cmd == "shot":
-        extra = [f"--hour={a.hour}"] * bool(a.hour) + [f"--day={a.day}"] * bool(a.day)
+        extra = [f"--hour={a.hour}"] * bool(a.hour) + [f"--day={a.day}"] * bool(a.day) + ["--pseudo"] * a.pseudo
         return shot(a.names, extra)
     if a.cmd == "test":
         return test(a.names[0] if a.names else None)

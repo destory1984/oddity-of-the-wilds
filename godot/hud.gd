@@ -21,6 +21,7 @@ func diamond(c: Vector2, r: float, col: Color) -> void:
 	draw_colored_polygon(PackedVector2Array([c + Vector2(0, -r), c + Vector2(r, 0), c + Vector2(0, r), c + Vector2(-r, 0)]), col)
 
 func text(at: Vector2, s: String, size: int, col: Color, align := HORIZONTAL_ALIGNMENT_LEFT, width := -1.0) -> void:
+	s = tr(s) # drawn text is not auto-translated like Labels are
 	draw_string_outline(main.ui_font, at, s, align, width, size, 4, Color(0, 0, 0, 0.7))
 	draw_string(main.ui_font, at, s, align, width, size, col)
 

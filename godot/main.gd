@@ -207,6 +207,8 @@ func glow_mat(c: Color, energy := 3.0) -> StandardMaterial3D:
 
 # ---------------------------------------------------------------- setup
 func _ready() -> void:
+	if "--pseudo" in OS.get_cmdline_user_args():
+		TranslationServer.pseudolocalization_enabled = true # shows which text goes through the translation table
 	get_viewport().size_changed.connect(func(): if ui.has("story_cap"): fit_story())
 	rng.seed = 7
 	# Pretendard ships as unicode-range pieces; chain them as fallbacks so web builds (no system fonts) get Hangul
@@ -1381,7 +1383,7 @@ func damage_enemy(e: Dictionary, amt: float, from: Vector2, kb := 4.0, force_cri
 		else:
 			var g := 3 + rng.randi() % 5
 			player.gold += g
-			toast("금화 +%d" % g)
+			toast(tr("금화 +%d") % g)
 			gain_xp(12)
 
 func gain_xp(n: int) -> void:
@@ -1392,7 +1394,7 @@ func gain_xp(n: int) -> void:
 		player.max_hp += 12
 		player.atk += 3
 		player.hp = float(player.max_hp)
-		ui.banner_title.text = "레벨 %d" % player.lv
+		ui.banner_title.text = tr("레벨 %d") % player.lv
 		ui.banner_sub.text = "최대 체력 +12 · 공격력 +3"
 		ui.banner.modulate.a = 1.0
 		banner_t = 2.5
@@ -1540,7 +1542,7 @@ func interact() -> void:
 			player.gold += g
 			player.pots += 1
 			burst(Vector3(c.x, height_at(c.x, c.z) + 0.6, c.z), Color("#ffd84a"), 30, 3.0)
-			toast("금화 %d닢과 회복약을 찾았다" % g)
+			toast(tr("금화 %d닢과 회복약을 찾았다") % g)
 			sfx(784, 0.12, "triangle", 0.25)
 			get_tree().create_timer(0.1).timeout.connect(func(): sfx(1046, 0.25, "triangle", 0.25))
 			return
@@ -1577,7 +1579,7 @@ func skip_time(hours: float) -> void:
 	if hour < 12.0 and hour + hours >= 12.0 or hour + hours >= 36.0:
 		day += 1
 	hour = fmod(hour + hours, 24.0)
-	toast("%02d시" % int(hour))
+	toast(tr("%02d시") % int(hour))
 
 func update_daylight(dt: float) -> void:
 	if in_cave:
@@ -1765,7 +1767,7 @@ func build_hud() -> void:
 		dsc.size = Vector2(140, 40)
 		dsc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		var b := Button.new()
-		b.text = "◆ %d  사기" % it.price
+		b.text = tr("◆ %d  사기") % it.price
 		b.add_theme_font_override("font", ui_font)
 		b.add_theme_font_size_override("font_size", 15)
 		b.position = Vector2(118, 112)
@@ -2038,6 +2040,7 @@ func build_hud() -> void:
 	story.visible = false
 	ui.story = story
 	ui.story_img = img
+	cap_text.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 	ui.story_text = cap_text
 	ui.story_face = face
 	ui.story_who = who
@@ -2600,7 +2603,7 @@ func light_village_lamp(d: Dictionary) -> void:
 		errand = 2
 		set_quest("등불지기 심지에게 돌아가자")
 	else:
-		set_quest("동쪽 끝 꺼진 등불을 왕관으로 켜자 (E) %d/3" % n)
+		set_quest(tr("동쪽 끝 꺼진 등불을 왕관으로 켜자 (E) %d/3") % n)
 	var at: Vector2 = d.brick
 	get_tree().create_timer(1.0).timeout.connect(func():
 		spawn_enemy(at)
@@ -2816,7 +2819,7 @@ func show_line(line: String) -> void:
 		ui.story_face.texture = null # the portrait already shows who is talking
 	ui.story_text.position.x = 140.0 if ui.story_face.texture else 40.0
 	ui.story_tab.visible = parts[0] != ""
-	ui.story_text.text = parts[2]
+	ui.story_text.text = tr(parts[2]) # translated here so the typewriter counts the shown text
 	ui.story_text.visible_characters = 0
 	typing = 0.0
 
