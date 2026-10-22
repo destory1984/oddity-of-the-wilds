@@ -48,11 +48,11 @@ Godot 창이 멈춰 남으면 다음 실행이 조용히 실패한다. `python t
 - 효과음은 `sfx()` 로 코드에서 합성한다. 숫자는 `dev.py sound` 로 보지만 듣기 좋은지는 사용자에게 들어 봐 달라고 말한다.
 - 시험에서 키를 누른 것처럼 하려면 `Input.is_key_pressed` 대신 `key_down()` 을 쓴다. 그래야 `fake_keys` 로 누를 수 있다.
 
-## Text and languages
+## 글과 언어
 
-- All player-facing text goes through `i18n/text.csv` (columns: keys, ko, en, ja, zh_CN). The key is the Korean text itself.
-- After adding or changing Korean text, run `python tools/i18n.py`. `dev.py check` fails while the table is out of date.
-- Labels and buttons translate on their own. Strings with `%` need `tr("...") % x`, so the template is looked up before the numbers go in. Text drawn with `draw_string` (hud.gd `text()`) calls `tr()` itself.
-- Story lines `"speaker|face|text"` give two keys: speaker and text.
-- `python tools/dev.py shot SCENE --pseudo` wraps translated text in [brackets]. Text without brackets skipped the table.
-- A language is added to project.godot only once its column has text. Japanese and Chinese also need a font with those glyphs (Pretendard has Korean and Latin only).
+- 화면에 나오는 글은 모두 `i18n/text.csv` 를 거친다. 열은 keys, ko, en, ja, zh_CN 이고, 열쇠는 한국어 글 그대로다.
+- 한국어 글을 넣거나 고친 뒤에는 `python tools/i18n.py` 를 돌린다. 표가 코드와 맞지 않으면 `dev.py check` 가 실패한다.
+- Label과 Button은 저절로 번역된다. `%` 가 든 글은 `tr("...") % x` 로 쓴다. 숫자를 넣기 전에 틀을 찾아야 해서다. `draw_string` 으로 그리는 글은 hud.gd 의 `text()` 가 `tr()` 을 부른다.
+- 이야기 줄 `"말하는이|얼굴|대사"` 는 말하는이와 대사, 열쇠 2개가 된다.
+- `python tools/dev.py shot 장면 --pseudo` 는 표를 거친 글을 [대괄호]로 감싼다. 대괄호가 없는 글은 표를 건너뛴 글이다.
+- 언어는 그 열에 글이 생겨야 project.godot 에 올라간다. 일본어와 중국어는 그 글자가 든 글꼴이 더 필요하다. Pretendard에는 한글과 라틴 글자만 있다.

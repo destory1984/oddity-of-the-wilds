@@ -2200,7 +2200,7 @@ func open_cave(at: Vector2, with_story := true) -> void:
 	shake = 0.4
 	save_game()
 	show_story("res://art/story/05_brick_king.jpg", STORY.BOSS_FALLS)
-	set_quest("땅 아래로 가는 굴이 열렸다 (다음 장에서 계속)")
+	set_quest("땅 아래로 가는 동굴이 열렸다 (다음 장에서 계속)")
 
 # ---------------------------------------------------------------- save
 # Saved to user://save.json (on the web this lives in the browser's IndexedDB) every 5 s
@@ -2295,7 +2295,7 @@ func load_game() -> void:
 			key_chest.modulate = Color(0.55, 0.55, 0.55)
 	if is_instance_valid(ui.title_hint):
 		ui.title_hint.text = "아무 키나 눌러 이어하기  ·  F9 처음부터"
-	set_quest(["", "왕관을 만져 보자 (E)", "서쪽 오두막으로 가 보자", "북쪽 벽돌왕이 늪의 물길을 막고 있다", "", "땅 아래로 가는 굴이 열렸다 (다음 장에서 계속)"][clampi(story_step, 0, 5)])
+	set_quest(["", "왕관을 만져 보자 (E)", "서쪽 오두막으로 가 보자", "북쪽 벽돌왕이 늪의 물길을 막고 있다", "", "땅 아래로 가는 동굴이 열렸다 (다음 장에서 계속)"][clampi(story_step, 0, 5)])
 
 # keep level, gold and story, but put Sora back at the starting crossing (F8)
 func return_to_start() -> void:
@@ -2748,11 +2748,11 @@ func enter_cave() -> void:
 	player.x = sp.x
 	player.z = sp.y
 	ground_y = 0.0
-	set_quest("굴 깊은 곳으로")
+	set_quest("동굴 깊은 곳으로")
 	ui.outside_map = ui.mini.map_tex
 	ui.mini.map_tex = cave_map_tex()
-	ui.zone_name.text = "지하 굴"
-	ui.zone_sub.text = "벽 그림이 있는 굴"
+	ui.zone_name.text = "지하 동굴"
+	ui.zone_sub.text = "벽 그림이 있는 동굴"
 	save_game()
 
 func leave_cave() -> void:
