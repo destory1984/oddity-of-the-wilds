@@ -466,10 +466,15 @@ func run() -> void:
 		check("cave_faint", not main.in_cave and main.ui.zone_name.text == "갈대늪" and main.player.x < 100.0,
 			"fainting underground wakes outside with outside state: in cave=%s zone=%s" % [main.in_cave, main.ui.zone_name.text])
 	if want.call("cave_exit"):
+		main.has_skip = true
+		main.cave_exit_seen = false
 		main.in_cave = true
 		reset_to(main.cave_marks.E + Vector2(-0.5, 0))
 		await wait(1.2)
-		check("cave_exit", not main.in_cave and main.story_step == 7, "exit -> outside=%s step=%d" % [not main.in_cave, main.story_step])
+		var talk: bool = main.story_open
+		main.close_story()
+		await wait(0.6)
+		check("cave_exit", talk and not main.in_cave and main.story_step == 7, "exit -> outside=%s step=%d" % [not main.in_cave, main.story_step])
 	if want.call("water_skip"):
 		main.in_cave = false
 		main.has_skip = true

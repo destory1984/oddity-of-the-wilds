@@ -2107,12 +2107,12 @@ func touch_crown() -> void:
 		burst(Vector3(g.x, height_at(g.x, g.z) + 0.4, g.z), Color("#c9a066"), 20, 2.0)
 		pop_num(Vector3(g.x, height_at(g.x, g.z) + 1.3, g.z), "!", Color("#ff5a4a"))
 		sfx(110, 0.25, "square", 0.25, 80)
-		get_tree().create_timer(4.0).timeout.connect(func(): set_quest("서쪽 오두막으로 가 보자")))
+		get_tree().create_timer(4.0).timeout.connect(func(): set_quest("쪽지에 적힌 서쪽 오두막을 찾아가자")))
 
 func meet_bori() -> void:
 	story_step = 3
 	save_game()
-	set_quest("북쪽 벽돌왕이 늪의 물길을 막고 있다")
+	set_quest("북쪽 벽돌왕을 쓰러뜨려 물길을 열어라 (상점에서 약을 챙기자)")
 	show_story("", STORY.BORI)
 
 # story step 5: the Brick King falls, the blocked waterway breaks free and a cave mouth opens
@@ -2186,7 +2186,7 @@ func save_game() -> void:
 			boss_dead = true
 	var d := {"lv": player.lv, "xp": player.xp, "max_hp": player.max_hp, "hp": player.hp, "atk": player.atk,
 		"gold": player.gold, "pots": player.pots, "x": player.x, "z": player.z,
-		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
+		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
 		"chests": chests.map(func(c): return c.open)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -2210,6 +2210,7 @@ func load_game() -> void:
 	story_step = int(d.get("story", 0))
 	var was_in_cave := bool(d.get("in_cave", false))
 	has_skip = bool(d.get("has_skip", false))
+	cave_exit_seen = bool(d.get("cave_exit_seen", false))
 	var opened: Array = d.get("chests", [])
 	for i in mini(opened.size(), chests.size()):
 		if opened[i]:
@@ -2484,6 +2485,7 @@ const CAVE_SPAWNS := [ # [x, z, archer] in cave tiles
 	[13, 11, true], [18, 15, true],
 ]
 var cave_spawned := false
+var cave_exit_seen := false
 var has_key := false
 var saw_painting := false
 var door_node: Node3D
@@ -2576,12 +2578,16 @@ func leave_cave() -> void:
 	player.x = 36.0 # east marsh shore
 	player.z = 20.0
 	ground_y = height_at(player.x, player.z)
-	set_quest("동쪽 늪이 열렸다")
+	set_quest("동쪽 강을 물수제비 걸음으로 건너, 마을 불빛을 찾아라")
 	if ui.has("outside_map"):
 		ui.mini.map_tex = ui.outside_map
 	ui.zone_name.text = "갈대늪"
 	ui.zone_sub.text = "동쪽 물가"
 	save_game()
+	var first := not cave_exit_seen
+	cave_exit_seen = true
+	if first:
+		show_story("", STORY.CAVE_EXIT)
 
 func set_quest(text: String) -> void:
 	ui.quest.text = text
@@ -2851,7 +2857,9 @@ func _process(dt: float) -> void:
 		fade_then(enter_cave)
 	if in_cave:
 		check_painting()
-	if in_cave and Vector2(player.x, player.z).distance_to(cave_marks.E) < 1.0 and fade_rect.color.a == 0.0:
+	if in_cave and not has_skip and Vector2(player.x, player.z).distance_to(cave_marks.E) < 1.6 and toast_t <= 0.0:
+		toast("바깥 빛이 보인다. 하지만 수레두더지가 길을 막고 있다")
+	if in_cave and has_skip and Vector2(player.x, player.z).distance_to(cave_marks.E) < 1.0 and fade_rect.color.a == 0.0:
 		fade_then(leave_cave)
 	update_daylight(dt)
 	update_lights()
