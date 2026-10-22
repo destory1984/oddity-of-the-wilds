@@ -30,6 +30,8 @@ SOFTWARE.
    - The pixel-art character "Sora" (소라): its design and every drawing of it
      in art/sora/ and inside the game data (index.pck), including drawings
      newly made from it.
+   - The title lettering "Oddity of the Wilds" (art/title/title.png and the
+     same image inside the game data).
    Copyright (c) 2026 destory1984. All rights reserved.
    You may view this material here, but you may not copy, modify, publish or
    sell it, or use it in your own work, without written permission from the
