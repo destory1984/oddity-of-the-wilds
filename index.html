@@ -28,7 +28,7 @@
   #arc { position:absolute; left:18px; right:18px; top:14px; height:84px; border:1px dashed rgba(239,230,207,.35); border-radius:50%; }
   #horizon { position:absolute; left:8px; right:8px; bottom:6px; height:1px; background:linear-gradient(90deg,transparent,#b9a273,transparent); }
   #sun { position:absolute; width:22px; height:22px; margin:-11px 0 0 -11px; border-radius:50%; transition:left 1.5s, top 1.5s, background 1.5s, box-shadow 1.5s; }
-  #mini { right:14px; top:84px; width:186px; height:186px; padding:0; border-radius:50%; overflow:hidden;
+  #mini { right:14px; top:12px; width:186px; height:186px; padding:0; border-radius:50%; overflow:hidden;
     border:3px double #b9a273; box-shadow:0 4px 18px rgba(0,0,0,.5), inset 0 0 18px rgba(60,40,10,.6); }
   #mini canvas { width:100%; height:100%; image-rendering:pixelated; border-radius:50%; }
   #mini b { position:absolute; transform:translate(-50%,-50%); font-size:11px; font-weight:800; color:#7a2a1a;
@@ -96,7 +96,7 @@
     <span>기력</span><div class="bar"><div id="spb" style="background:linear-gradient(#fff3c8,#d9be7a)"></div></div><span></span>
   </div>
 </div>
-<div class="hud panel" id="clock"><div id="sky"></div><div id="arc"></div><div id="sun"></div><div id="horizon"></div></div>
+<div class="hud panel" id="clock" style="display:none"><div id="sky"></div><div id="arc"></div><div id="sun"></div><div id="horizon"></div></div>
 <div class="hud panel" id="mini"><canvas id="minimap" width="96" height="96"></canvas><b>N</b></div>
 <div class="hud panel" id="controls">
   <button id="helpx" title="닫기">✕</button>
@@ -560,6 +560,15 @@ new THREE.TextureLoader().load('art/sora/sora-walk-cut.png', (t) => {
   heroFrames.side = cols.map(i => cut(2, i)); heroFrames.up = cols.map(i => cut(3, i));
   heroSprite.scale.set(1.1, 1.65, 1); heroSprite.center.set(.5, .01);
 });
+// diagonals (art/sora/sora-walk-diag-cut.png): rows down-left, down-right, up-left, up-right
+new THREE.TextureLoader().load('art/sora/sora-walk-diag-cut.png', (t) => {
+  t.colorSpace = THREE.SRGBColorSpace; t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.generateMipmaps = false;
+  const cut = (row, col) => {
+    const c = t.clone(); c.repeat.set(.25, .25);
+    c.offset.set(col / 4, 1 - (row + 1) / 4); c.needsUpdate = true; return c;
+  };
+  ['downleft', 'downright', 'upleft', 'upright'].forEach((d, row) => { heroFrames[d] = [0, 1, 2, 3].map(i => cut(row, i)); });
+});
 const heroShadow = blob(0.9);
 const heroLight = new THREE.PointLight(0xffd59a, 0.0, 6); scene.add(heroLight);
 
@@ -935,7 +944,10 @@ function update(dt) {
 
   // hero sprite orientation + animation
   const sx = player.face.x * right.x + player.face.y * right.y, sz = player.face.x * fwd.x + player.face.y * fwd.y;
-  player.dir = Math.abs(sx) > Math.abs(sz) ? (sx > 0 ? 'side' : 'left') : (sz > 0 ? 'up' : 'down');
+  // 8 directions on screen; diagonals fall back to the 4-way frames until their sheet loads
+  const DIRS8 = ['up', 'upright', 'side', 'downright', 'down', 'downleft', 'left', 'upleft'];
+  const d8 = DIRS8[(Math.round(Math.atan2(sx, sz) / (Math.PI / 4)) + 8) % 8];
+  player.dir = heroFrames[d8] ? d8 : Math.abs(sx) > Math.abs(sz) ? (sx > 0 ? 'side' : 'left') : (sz > 0 ? 'up' : 'down');
   const moving = Math.hypot(player.vx, player.vz) > .4;
   player.anim += dt * (running ? 12 : 8);
   const frame = moving ? (player.anim | 0) % 4 : 0;

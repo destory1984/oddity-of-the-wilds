@@ -1,0 +1,13 @@
+The attached image is a pixel-art walk-cycle sheet of a character named Sora (4 columns x 4 rows: walking down/front, left, right, up/back).
+Use your image generation tool to create ONE new PNG image and save it as sora-walk-diag.png in the current directory.
+
+Draw the SAME character (same face, silver hair, crown, blue ribbon, blue-and-white outfit with gold diamond trims, both arms clearly visible with long sleeves, same pixel-art style and proportions) walking in the four DIAGONAL directions of a top-down 3/4-view RPG.
+- Layout: a strict grid of 4 columns x 4 rows, every cell the same size, character centered, feet on the same baseline near the bottom of each cell.
+  - Row 1: walking down-left (three-quarter front view, turned toward the lower left), 4-frame walk cycle.
+  - Row 2: walking down-right (three-quarter front view, turned toward the lower right), 4-frame walk cycle.
+  - Row 3: walking up-left (three-quarter back view, turned toward the upper left), 4-frame walk cycle.
+  - Row 4: walking up-right (three-quarter back view, turned toward the upper right), 4-frame walk cycle.
+- Feet on the ground, legs alternating, arms swinging. Not flying.
+- Crisp hard pixel edges, no text, no labels, no grid lines.
+- Background: solid flat pure magenta #FF00FF everywhere outside the character. No ground shadow.
+When done, reply with only the file path.
