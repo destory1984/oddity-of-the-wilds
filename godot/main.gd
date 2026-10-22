@@ -114,6 +114,8 @@ func cave_char(x: float, z: float) -> String:
 	return c
 
 func tile_at(x: float, z: float) -> int:
+	if x >= GARDEN.GARDEN_X - 0.5:
+		return WATER if garden.blocked(x, z) else (SAND if garden.char_at(x, z) == "=" else GRASS)
 	if x >= FOREST.FOREST_X - 0.5:
 		return WATER if forest.blocked(x, z) else (SAND if forest.char_at(x, z) == "=" else GRASS)
 	if x >= VILLAGE.VILLAGE_X - 0.5:
@@ -243,6 +245,7 @@ func _ready() -> void:
 	build_cave()
 	village.build(self)
 	forest.build(self)
+	garden.build(self)
 	build_player()
 	for i in 9:
 		spawn_enemy()
@@ -287,6 +290,7 @@ const SCENES := {
 	"village_night": {"play": true, "village": true, "hour": 22.0},
 	"forest": {"play": true, "village": true, "forest": true, "hour": 16.0},
 	"forest_night": {"play": true, "village": true, "forest": true, "hour": 22.0},
+	"mold": {"play": true, "village": true, "mold": true, "hour": 21.0},
 	"kid": {"play": true, "village": true, "kid": true, "hour": 20.5},
 }
 
@@ -331,6 +335,15 @@ func apply_test_args(args: PackedStringArray) -> void:
 			enter_forest()
 			player.x = forest.walls[0].pos.x - 2.5
 			player.z = forest.walls[0].pos.y
+		if sc.get("mold", false): # the last boss in the heart of the garden
+			night_q = 4
+			forest_q = 3
+			garden_q = 1
+			enter_garden()
+			garden_q = 2
+			spawn_mold()
+			player.x = garden.marks.C.x - 4.5
+			player.z = garden.marks.C.y + 1.5
 		if sc.get("kid", false): # Kongal's kid goblin trotting after Sora in the south field
 			errand = 3
 			player.x = VILLAGE.VILLAGE_X + 9.0
@@ -1357,6 +1370,8 @@ func footstep() -> void:
 
 # ---------------------------------------------------------------- combat
 func damage_enemy(e: Dictionary, amt: float, from: Vector2, kb := 4.0, force_crit := false, stop := 0.05) -> void:
+	if e.get("locked", false):
+		return # the mold at its last sliver only breaks to the wind
 	if e.dead or e.get("roar", 0.0) > 0.0:
 		return
 	var crit := force_crit or rng.randf() < 0.15
@@ -2242,7 +2257,7 @@ func save_game() -> void:
 			boss_dead = true
 	var d := {"lv": player.lv, "xp": player.xp, "max_hp": player.max_hp, "hp": player.hp, "atk": player.atk,
 		"gold": player.gold, "pots": player.pots, "x": player.x, "z": player.z,
-		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "in_village": in_village, "met": met.keys(), "pips": crown_pips, "errand": errand, "kid_q": kid_q, "doran_q": doran_q, "mul_q": mul_q, "night_q": night_q, "in_forest": in_forest, "forest_q": forest_q, "walls": forest.walls.map(func(w): return w.open), "has_unbrick": has_unbrick, "vlit": village.dark.map(func(d): return d.lit), "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
+		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "in_village": in_village, "met": met.keys(), "pips": crown_pips, "errand": errand, "kid_q": kid_q, "doran_q": doran_q, "mul_q": mul_q, "night_q": night_q, "in_forest": in_forest, "in_garden": in_garden, "garden_q": garden_q, "forest_q": forest_q, "walls": forest.walls.map(func(w): return w.open), "has_unbrick": has_unbrick, "vlit": village.dark.map(func(d): return d.lit), "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
 		"chests": chests.map(func(c): return c.open)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -2272,6 +2287,9 @@ func load_game() -> void:
 	mul_q = int(d.get("mul_q", 0))
 	night_q = int(d.get("night_q", 0))
 	forest_q = int(d.get("forest_q", 0))
+	garden_q = int(d.get("garden_q", 0))
+	if garden_q >= 2 and garden_q < 5:
+		garden_q = 1 # the mold fight starts over when she walks back in
 	var wo: Array = d.get("walls", [])
 	for i in mini(wo.size(), forest.walls.size()):
 		if wo[i]:
@@ -2305,6 +2323,12 @@ func load_game() -> void:
 		player.z = vz
 		if kid_q > 0:
 			place_kid()
+	if bool(d.get("in_garden", false)):
+		var gx: float = player.x
+		var gz: float = player.z
+		enter_garden()
+		player.x = gx
+		player.z = gz
 	if bool(d.get("in_forest", false)):
 		var fx: float = player.x
 		var fz: float = player.z
@@ -2565,6 +2589,11 @@ var village = VILLAGE.new()
 const FOREST := preload("res://forest.gd")
 var forest = FOREST.new()
 var in_forest := false
+const GARDEN := preload("res://garden.gd")
+var garden = GARDEN.new()
+var in_garden := false
+var garden_q := 0          # 0 never entered, 1 inside, 2 fighting the mold, 3 the villagers' lights are coming, 4 ready to wind, 5 wound (the end)
+var mold_wave := {}        # the mold's expanding shock ring: {"r": radius, "node": MeshInstance3D}
 var forest_q := 0          # 0 never entered, 1 walking the forest, 2 second duel, 3 Noeul turned
 var in_village := false
 var crown_pips := 8        # the crown's moon gauge, 0..8
@@ -2631,6 +2660,9 @@ func crown_key() -> void:
 	if in_forest:
 		if try_unbrick():
 			return
+	if in_garden and garden_q == 4:
+		final_wind()
+		return
 	if in_village:
 		if me.distance_to(village.marks.M) < 1.8:
 			if errand == 0:
@@ -3024,6 +3056,200 @@ func noeul_turned() -> void:
 	gain_xp(250)
 	show_story("res://art/story/10_jae_turns.jpg", STORY.NOEUL_TURNS)
 	set_quest("정원 한가운데로 가는 길을 찾자 (다음 장에서 계속)")
+	save_game()
+
+# ---- the heart of the garden (story steps 11 and 12)
+func enter_garden() -> void:
+	in_forest = false
+	in_garden = true
+	story_step = maxi(story_step, 11)
+	player.x = garden.marks.S.x + 1.5
+	player.z = garden.marks.S.y
+	ground_y = 0.0
+	ui.mini.map_tex = garden.map_tex(GARDEN.GARDEN_X + GARDEN.W)
+	ui.zone_name.text = "정원 한가운데"
+	ui.zone_sub.text = "굳은달 빈터"
+	if garden_q == 0:
+		garden_q = 1
+		show_story("", STORY.GARDEN_IN)
+	if garden_q < 5:
+		set_quest("굳은달 거푸집의 심장을 노리자")
+	if garden_q >= 5:
+		garden.set_posts(8)
+	save_game()
+
+func leave_garden() -> void:
+	in_garden = false
+	in_forest = true
+	player.x = forest.marks.E.x - 1.2
+	player.z = forest.marks.E.y
+	ground_y = 0.0
+	ui.mini.map_tex = forest.map_tex(FOREST.FOREST_X + FOREST.W)
+	ui.zone_name.text = "굳은 숲"
+	ui.zone_sub.text = "노을의 빈터"
+	ui.boss.visible = false
+	save_game()
+
+func update_garden(dt: float) -> void:
+	if garden_q == 1 and not story_open and Vector2(player.x, player.z).distance_to(garden.marks.C) < 8.0:
+		garden_q = 2
+		spawn_mold()
+	if not mold_wave.is_empty():
+		update_mold_wave(dt)
+
+func spawn_mold() -> void:
+	if enemies.any(func(e): return e.get("mold", false) and not e.dead):
+		return
+	var c: Vector2 = garden.marks.C
+	var node: Node3D = garden.mold(self)
+	enemies.append({"x": c.x, "z": c.y, "hp": 1300.0, "max_hp": 1300, "node": node, "shadow": blob(2.2), "t": 0.0,
+		"atk_cd": 2.5, "hurt": 0.0, "kx": 0.0, "kz": 0.0, "wx": c.x, "wz": c.y, "dead": false, "respawn": 0.0,
+		"mold": true, "cave": true, "wind": 0.0, "stun": 0.0, "next": 0, "rings": [], "locked": false})
+
+func mold_phase(e: Dictionary) -> int:
+	var f: float = e.hp / e.max_hp
+	return 1 if f > 0.66 else (2 if f > 0.33 else 3)
+
+# the mold: drifts toward Sora; slams rings of brick (1, 3, 5 by phase), sends a shock ring out (phase 2+),
+# and wakes goblins (every third move). At 12% it locks and the last wind begins.
+func update_mold(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
+	var node: Node3D = e.node
+	ui.boss.visible = true
+	ui.boss_name.text = "굳은달 거푸집"
+	ui.boss_bar.size.x = 420.0 * maxf(0.0, e.hp) / e.max_hp
+	e.t += dt
+	e.hurt -= dt
+	var crescent: Node3D = node.get_node("crescent")
+	crescent.rotation.y += dt * (0.4 + 0.3 * mold_phase(e))
+	var heart: MeshInstance3D = node.get_node("heart")
+	heart.position.y = 1.0 + sin(e.t * 3.0) * 0.15
+	heart.scale = Vector3.ONE * (1.3 if e.hurt > 0.0 else 1.0)
+	if e.locked:
+		node.position = Vector3(e.x, 0, e.z)
+		return
+	if e.hp <= e.max_hp * 0.12 and garden_q == 2:
+		mold_locks(e)
+		return
+	var ph := mold_phase(e)
+	if e.wind > 0.0:
+		e.wind -= dt
+		if e.wind <= 0.0:
+			for r in e.rings:
+				burst(Vector3(r.x, 0.3, r.y), Color("#8a8a96"), 18, 3.0)
+				if Vector2(player.x, player.z).distance_to(r) < 1.3:
+					player_hit(18 + 4 * ph, r, e)
+			shake = 0.2
+			sfx(70, 0.3, "square", 0.25, -30)
+			e.atk_cd = 2.2 - 0.4 * ph
+	else:
+		e.atk_cd -= dt
+		if e.atk_cd <= 0.0:
+			e.next = int(e.next) + 1
+			if int(e.next) % 3 == 0 and enemies.filter(func(g): return not g.dead and g.x > GARDEN.GARDEN_X and not g.get("mold", false)).size() < 4:
+				for k in 2: # wakes two goblins at the arena's edge
+					var a := rnd(0, TAU)
+					spawn_enemy(garden.marks.C + Vector2(cos(a), sin(a)) * 7.0)
+					enemies[enemies.size() - 1].cave = true
+				e.atk_cd = 1.5
+			elif ph >= 2 and int(e.next) % 3 == 1 and mold_wave.is_empty():
+				start_mold_wave(e)
+				e.atk_cd = 2.4
+			else:
+				e.wind = 0.9
+				e.rings = [Vector2(player.x, player.z)]
+				for k in (ph - 1) * 2:
+					e.rings.append(Vector2(player.x, player.z) + Vector2(rnd(-3, 3), rnd(-3, 3)))
+				for r in e.rings:
+					warn_ring(Vector3(r.x, 0.0, r.y), 1.3, 0.9)
+		elif d > 1.3: # drifts after Sora, slowly
+			var nx: float = e.x + to.x / d * 0.9 * dt
+			var nz: float = e.z + to.y / d * 0.9 * dt
+			if Vector2(nx, nz).distance_to(garden.marks.C) < 5.0:
+				e.x = nx
+				e.z = nz
+	node.position = Vector3(e.x, 0, e.z)
+	e.shadow.position = Vector3(e.x, 0.02, e.z)
+
+# a ring of grey force rolls outward from the mold; dodge through it (the flash dodge works) or be hit
+func start_mold_wave(e: Dictionary) -> void:
+	var ring := MeshInstance3D.new()
+	var tor := TorusMesh.new()
+	tor.inner_radius = 0.85
+	tor.outer_radius = 1.0
+	ring.mesh = tor
+	ring.material_override = glow_mat(Color("#b48cff"), 2.0)
+	ring.position = Vector3(e.x, 0.2, e.z)
+	add_child(ring)
+	mold_wave = {"r": 0.5, "node": ring, "c": Vector2(e.x, e.z), "hit": false}
+	pop_num(Vector3(e.x, 3.0, e.z), "!", Color("#ff5a4a"))
+	sfx(110, 0.6, "sawtooth", 0.25, 200)
+
+func update_mold_wave(dt: float) -> void:
+	mold_wave.r += dt * 5.0
+	var ring: MeshInstance3D = mold_wave.node
+	ring.scale = Vector3(mold_wave.r, 1.0, mold_wave.r)
+	var pd: float = Vector2(player.x, player.z).distance_to(mold_wave.c)
+	if not mold_wave.hit and absf(pd - mold_wave.r) < 0.45:
+		mold_wave.hit = true
+		var e: Dictionary = {} if enemies.is_empty() else enemies.filter(func(m): return m.get("mold", false))[0]
+		player_hit(22, mold_wave.c, e)
+	if mold_wave.r > 10.0:
+		ring.queue_free()
+		mold_wave = {}
+
+func mold_locks(e: Dictionary) -> void:
+	e.locked = true
+	garden_q = 3
+	crown_pips = 0
+	pip_flash = 0.5
+	for g in enemies:
+		if not g.dead and g.x > GARDEN.GARDEN_X and not g.get("mold", false):
+			g.dead = true
+			g.node.visible = false
+			g.shadow.visible = false
+	show_story("", STORY.FINAL_SHORT)
+	after_story = light_ring
+	save_game()
+
+# the villagers' lights fill the ring posts one by one, and each fills one pip
+func light_ring() -> void:
+	for k in 8:
+		get_tree().create_timer(0.35 * (k + 1)).timeout.connect(func():
+			garden.set_posts(k + 1)
+			crown_pips = k + 1
+			pip_flash = 0.3
+			var l: OmniLight3D = garden.posts[k]
+			burst(l.position, Color("#ffc46a"), 16, 2.0)
+			sfx(392 + 40 * k, 0.25, "sine", 0.2))
+	get_tree().create_timer(3.2).timeout.connect(func():
+		garden_q = 4
+		set_quest("왕관을 높이 들어 다 같이 땅을 감자 (E)")
+		save_game())
+
+func final_wind() -> void:
+	garden_q = 5
+	crown_pips = 0
+	burst(Vector3(player.x, 2.0, player.z), Color("#fff1a0"), 60, 6.0)
+	shake = 0.6
+	show_story("res://art/story/11_final_mold.jpg", STORY.FINAL_WIND)
+	after_story = mold_breaks
+	save_game()
+
+func mold_breaks() -> void:
+	for e in enemies:
+		if e.get("mold", false) and not e.dead:
+			e.dead = true
+			for k in 6:
+				burst(Vector3(e.x + rnd(-2, 2), rnd(0.5, 4.0), e.z + rnd(-2, 2)), Color("#8a8a96"), 30, 5.0)
+			e.node.queue_free()
+			e.shadow.queue_free()
+	ui.boss.visible = false
+	crown_pips = 8
+	player.gold += 500
+	gain_xp(400)
+	story_step = 12
+	show_story("res://art/story/12_festival.jpg", STORY.ENDING)
+	set_quest("끝. 다시 돌기 시작한 정원을 마음껏 거닐자")
 	save_game()
 
 # put the kid goblin where kid_q says: in the field with guards, or beside Kongal
@@ -3563,6 +3789,15 @@ func _process(dt: float) -> void:
 		fade_then(leave_forest)
 	if in_forest:
 		update_forest()
+	if in_forest and Vector2(player.x, player.z).distance_to(forest.marks.E) < 0.9 and fade_rect.color.a == 0.0:
+		if forest_q >= 3:
+			fade_then(enter_garden)
+		elif toast_t <= 0.0:
+			toast("노을이 길을 막고 있다")
+	if in_garden and Vector2(player.x, player.z).distance_to(garden.marks.S) < 0.9 and fade_rect.color.a == 0.0:
+		fade_then(leave_garden)
+	if in_garden:
+		update_garden(dt)
 	update_pips(dt)
 	update_kid(dt)
 	update_oar()
@@ -3673,6 +3908,9 @@ func update_enemies(dt: float, gy: float) -> void:
 			continue
 		if e.get("noeul", false):
 			update_noeul(e, dt, d, to)
+			continue
+		if e.get("mold", false):
+			update_mold(e, dt, d, to)
 			continue
 		if d < 7 and not intro and e.get("archer", false):
 			if d < 4.0:
@@ -3932,6 +4170,18 @@ func hurt_player(dmg: int, gy: float) -> void:
 
 # Sora faints: say so plainly, keep gold and level, heal the boss, and wake her at the start
 func faint() -> void:
+	if in_garden:
+		ui.mini.map_tex = village.map_tex(VILLAGE.VILLAGE_X + VILLAGE.W)
+		in_garden = false
+		in_village = true
+		if garden_q >= 2 and garden_q < 5:
+			garden_q = 1 # the fight starts over
+			garden.set_posts(0)
+			for e in enemies:
+				if e.get("mold", false) and not e.dead:
+					e.dead = true
+					e.node.queue_free()
+					e.shadow.queue_free()
 	if in_village or in_forest:
 		in_forest = false
 		in_village = true

@@ -8,7 +8,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "forest", "village_exit", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "forest", "garden_end", "village_exit", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -778,6 +778,41 @@ func run() -> void:
 		reset_to(main.forest.marks.S + Vector2(0.3, 0))
 		await wait(1.5)
 		main.hour = 12.0
+		main.in_village = true
+		reset_to(main.village.marks.M + Vector2(-1.2, 0))
+	if want.call("garden_end"):
+		main.forest_q = 3
+		main.garden_q = 0
+		main.in_village = false
+		main.in_forest = true
+		reset_to(main.forest.marks.E + Vector2(-0.3, 0))
+		await wait(1.5)
+		var entered: bool = main.in_garden and main.garden_q == 1
+		main.close_story()
+		reset_to(main.garden.marks.C + Vector2(-6.0, 0))
+		main.player.inv = 30.0
+		await wait(0.3)
+		var mold: Array = main.enemies.filter(func(e): return e.get("mold", false) and not e.dead)
+		var fought: bool = main.garden_q == 2 and mold.size() == 1
+		if fought:
+			mold[0].hp = mold[0].max_hp * 0.13
+			main.damage_enemy(mold[0], 30.0, Vector2(main.player.x, main.player.z))
+			await wait(0.3)
+		var locked: bool = main.garden_q == 3 and mold.size() == 1 and mold[0].locked and main.crown_pips == 0
+		main.close_story()
+		await wait(3.6)
+		var ready: bool = main.garden_q == 4 and main.crown_pips == 8
+		tap(KEY_E)
+		await wait(0.3)
+		main.close_story()
+		await wait(0.4)
+		var ended: bool = main.story_step == 12 and main.garden_q == 5 and mold[0].dead
+		main.close_story()
+		check("garden_end", entered and fought and locked and ready and ended,
+			"entered=%s fought=%s locked at 12%%=%s lights filled=%s ended=%s step=%d" % [entered, fought, locked, ready, ended, main.story_step])
+		reset_to(main.garden.marks.S + Vector2(0.3, 0))
+		await wait(1.5)
+		main.in_forest = false
 		main.in_village = true
 		reset_to(main.village.marks.M + Vector2(-1.2, 0))
 	if want.call("village_exit"):

@@ -24,7 +24,7 @@ S=======W....g..TTTTTTTTTTT...TTTTT#
 #TTTTTTTTT...TTTTTTTTTTTTTTTWTTTTTT#
 #TTTTTTTTT...TTTTTTTTTTT..........T#
 #TTTTTTTTT.g.TTTTTTTTTTT..g.......T#
-#TTTTTTTTT.L.TTTTTTTTTTT.......N..T#
+#TTTTTTTTT.L.TTTTTTTTTTT.......N...E
 #TTTTTTTTT...TTTTTTTTTTT.L........T#
 #TTTTTTTTTTTTTTTTTTTTTTT........g.T#
 ####################################"""
@@ -66,7 +66,7 @@ func build(m: Node) -> void:
 		for x in W:
 			var c: String = grid[z][x]
 			var w := Vector2(FOREST_X + x, z)
-			if c in "SN":
+			if c in "SNE":
 				marks[c] = w
 			if c == "g":
 				goblins.append(w)
