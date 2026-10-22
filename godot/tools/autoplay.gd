@@ -8,7 +8,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "village_exit", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "village_exit", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -651,6 +651,37 @@ func run() -> void:
 			"asked=%s read=%s delivered(no shop)=%s doran_q=%d pips=%d max_hp +%d" % [asked, read, no_shop, main.doran_q, main.crown_pips, main.player.max_hp - hp0])
 		main.in_village = true
 		reset_to(main.village.marks.M + Vector2(-1.2, 0))
+	if want.call("mulgyeol_errand"):
+		main.doran_q = 3
+		main.mul_q = 0
+		var mp: Vector2 = main.village.folk_pos.mulgyeol
+		reset_to(mp + Vector2(-1.0, 0))
+		tap(KEY_E)
+		await wait(0.3)
+		main.close_story()
+		var asked: bool = main.mul_q == 1 and main.oar_node != null
+		main.in_village = false
+		main.has_skip = true
+		reset_to(Vector2(13.6, 12.0)) # east shore of the pond: run west over the water to the oar
+		main.player.inv = 5.0
+		main.player.sp = 100.0
+		hold_world(Vector2(-1, 0))
+		main.fake_keys[KEY_SHIFT] = true
+		await wait(1.0)
+		release()
+		await wait(0.4)
+		var got: bool = main.mul_q == 2 and not main.oar_node.visible
+		main.in_village = true
+		reset_to(mp + Vector2(-1.0, 0))
+		var g0: int = main.player.gold
+		tap(KEY_E)
+		await wait(0.3)
+		main.close_story()
+		check("mulgyeol_errand", asked and got and main.mul_q == 3 and main.player.gold == g0 + 50,
+			"asked=%s got oar=%s mul_q=%d gold +%d cave=%s" % [asked, got, main.mul_q, main.player.gold - g0, main.in_cave])
+		for e in main.enemies.filter(func(e): return not e.dead and e.x < 20.0 and e.z < 20.0):
+			e.dead = true
+			e.node.visible = false
 	if want.call("village_exit"):
 		reset_to(main.village.marks.G + Vector2(0.6, 0))
 		main.player.x = main.village.marks.G.x + 0.3

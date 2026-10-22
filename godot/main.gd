@@ -2228,7 +2228,7 @@ func save_game() -> void:
 			boss_dead = true
 	var d := {"lv": player.lv, "xp": player.xp, "max_hp": player.max_hp, "hp": player.hp, "atk": player.atk,
 		"gold": player.gold, "pots": player.pots, "x": player.x, "z": player.z,
-		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "in_village": in_village, "met": met.keys(), "pips": crown_pips, "errand": errand, "kid_q": kid_q, "doran_q": doran_q, "vlit": village.dark.map(func(d): return d.lit), "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
+		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "in_village": in_village, "met": met.keys(), "pips": crown_pips, "errand": errand, "kid_q": kid_q, "doran_q": doran_q, "mul_q": mul_q, "vlit": village.dark.map(func(d): return d.lit), "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
 		"chests": chests.map(func(c): return c.open)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -2255,6 +2255,9 @@ func load_game() -> void:
 	errand = int(d.get("errand", 0))
 	kid_q = int(d.get("kid_q", 0))
 	doran_q = int(d.get("doran_q", 0))
+	mul_q = int(d.get("mul_q", 0))
+	if mul_q == 1:
+		place_oar()
 	for id in d.get("met", []):
 		met[id] = true
 	var vlit: Array = d.get("vlit", [])
@@ -2534,6 +2537,9 @@ var met := {}               # villagers already greeted
 var errand := 0            # 0 not given, 1 lighting lanterns, 2 lanterns done, 3 rewarded
 var kid_q := 0             # Kongal's errand: 0 not given, 1 find the kid goblin, 2 it follows Sora, 3 home
 var kid_node: Node3D
+var mul_q := 0             # Mulgyeol's oar: 0 not given, 1 fetch it from the NW pond, 2 carrying it, 3 returned
+var oar_node: Node3D
+const OAR_AT := Vector2(9.0, 11.0) # middle of the north-west marsh pond, reachable only by water skip
 var doran_q := 0           # Doran's letter: 0 not given, 1 read it with the crown, 2 carry it to Bori, 3 delivered
 
 func enter_village() -> void:
@@ -2598,6 +2604,9 @@ func crown_key() -> void:
 				if id == "kongal" and errand >= 3 and kid_q != 1:
 					kongal_errand()
 					return
+				if id == "mulgyeol" and doran_q >= 3 and mul_q != 1:
+					mulgyeol_errand()
+					return
 				if id == "doran" and kid_q >= 3 and doran_q < 2:
 					doran_errand()
 					return
@@ -2654,8 +2663,58 @@ func deliver_letter() -> void:
 	player.max_hp += 10
 	player.hp = float(player.max_hp)
 	show_story("", STORY.BORI_LETTER)
-	set_quest("등불 마을로 돌아가자 (다음 장에서 계속)")
+	set_quest("마을의 뱃사공 물결에게 가 보자 (E)")
 	save_game()
+
+# errand 4: Mulgyeol's oar floats in the middle of the half-hardened NW pond
+func mulgyeol_errand() -> void:
+	if mul_q == 0:
+		mul_q = 1
+		show_story("", STORY.MUL_ASK)
+		set_quest("늪 북서쪽 연못 한가운데의 노를 건져 오자 (Shift로 물 위 달리기)")
+		place_oar()
+	elif mul_q == 2:
+		mul_q = 3
+		player.gold += 50
+		show_story("", STORY.MUL_DONE)
+		set_quest("마을 심부름을 모두 마쳤다 (다음 장에서 계속)")
+	else:
+		show_story("", STORY.FOLK.mulgyeol)
+	save_game()
+
+func place_oar() -> void:
+	if oar_node != null:
+		return
+	oar_node = Node3D.new()
+	var wood: Material = mat_color(Color("#8a5a2e"))
+	for part in [[Vector3(0.08, 0.08, 1.6), Vector3(0, 0, 0)], [Vector3(0.3, 0.06, 0.5), Vector3(0, 0, 0.95)]]:
+		var b: MeshInstance3D = box(part[0], wood)
+		b.position = part[1]
+		oar_node.add_child(b)
+	var glow := OmniLight3D.new() # a faint glint so it can be spotted from the shore
+	glow.light_color = Color("#bfe6ff")
+	glow.light_energy = 1.2
+	glow.omni_range = 3.0
+	glow.position = Vector3(0, 0.8, 0)
+	oar_node.add_child(glow)
+	oar_node.position = Vector3(OAR_AT.x, -0.15, OAR_AT.y)
+	oar_node.rotation.y = 0.7
+	add_child(oar_node)
+
+func update_oar() -> void:
+	if oar_node == null or not oar_node.visible:
+		return
+	oar_node.position.y = -0.15 + sin(t * 2.0) * 0.04
+	if mul_q == 1 and not in_village and not in_cave and Vector2(player.x, player.z).distance_to(OAR_AT) < 1.4:
+		mul_q = 2
+		oar_node.visible = false
+		burst(Vector3(player.x, 0.4, player.z), Color("#9fe0ff"), 18, 1.5)
+		sfx(659, 0.3, "triangle", 0.25)
+		toast("물결의 노를 건졌다")
+		set_quest("노를 마을의 물결에게 가져가자 (E)")
+		for at in [Vector2(6, 15), Vector2(12, 15)]: # the bricks on the shore wake up
+			spawn_enemy(at)
+		save_game()
 
 # put the kid goblin where kid_q says: in the field with guards, or beside Kongal
 func place_kid() -> void:
@@ -3170,6 +3229,7 @@ func _process(dt: float) -> void:
 		fade_then(leave_village)
 	update_pips(dt)
 	update_kid(dt)
+	update_oar()
 	if in_cave:
 		check_painting()
 	if in_cave and not has_skip and Vector2(player.x, player.z).distance_to(cave_marks.E) < 1.6 and toast_t <= 0.0:
