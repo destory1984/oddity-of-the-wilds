@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -1147,6 +1147,68 @@ func run() -> void:
 		calm_enemies(false)
 		check("grotto", entered and no_skip and crossed and met_crab and spat and beaten and pearl and side,
 			"entered=%s walk stops at water=%s skip crossed=%s crab woke=%s spat bricks=%s beaten=%s pearl=%s side chest=%s" % [entered, no_skip, crossed, met_crab, spat, beaten, pearl, side])
+	if want.call("cloud"):
+		main.in_village = false
+		main.in_forest = false
+		main.in_lake = false
+		main.in_garden = false
+		main.in_hill = true
+		main.hill_q = 3
+		main.cloud_q = 0
+		main.story_step = maxi(main.story_step, 10)
+		var cx: float = main.CLOUD.CLOUD_X
+		reset_to(main.hill.marks.U + Vector2(0, 0.3))
+		await wait(1.0)
+		var entered: bool = main.in_cloud() and main.cloud_q == 1
+		main.close_story()
+		await wait(0.1)
+		calm_enemies(true)
+		var hops := []
+		for leg in [[Vector2(cx + 3.6, 10), Vector2(1, 0)], [Vector2(cx + 12, 8.4), Vector2(0, -1)]]:
+			reset_to(leg[0])
+			hold_world(leg[1])
+			await wait(1.4)
+			release()
+			await wait(0.1)
+			hops.append(Vector2(main.player.x - cx, main.player.z))
+		var flew: bool = hops[0].x > 10.2 and hops[0].x < 13.0 and hops[1].y < 3.5 and hops[1].y > 0.5 and main.gust_dir == Vector2.ZERO
+		reset_to(main.cloud.marks.c + Vector2(-1.0, 0))
+		tap(KEY_E)
+		await wait(0.2)
+		var chest: bool = main.cloud_chest
+		reset_to(Vector2(cx + 13.6, 10))
+		hold_world(Vector2(1, 0))
+		await wait(1.4)
+		release()
+		await wait(0.2)
+		var woke: bool = main.cloud_q == 2 and main.player.x > cx + 20.0
+		main.close_story()
+		await wait(0.2)
+		var foes: Array = main.enemies.filter(func(e): return e.get("scare", false) and not e.dead)
+		var flung := false
+		if foes.size() == 1:
+			var k: Dictionary = foes[0]
+			for i in 40:
+				reset_to(Vector2(cx + 20.5, 14.0)) # stay off to the side: from afar it flings bricks four ways
+				main.player.inv = 99.0
+				await wait(0.1)
+				if main.enemy_shots.size() >= 4:
+					flung = true
+					break
+			main.player.inv = 0.0
+			k.hp = 1.0
+			main.damage_enemy(k, 50.0, Vector2(k.x, k.z - 1.0))
+		await wait(1.3)
+		main.close_story()
+		main.player.sp = 100.0
+		main.player.dodge = 0.0
+		tap(KEY_K)
+		await wait(0.05)
+		var cheap_roll: bool = main.has_feather and main.player.sp > 80.0
+		main.in_hill = false
+		calm_enemies(false)
+		check("cloud", entered and flew and chest and woke and flung and cheap_roll,
+			"entered=%s hops=%s chest=%s scarecrow woke=%s flung bricks=%s feather roll=%s (sp %.0f)" % [entered, hops, chest, woke, flung, cheap_roll, main.player.sp])
 	calm_enemies(false)
 	var failed := results.count(false)
 	print("TESTS %d passed, %d failed" % [results.size() - failed, failed])

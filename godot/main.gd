@@ -114,6 +114,8 @@ func cave_char(x: float, z: float) -> String:
 	return c
 
 func tile_at(x: float, z: float) -> int:
+	if x >= CLOUD.CLOUD_X - 0.5:
+		return WATER if cloud.blocked(x, z) else GRASS
 	if x >= GROTTO.GROTTO_X - 0.5:
 		return WATER if grotto.blocked(x, z) else GRASS
 	if x >= HILL.HILL_X - 0.5:
@@ -260,6 +262,8 @@ func _ready() -> void:
 	hill.build(self)
 	grotto.build(self)
 	grotto_steps()
+	cloud.build(self)
+	cloud.build_updraft(self, hill.marks.U)
 	build_player()
 	for i in 9:
 		spawn_enemy(Vector2(-1, -1), i >= 6) # the last three are brick archers
@@ -312,6 +316,8 @@ const SCENES := {
 	"grove": {"play": true, "village": true, "forest": true, "grove": true, "hour": 15.0},
 	"flies": {"play": true, "at": Vector2(8, 23), "hour": 22.5, "flies": true},
 	"crab": {"play": true, "village": true, "crab": true, "hour": 14.0},
+	"cloud": {"play": true, "village": true, "cloud": true, "hour": 11.0},
+	"scarecrow": {"play": true, "village": true, "cloud": true, "scare": true, "hour": 16.0},
 	"scrap": {"play": true, "at": Vector2(42.5, 5.5), "hour": 17.0},
 }
 
@@ -410,6 +416,25 @@ func apply_test_args(args: PackedStringArray) -> void:
 			hill.wind_mill(hill.mills[0], self)
 			player.x = hill.mills[0].pos.x + 2.5
 			player.z = hill.mills[0].pos.y + 2.0
+			snap_mates()
+		if sc.get("cloud", false): # the cloud mound above the hill, mates along; with "scare" the scarecrow is up
+			night_q = 4
+			lake_q = 4
+			forest_q = 3
+			hill_q = 3
+			join_mate()
+			join_noeul()
+			enter_hill()
+			close_story()
+			enter_cloud()
+			close_story()
+			player.x = CLOUD.CLOUD_X + 3.0
+			player.z = 10.0
+			if sc.has("scare"):
+				cloud_q = 2
+				spawn_scarecrow()
+				player.x = cloud.marks.K.x - 3.0
+				player.z = cloud.marks.K.y + 1.5
 			snap_mates()
 		if sc.get("kid", false): # Kongal's kid goblin trotting after Sora in the south field
 			errand = 3
@@ -1600,6 +1625,8 @@ func damage_enemy(e: Dictionary, amt: float, from: Vector2, kb := 4.0, force_cri
 			get_tree().create_timer(1.0).timeout.connect(turtle_beaten)
 		elif e.get("crab", false):
 			get_tree().create_timer(1.0).timeout.connect(crab_beaten)
+		elif e.get("scare", false):
+			get_tree().create_timer(1.0).timeout.connect(scarecrow_beaten)
 		elif e.get("hawk", false):
 			get_tree().create_timer(1.0).timeout.connect(hawk_beaten)
 		elif e.get("mole", false):
@@ -1851,9 +1878,10 @@ func drink_potion() -> void:
 	sfx(660, 0.25, "sine", 0.25, 300)
 
 func dodge() -> void:
-	if player.dodge > 0 or player.sp < 25:
+	var cost := 15 if has_feather else 25
+	if player.dodge > 0 or player.sp < cost:
 		return
-	player.sp -= 25
+	player.sp -= cost
 	player.dodge = 0.32
 	player.inv = 0.3
 	dodge_start = t
@@ -1876,6 +1904,8 @@ func interact() -> void:
 		toggle_shop(not shop_open)
 		return
 	if in_grotto() and grotto_key():
+		return
+	if in_cloud() and cloud_key():
 		return
 	if in_forest and forest.solved and not forest.chest_open and Vector2(player.x, player.z).distance_to(forest.marks.c) < 1.6:
 		open_grove_chest()
@@ -2579,7 +2609,8 @@ func save_game() -> void:
 		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "in_village": in_village, "met": met.keys(), "pips": crown_pips, "errand": errand, "kid_q": kid_q, "doran_q": doran_q, "mul_q": mul_q, "night_q": night_q, "in_forest": in_forest, "in_garden": in_garden, "in_hill": in_hill, "hill_q": hill_q, "mills": hill.mills.map(func(mm): return mm.turning), "in_lake": in_lake, "lake_q": lake_q, "garden_q": garden_q, "forest_q": forest_q, "walls": forest.walls.map(func(w): return w.open), "stones": forest.stones.map(func(st): return st.phase), "grove": forest.solved, "grove_chest": forest.chest_open, "has_unbrick": has_unbrick, "vlit": village.dark.map(func(d): return d.lit), "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
 		"chests": chests.map(func(c): return c.open), "scraps": marsh.found, "moon_chest": marsh.chest_open,
 		"fly_q": fly_q, "flies": marsh.flies.map(func(f): return f.caught),
-		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl}
+		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
+		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify(d))
@@ -2688,10 +2719,19 @@ func load_game() -> void:
 		player.x = lx
 		player.z = lz
 		snap_mate()
+	cloud_q = int(d.get("cloud_q", 0))
+	if cloud_q == 2:
+		cloud_q = 1 # the scarecrow fight starts over when she walks back onto its island
+	cloud_chest = bool(d.get("cloud_chest", false))
+	if cloud_chest:
+		cloud.opened_look()
+	has_feather = bool(d.get("has_feather", false))
 	if bool(d.get("in_hill", false)):
 		var hx: float = player.x
 		var hz: float = player.z
 		enter_hill()
+		if hx >= CLOUD.CLOUD_X - 0.5:
+			enter_cloud()
 		player.x = hx
 		player.z = hz
 		snap_mates()
@@ -2985,6 +3025,17 @@ var mate_cd := 0.0
 const GARDEN := preload("res://garden.gd")
 const MARSH := preload("res://marsh.gd")
 const GROTTO := preload("res://grotto.gd")
+const CLOUD := preload("res://cloud.gd")
+var cloud = CLOUD.new()     # 구름 둔덕 above the hill (Sora is still in_hill up there)
+var cloud_q := 0            # 0 never entered, 1 inside, 2 fighting the scarecrow, 3 scarecrow beaten
+var cloud_chest := false
+var cloud_spawned := false
+var has_feather := false    # 바람 깃털: a dodge costs 15 stamina instead of 25
+var gust_dir := Vector2.ZERO # a wind vent is carrying Sora this way
+var gust_t := 0.0
+var gust_gap := false
+var gust_solid := 0.0
+var on_vent_prev := false
 var grotto = GROTTO.new()   # 물빛 동굴 under Mulgyeol's island (Sora is still in_lake down there)
 var grotto_q := 0           # 0 never entered, 1 inside, 2 fighting the crab, 3 crab beaten, 4 pearl taken
 var grotto_side := false    # the side-room chest is open
@@ -3069,6 +3120,8 @@ func crown_key() -> void:
 		final_wind()
 		return
 	if in_grotto() and grotto_key():
+		return
+	if in_cloud() and cloud_key():
 		return
 	if in_lake and lake_key():
 		return
@@ -3861,6 +3914,188 @@ func crab_beaten() -> void:
 	player.gold += 180
 	gain_xp(220)
 	show_story("", STORY.CRAB_DOWN)
+	save_game()
+
+# ---- 구름 둔덕 above the hill (after the hawk): wind vents across open sky, the brick scarecrow, the wind feather
+func in_cloud() -> bool:
+	return in_hill and player.x >= CLOUD.CLOUD_X - 0.5
+
+func enter_cloud() -> void:
+	player.x = cloud.marks.S.x + 1.2
+	player.z = cloud.marks.S.y
+	ground_y = 0.0
+	gust_dir = Vector2.ZERO
+	ui.mini.map_tex = cloud.map_tex(CLOUD.CLOUD_X + CLOUD.W)
+	ui.zone_name.text = "구름 둔덕"
+	ui.zone_sub.text = "바람구멍 섬들"
+	snap_mates()
+	if not cloud_spawned:
+		cloud_spawned = true
+		for f in cloud.foes:
+			spawn_enemy(f[0], f[1])
+	if cloud_q == 0:
+		cloud_q = 1
+		show_story("", STORY.CLOUD_IN)
+	save_game()
+
+func leave_cloud() -> void:
+	player.x = hill.marks.U.x
+	player.z = hill.marks.U.y + 1.3
+	ground_y = 0.0
+	gust_dir = Vector2.ZERO
+	ui.mini.map_tex = hill.map_tex(HILL.HILL_X + HILL.W)
+	ui.zone_name.text = "바람 언덕"
+	ui.zone_sub.text = "언덕 꼭대기"
+	ui.boss.visible = false
+	snap_mates()
+	save_game()
+
+# stepping onto a vent from plain ground starts a gust: Sora flies 8 tiles/s the way it points, over the gap,
+# and lands 0.6 tiles onto the next island. Normal walking is off while she flies.
+func start_gust(dir: Vector2) -> void:
+	gust_dir = dir
+	gust_t = 0.0
+	gust_gap = false
+	gust_solid = 0.0
+	player.vx = 0.0
+	player.vz = 0.0
+	sfx(260, 0.45, "noise", 0.1, 500)
+	burst(Vector3(player.x, 0.4, player.z), Color("#ffffff"), 16, 2.0)
+
+func update_gust(dt: float) -> void:
+	gust_t += dt
+	var step := gust_dir * 8.0 * dt
+	var np := Vector2(player.x, player.z) + step
+	if cloud.char_at(np.x, np.y) == "#" or gust_t > 3.0:
+		gust_dir = Vector2.ZERO
+		return
+	player.x = np.x
+	player.z = np.y
+	if cloud.char_at(np.x, np.y) == "_":
+		gust_gap = true
+	elif gust_gap:
+		gust_solid += step.length()
+		if gust_solid >= 0.6 and not cloud.blocked(np.x, np.y):
+			gust_dir = Vector2.ZERO
+	if int(gust_t * 10.0) != int((gust_t - dt) * 10.0):
+		burst(Vector3(player.x, 0.5, player.z), Color("#ffffff"), 3, 0.8)
+
+func cloud_key() -> bool:
+	if not cloud_chest and Vector2(player.x, player.z).distance_to(cloud.marks.c) < 1.6:
+		cloud_chest = true
+		cloud.opened_look()
+		player.gold += 100
+		player.pots += 1
+		burst(Vector3(cloud.marks.c.x, 0.8, cloud.marks.c.y), Color("#f2ead8"), 30, 3.0)
+		sfx(784, 0.12, "triangle", 0.25)
+		toast("금화 100닢과 회복약을 찾았다")
+		save_game()
+		return true
+	return false
+
+func spawn_scarecrow() -> void:
+	if enemies.any(func(e): return e.get("scare", false) and not e.dead):
+		return
+	var at: Vector2 = cloud.marks.K
+	var root := Node3D.new()
+	var body := Node3D.new()
+	body.name = "body"
+	root.add_child(body)
+	var wood: Material = mat_color(Color("#6a4a2a"))
+	var straw: Material = mat_color(Color("#d8b04a"))
+	var cloth: Material = mat_color(Color("#4a6a9a"))
+	for part in [[Vector3(0.2, 1.6, 0.2), Vector3(0, 0.8, 0), wood], [Vector3(0.8, 0.8, 0.5), Vector3(0, 1.4, 0), cloth],
+			[Vector3(0.6, 0.55, 0.55), Vector3(0, 2.1, 0), straw], [Vector3(0.9, 0.12, 0.9), Vector3(0, 2.45, 0), wood],
+			[Vector3(0.45, 0.3, 0.45), Vector3(0, 2.65, 0), wood]]:
+		var b := box(part[0], part[2])
+		b.position = part[1]
+		body.add_child(b)
+	for side in [-0.14, 0.14]:
+		var eye := box(Vector3(0.1, 0.1, 0.05), glow_mat(Color("#ff8a30"), 2.0))
+		eye.position = Vector3(side, 2.15, 0.29)
+		body.add_child(eye)
+	var arms := Node3D.new() # the cross-bar arms, which spin on the big attack
+	arms.name = "arms"
+	arms.position = Vector3(0, 1.55, 0)
+	body.add_child(arms)
+	var bar := box(Vector3(2.6, 0.18, 0.18), wood)
+	arms.add_child(bar)
+	for side in [-1.3, 1.3]:
+		var tuft := box(Vector3(0.35, 0.35, 0.35), straw)
+		tuft.position = Vector3(side, 0, 0)
+		arms.add_child(tuft)
+	add_child(root)
+	enemies.append({"x": at.x, "z": at.y, "hp": 820.0, "max_hp": 820, "node": root, "shadow": blob(1.2), "t": 0.0,
+		"atk_cd": 1.6, "hurt": 0.0, "kx": 0.0, "kz": 0.0, "wx": at.x, "wz": at.y, "dead": false, "respawn": 0.0,
+		"scare": true, "cave": true, "wind": 0.0, "stun": 0.0, "next": "", "spins": 0, "spin_t": 0.0})
+
+# the brick scarecrow: close in, a 0.8 s wind-up (red ring) then a 2.6-tile arm spin (twice below half);
+# farther out, a 0.6 s wind-up then straw bricks flung four ways (eight below half), turned a little each time
+func update_scarecrow(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
+	var node: Node3D = e.node
+	var body: Node3D = node.get_node("body")
+	var arms: Node3D = body.get_node("arms")
+	ui.boss.visible = d < 12.0
+	ui.boss_name.text = "벽돌 허수아비"
+	ui.boss_bar.size.x = 420.0 * maxf(0.0, e.hp) / e.max_hp
+	e.t += dt
+	e.hurt -= dt
+	e.stun -= dt
+	var angry: bool = e.hp < e.max_hp / 2.0
+	body.rotation.z = sin(e.t * 2.0) * 0.06 # sways on its post
+	if e.spin_t > 0.0:
+		e.spin_t -= dt
+		arms.rotation.y += dt * 18.0
+	if e.stun > 0.0:
+		pass
+	elif e.wind > 0.0:
+		e.wind -= dt
+		arms.rotation.y += dt * (6.0 if e.next == "spin" else 0.0)
+		if e.wind <= 0.0:
+			if e.next == "spin":
+				e.spin_t = 0.5
+				burst(Vector3(e.x, 1.4, e.z), Color("#d8b04a"), 24, 4.0)
+				sfx(200, 0.4, "noise", 0.15, 300)
+				if d < 2.6:
+					player_hit(20 + player.lv, Vector2(e.x, e.z), e)
+				if e.spins > 0:
+					e.spins -= 1
+					e.wind = 0.5
+					warn_ring(Vector3(e.x, 0.0, e.z), 2.6, 0.5)
+					return
+			else:
+				var n := 8 if angry else 4
+				var a0: float = e.t
+				for k in n:
+					throw_brick(Vector2(e.x, e.z), Vector2.RIGHT.rotated(a0 + k * TAU / n), e)
+			e.atk_cd = 1.1 if angry else 1.6
+	else:
+		e.atk_cd -= dt
+		if e.atk_cd <= 0.0 and d < 10.0:
+			e.next = "spin" if d < 2.6 else "fling"
+			if e.next == "spin":
+				e.wind = 0.8
+				e.spins = 1 if angry else 0
+				warn_ring(Vector3(e.x, 0.0, e.z), 2.6, 0.8)
+			else:
+				e.wind = 0.6
+			pop_num(Vector3(e.x, 3.0, e.z), "!", Color("#ff5a4a") if e.next == "spin" else Color("#ffd84a"))
+		elif d > 3.0: # hops slowly after her on its post
+			var nx: float = e.x + to.x / d * 0.8 * dt
+			var nz: float = e.z + to.y / d * 0.8 * dt
+			if walkable(nx, e.z): e.x = nx
+			if walkable(e.x, nz): e.z = nz
+	body.position.y = absf(sin(e.t * 4.0)) * 0.08
+	node.position = Vector3(e.x, 0, e.z)
+	e.shadow.position = Vector3(e.x, 0.02, e.z)
+
+func scarecrow_beaten() -> void:
+	cloud_q = 3
+	has_feather = true
+	ui.boss.visible = false
+	player.gold += 160
+	gain_xp(240)
+	show_story("", STORY.SCARE_DOWN)
 	save_game()
 
 func turtle_beaten() -> void:
@@ -4841,9 +5076,16 @@ func _process(dt: float) -> void:
 	if player.dodge > 0:
 		v = Vector2(player.dvx, player.dvz)
 		player.dodge -= dt
+	var vent: Vector2 = cloud.vent_at(player.x, player.z) if in_cloud() else Vector2.ZERO
+	if gust_dir == Vector2.ZERO and vent != Vector2.ZERO and not on_vent_prev and player.dodge <= 0.0:
+		start_gust(vent)
+	on_vent_prev = vent != Vector2.ZERO
+	if gust_dir != Vector2.ZERO:
+		update_gust(dt)
+		v = Vector2.ZERO
 	var nx: float = player.x + v.x * dt
 	var nz: float = player.z + v.y * dt
-	if not player_can(player.x, player.z): # stuck in a wall (old save, knockback): hop to the nearest open floor
+	if gust_dir == Vector2.ZERO and not player_can(player.x, player.z): # stuck in a wall (old save, knockback): hop to the nearest open floor
 		unstick()
 	if player_can(nx, player.z): player.x = nx
 	if player_can(player.x, nz): player.z = nz
@@ -4933,6 +5175,18 @@ func _process(dt: float) -> void:
 			fade_then(enter_garden)
 		elif toast_t <= 0.0:
 			toast("벽돌 매가 하늘을 지키고 있다")
+	if in_hill and not in_cloud() and Vector2(player.x, player.z).distance_to(hill.marks.U) < 0.8 and fade_rect.color.a == 0.0:
+		if hill_q >= 3:
+			fade_then(enter_cloud)
+		elif toast_t <= 0.0:
+			toast("바람구멍에서 거센 바람이 솟는다. 벽돌 매가 하늘에 있는 동안은 위험하다")
+	if in_cloud() and gust_dir == Vector2.ZERO and Vector2(player.x, player.z).distance_to(cloud.marks.S) < 0.7 and fade_rect.color.a == 0.0:
+		fade_then(leave_cloud)
+	if in_cloud() and cloud_q == 1 and not story_open and gust_dir == Vector2.ZERO and Vector2(player.x, player.z).distance_to(cloud.marks.K) < 6.0:
+		cloud_q = 2
+		show_story("", STORY.SCARE_IN)
+		after_story = spawn_scarecrow
+		save_game()
 	if in_hill:
 		update_hill(dt)
 	if in_garden and Vector2(player.x, player.z).distance_to(garden.marks.S) < 0.9 and fade_rect.color.a == 0.0:
@@ -5082,6 +5336,9 @@ func update_enemies(dt: float, gy: float) -> void:
 			continue
 		if e.get("crab", false):
 			update_crab(e, dt, d, to)
+			continue
+		if e.get("scare", false):
+			update_scarecrow(e, dt, d, to)
 			continue
 		if e.get("hawk", false):
 			update_hawk(e, dt, d, to)
@@ -5378,9 +5635,16 @@ func faint() -> void:
 	if in_hill:
 		in_hill = false
 		in_village = true
+		gust_dir = Vector2.ZERO
 		for e in enemies:
 			if e.get("hawk", false) and not e.dead:
 				e.hp = float(e.max_hp)
+			if e.get("scare", false) and not e.dead:
+				e.dead = true
+				e.node.queue_free()
+				e.shadow.queue_free()
+		if cloud_q == 2:
+			cloud_q = 1
 	if in_village or in_forest:
 		in_forest = false
 		in_village = true

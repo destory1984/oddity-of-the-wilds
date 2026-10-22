@@ -8,7 +8,7 @@ const W := 34
 const H := 24
 const BRIDGE_ROWS := [11, 12, 13]
 const ROWS := """##################################
-#...................__...........#
+#...................__.......U...#
 #..........r......L.__...........#
 #...r.........a.....__..r........#
 #................r..__...........#
@@ -33,7 +33,7 @@ S========...L..M....__.L...B.....X
 ##################################"""
 
 var grid: Array = []
-var marks := {}          # S entry, X exit east, B the hawk's perch -> world Vector2
+var marks := {}          # S entry, X exit east, B the hawk's perch, U the updraft up to the cloud mound -> world Vector2
 var mills: Array = []    # [{"pos": Vector2, "blades": Node3D, "turning": bool}]
 var foes: Array = []     # [world Vector2, kind] with kind "s" shield goblin, "a" archer, "g" goblin
 var bridge: Node3D
@@ -64,7 +64,7 @@ func build(m: Node) -> void:
 		for x in W:
 			var c: String = grid[z][x]
 			var w := Vector2(HILL_X + x, z)
-			if c in "SXB":
+			if c in "SXBU":
 				marks[c] = w
 			if c in "sag":
 				foes.append([w, c])
