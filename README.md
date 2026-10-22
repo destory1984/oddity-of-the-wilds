@@ -15,6 +15,11 @@ python -m http.server 8765
 
 그다음 `http://localhost:8765` 를 연다. Three.js를 인터넷에서 받으므로 인터넷 연결이 필요하다.
 
+## Godot 판
+
+같은 게임을 Godot 4.7로 옮긴 판을 `godot/` 에 웹으로 내보내 두었다. 주소 끝에 `/godot/` 를 붙여 연다.
+엔진째로 받으므로 첫 로딩이 약 45MB다. 원본 프로젝트는 따로 있다(`wilds_godot`).
+
 ## 조작
 
 | 키 | 하는 일 |
