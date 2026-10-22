@@ -15,9 +15,9 @@ dest_files=["res://.godot/imported/03_ambush.jpg-4e9373c854d70f206916b2f571ef854
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/high_quality=false
-compress/lossy_quality=0.7
+compress/lossy_quality=0.75
 compress/uastc_level=0
 compress/rdo_quality_loss=0.0
 compress/hdr_compression=1

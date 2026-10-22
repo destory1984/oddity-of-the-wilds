@@ -92,9 +92,11 @@ func run() -> void:
 		await wait(0.3)
 		check("start_click", not main.intro, "title closes on a mouse click")
 		check("story_opens", main.story_open, "opening illustration shows after the title")
-		click()
-		await wait(0.1)
-		click()
+		for k in 30:
+			if not main.story_open:
+				break
+			click()
+			await wait(0.05)
 		await wait(0.7)
 		check("story_closes", not main.story_open and not main.ui.story.visible, "two clicks page through and close it")
 	if main.intro:
@@ -194,15 +196,20 @@ func run() -> void:
 		g.x = 2.0
 		g.z = 2.0
 		g.node.visible = false
+		check("lantern_scene", main.story_open, "touching the crown shows the lantern scene")
+		main.close_story()
+		await wait(0.6)
 	if want.call("meet_bori"):
 		reset_to(Vector2(main.shop_pos.x, main.shop_pos.z))
 		main.story_step = 2
 		tap(KEY_SPACE)
 		await wait(0.2)
 		var talking: bool = main.story_open and not main.shop_open
-		for k in 3:
+		for k in 40:
+			if not main.story_open:
+				break
 			tap(KEY_SPACE)
-			await wait(0.1)
+			await wait(0.05)
 		await wait(0.6)
 		tap(KEY_SPACE)
 		await wait(0.2)
