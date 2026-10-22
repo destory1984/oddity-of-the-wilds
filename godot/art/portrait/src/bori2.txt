@@ -1,0 +1,6 @@
+The first attached image shows Grandma Bori as she must look: an OLD woman of about 75 with visible wrinkles around the eyes and mouth, soft round face, silver-grey hair in a bun, warm kind eyes, rust-red fringed shawl over a dark olive dress and a cream apron. The second image is the style reference.
+Use your image generation tool to create ONE PNG and save it as bori_stand2.png in the current directory.
+Content: dialogue standing portraits of THIS SAME old Grandma Bori (keep her age and wrinkles - she must clearly look elderly, not young, not a child), WAIST-UP, body turned slightly to the LEFT, 2 columns x 1 row, same framing in both cells: (1) warm grandmotherly smile, (2) serious and wise, one hand near her chin. She holds a wooden walking stick with a small lantern.
+STYLE: classic 1990s TV anime cel matching the style reference: clean dark ink outlines, flat colors with one hard shadow tone, no gradients, no glow.
+No text, no labels, no grid lines. Background: solid flat pure magenta #FF00FF everywhere outside the character.
+When done, reply with only the file path.

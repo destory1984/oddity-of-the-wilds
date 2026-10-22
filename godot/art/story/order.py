@@ -15,6 +15,7 @@ REF = HERE / "ref.webp"  # Sora turnaround, kept out of git
 
 SORA = """The first attached image is the official character turnaround of Sora, the heroine. Keep her design exactly: lavender-silver short wavy hair, small gold crown with a blue diamond gem, blue ribbon with gold diamond charms on one side, gold diamond earrings, deep blue eyes, white dress with royal-blue panels and gold trim, detached white sleeves with blue-and-gold cuffs, blue tassels ending in gold diamonds, white stockings, blue boots.
 The third attached image shows Sora's FACE: keep exactly this face (big round deep-blue eyes, small nose, soft round cheeks, child-like proportions, lavender-silver wavy bob with side ribbon) in every picture.
+If a fourth image is attached it is Grandma Bori: keep her EXACTLY like it (old woman about 75, wrinkles, silver bun, rust shawl, olive dress, cream apron).
 Make Sora as beautiful, lovely and endearing as possible: soft delicate face, big sparkling eyes, gentle blush, natural relaxed pose (not stiff), beautifully rendered hair and fabric."""
 
 RULES = """ANATOMY MUST BE CORRECT: every character has exactly two arms and two legs, a natural unbroken spine and waist (no twisted or bent-back torso), each clearly attached, natural proportions, five fingers per hand, no extra or merged limbs.
@@ -38,7 +39,7 @@ CAST = {
 ORDERS = {
     "02_lantern": f"{SORA}\nScene: Sora gently touches the crown and the blue gem glows; at the same moment a dark old lantern post beside the marsh path lights up warm gold, and next to it a pile of toy bricks begins to stand up into a little brick goblin. Twilight, fireflies, sense of wonder and a little surprise.",
     "03_ambush": f"{SORA}\nScene: action shot, several cute toy-brick goblins rush at Sora through the golden reeds trying to grab her crown; Sora swings a slim sword in a bright arc, ribbon and hair flowing with motion, determined but graceful expression. Dynamic angle, motion lines, sparks.",
-    "04_cottage": f"{SORA}\n{CAST['bori']}\nScene: inside Grandma Bori's warm cottage shop at night: shelves of jars and potions, a kettle steaming on a little stove; Bori pours tea and smiles knowingly at the crown while Sora sits at the wooden table holding a teacup with both hands, curious and a bit shy. Cozy firelight.",
+    "04_cottage": f"{SORA}\n{CAST['bori']}\nScene: inside Grandma Bori's warm cottage shop at night: shelves of jars and potions, a kettle steaming on a little stove; Bori leans over the table pouring tea from a teapot into the empty cup in front of Sora; Bori's EYES LOOK DOWN AT THE CUP she is filling (natural, careful pouring, gentle smile). Sora sits at the wooden table with both hands resting near the saucer, waiting, looking up at Bori with curious, slightly shy eyes. Only ONE cup for Sora (the one being filled). Cozy firelight.",
     "05_brick_king": f"{SORA}\nScene: a giant brick king (purple brick body, black brick head with two glowing square eyes, gold studded crown, red cape plate) crumbles into scattered bricks after the battle; behind him a blocked waterway bursts free in sparkling water, revealing a stone cave entrance in the ground. Sora stands in the foreground, breathing hard, looking at the opening. Epic, sunset.",
     "06_cave_rival": f"{SORA}\n{CAST['jae']}\nScene: an underground cave with ancient glowing wall paintings of robed moon-keepers holding a crown under eight moons; Jae appears on a ledge above, cloak swirling, pointing at Sora's crown; Sora stands on the cave floor, startled, looking up with one hand raised to protect the crown (standing, not sitting). Blue cave light, mysterious.",
     "07_water_skip": f"{SORA}\nScene: Sora runs lightly across the surface of a shallow marsh as if skipping like a stone, each footstep making a ring of glowing moonlight ripples; the crown gem glows; the east marsh opens ahead toward a distant village with lights. Joyful, free, wind in hair. Morning light.",
@@ -73,7 +74,7 @@ def order(name):
     t0 = time.time()
     with open(HERE / f"{name}.txt", encoding="utf-8") as f:
         subprocess.run(["codex", "exec", "--skip-git-repo-check", "-c", 'windows.sandbox="unelevated"', "--sandbox", "workspace-write",
-                        "-i", str(REF), "-i", str(HERE / "style_ref.png"), "-i", str(HERE / "face_ref.png"), "-"], cwd=HERE, stdin=f, capture_output=True, text=True, encoding="utf-8", errors="replace", shell=True)
+                        "-i", str(REF), "-i", str(HERE / "style_ref.png"), "-i", str(HERE / "face_ref.png")] + (["-i", str(HERE / "bori_ref.png")] if "bori" in ORDERS[name].lower() else []) + ["-"], cwd=HERE, stdin=f, capture_output=True, text=True, encoding="utf-8", errors="replace", shell=True)
     status = "ok" if out.exists() else "FAILED"
     line = f"{status} {name} {time.time() - t0:.0f}s"
     print(line, flush=True)
