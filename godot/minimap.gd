@@ -7,6 +7,7 @@ const SQUASH := 0.62
 
 var main: Node
 var map_tex: Texture2D
+const MARSH := preload("res://marsh.gd")
 var sora_icon: Texture2D = preload("res://art/ui/portrait.png")
 
 func _ready() -> void:
@@ -40,6 +41,10 @@ func _draw() -> void:
 		if not ch.open:
 			draw_rect(Rect2(ch.x - 0.2, ch.z + 0.3, 1.4, 0.5), Color("#b07a12"))
 			draw_rect(Rect2(ch.x + 0.25, ch.z - 0.2, 0.5, 1.4), Color("#b07a12"))
+	var mc: Vector2 = MARSH.CHEST_AT
+	if main.marsh.chest.visible and not main.marsh.chest_open: # the moonkeeper chest, a pale blue cross
+		draw_rect(Rect2(mc.x - 0.4, mc.y + 0.2, 1.8, 0.6), Color("#bcd6ff"))
+		draw_rect(Rect2(mc.x + 0.2, mc.y - 0.4, 0.6, 1.8), Color("#bcd6ff"))
 	draw_set_transform_matrix(Transform2D())
 	# Sora's face in a small round badge marks the player
 	var u := c

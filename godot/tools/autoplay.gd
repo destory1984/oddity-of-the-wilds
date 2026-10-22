@@ -4,11 +4,12 @@
 # and the run ends with `TESTS n passed, m failed` and exit code m.
 extends Node
 
+const MARSH := preload("res://marsh.gd")
 var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -974,6 +975,36 @@ func run() -> void:
 		main.player.x = main.village.marks.G.x + 0.3
 		await wait(1.2)
 		check("village_exit", not main.in_village and main.player.x < 48.0, "west gate -> outside=%s x=%.1f" % [not main.in_village, main.player.x])
+	if want.call("marsh_scraps"):
+		main.in_village = false
+		main.in_forest = false
+		main.in_lake = false
+		main.in_hill = false
+		main.in_garden = false
+		calm_enemies(true)
+		var walk_ok := true
+		for p in MARSH.SCRAPS + [MARSH.CHEST_AT]:
+			walk_ok = walk_ok and main.player_can(p.x, p.y)
+		for i in 3:
+			reset_to(MARSH.SCRAPS[i])
+			await wait(0.2)
+			main.close_story()
+		var whole: bool = main.marsh.count() == 3 and main.marsh.chest.visible
+		var atk0: int = main.player.atk
+		var hp0: int = main.player.max_hp
+		reset_to(MARSH.CHEST_AT + Vector2(0.8, 0))
+		tap(KEY_SPACE)
+		await wait(0.2)
+		main.close_story()
+		var opened: bool = main.marsh.chest_open and main.player.atk == atk0 + 4 and main.player.max_hp == hp0 + 20
+		main.save_game()
+		main.marsh.found = [false, false, false]
+		main.marsh.chest_open = false
+		var sd = JSON.parse_string(FileAccess.get_file_as_string(main.SAVE_PATH))
+		main.marsh.restore(sd.get("scraps", []), bool(sd.get("moon_chest", false)))
+		var kept: bool = main.marsh.count() == 3 and main.marsh.chest_open and not main.marsh.nodes[0].visible
+		calm_enemies(false)
+		check("marsh_scraps", walk_ok and whole and opened and kept, "spots walkable=%s whole map=%s opened=%s (atk +%d) kept after load=%s" % [walk_ok, whole, opened, main.player.atk - atk0, kept])
 	calm_enemies(false)
 	var failed := results.count(false)
 	print("TESTS %d passed, %d failed" % [results.size() - failed, failed])

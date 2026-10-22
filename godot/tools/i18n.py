@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 TABLE = ROOT / "i18n" / "text.csv"
 LANGS = ["ko", "en", "ja", "zh_CN"]
-SOURCES = ["main.gd", "hud.gd", "story_lines.gd", "village.gd"]
+SOURCES = ["main.gd", "hud.gd", "story_lines.gd", "village.gd", "marsh.gd"]
 HANGUL = re.compile(r"[가-힣]")
 LITERAL = re.compile(r'"((?:[^"\\n]|\.)*)"')
 

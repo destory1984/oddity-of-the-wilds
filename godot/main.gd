@@ -254,12 +254,13 @@ func _ready() -> void:
 	hill.build(self)
 	build_player()
 	for i in 9:
-		spawn_enemy()
+		spawn_enemy(Vector2(-1, -1), i >= 6) # the last three are brick archers
 	enemies[0].x = 12.0
 	enemies[0].z = 24.0
 	enemies[1].x = 30.0
 	enemies[1].z = 22.0
 	build_chests()
+	marsh.build(self)
 	spawn_boss()
 	build_particles()
 	build_hud()
@@ -300,6 +301,7 @@ const SCENES := {
 	"turtle": {"play": true, "village": true, "turtle": true, "hour": 15.0},
 	"hill": {"play": true, "village": true, "hill": true, "hour": 10.0},
 	"kid": {"play": true, "village": true, "kid": true, "hour": 20.5},
+	"scrap": {"play": true, "at": Vector2(42.5, 5.5), "hour": 17.0},
 }
 
 func apply_test_args(args: PackedStringArray) -> void:
@@ -991,7 +993,7 @@ const SHOP := [
 func near_shop() -> bool:
 	return Vector2(player.x - shop_pos.x, player.z - shop_pos.z).length() < 1.6
 
-const SHOP_GREET := ["어서 오렴. 천천히 골라 보거라.", "오늘은 뭐가 필요하니?", "늪이 험하지? 약은 넉넉히 챙기렴."]
+const SHOP_GREET := ["어서 오렴. 천천히 골라 보거라.", "오늘은 뭐가 필요하니?", "늪이 험하지? 약은 넉넉히 챙기렴.", "늪 구석구석에 달지기들의 옛 지도 조각이 흩어져 있다더구나."]
 
 func toggle_shop(open: bool) -> void:
 	if open and story_step < 3:
@@ -1826,6 +1828,9 @@ func dodge() -> void:
 	player.dvz = d.y * 11.0
 	sfx(120, 0.12, "triangle", 0.15, 80)
 
+func in_marsh() -> bool:
+	return not (in_cave or in_village or in_forest or in_lake or in_hill or in_garden)
+
 func interact() -> void:
 	if in_cave and cave_interact():
 		return
@@ -1834,6 +1839,9 @@ func interact() -> void:
 		return
 	if near_shop():
 		toggle_shop(not shop_open)
+		return
+	if in_marsh() and marsh.near_chest(self):
+		marsh.open_chest(self)
 		return
 	for c in chests:
 		if not c.open and Vector2(c.x - player.x, c.z - player.z).length() < 1.5:
@@ -2529,7 +2537,7 @@ func save_game() -> void:
 	var d := {"lv": player.lv, "xp": player.xp, "max_hp": player.max_hp, "hp": player.hp, "atk": player.atk,
 		"gold": player.gold, "pots": player.pots, "x": player.x, "z": player.z,
 		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "in_village": in_village, "met": met.keys(), "pips": crown_pips, "errand": errand, "kid_q": kid_q, "doran_q": doran_q, "mul_q": mul_q, "night_q": night_q, "in_forest": in_forest, "in_garden": in_garden, "in_hill": in_hill, "hill_q": hill_q, "mills": hill.mills.map(func(mm): return mm.turning), "in_lake": in_lake, "lake_q": lake_q, "garden_q": garden_q, "forest_q": forest_q, "walls": forest.walls.map(func(w): return w.open), "has_unbrick": has_unbrick, "vlit": village.dark.map(func(d): return d.lit), "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
-		"chests": chests.map(func(c): return c.open)}
+		"chests": chests.map(func(c): return c.open), "scraps": marsh.found, "moon_chest": marsh.chest_open}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify(d))
@@ -2638,6 +2646,7 @@ func load_game() -> void:
 		player.z = fz
 	has_skip = bool(d.get("has_skip", false))
 	cave_exit_seen = bool(d.get("cave_exit_seen", false))
+	marsh.restore(d.get("scraps", []), bool(d.get("moon_chest", false)))
 	var opened: Array = d.get("chests", [])
 	for i in mini(opened.size(), chests.size()):
 		if opened[i]:
@@ -2904,6 +2913,8 @@ var lake_npc: Sprite3D     # Mulgyeol waiting on the pier before he joins
 var mate: Node3D           # Mulgyeol as a companion
 var mate_cd := 0.0
 const GARDEN := preload("res://garden.gd")
+const MARSH := preload("res://marsh.gd")
+var marsh = MARSH.new()     # the map scraps and the moonkeeper chest
 var garden = GARDEN.new()
 var in_garden := false
 var garden_q := 0          # 0 never entered, 1 inside, 2 fighting the mold, 3 the villagers' lights are coming, 4 ready to wind, 5 wound (the end)
@@ -4628,6 +4639,8 @@ func _process(dt: float) -> void:
 	update_pips(dt)
 	update_kid(dt)
 	update_oar()
+	if in_marsh() and not intro:
+		marsh.update(self)
 	update_night(dt)
 	if in_cave:
 		check_painting()
@@ -4718,7 +4731,7 @@ func update_enemies(dt: float, gy: float) -> void:
 			e.respawn -= dt
 			if e.respawn <= 0:
 				enemies.erase(e)
-				spawn_enemy()
+				spawn_enemy(Vector2(-1, -1), e.get("archer", false))
 			continue
 		e.t += dt
 		e.atk_cd -= dt
