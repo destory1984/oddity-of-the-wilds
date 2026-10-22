@@ -1,5 +1,6 @@
 # Story scripts. Each line is "speaker|face|text"; an empty speaker is narration.
-# Faces: calm, surprised, determined, sad, laugh, shy (Sora); bori; jae.
+# Faces: calm, surprised, determined, sad, laugh, shy (Sora); bori, bori_serious; jae, jae_smirk.
+# Scenes shown with an empty picture path become talk scenes with standing portraits (art/portrait).
 extends RefCounted
 
 const WAKE := [
@@ -21,11 +22,11 @@ const LANTERN := [
 const BORI := [
 	"보리 할멈|bori|어서 오렴. 문 앞에서 떨지 말고 들어와 앉아.",
 	"||할멈은 대답도 듣기 전에 찻잔 두 개를 꺼냈다.",
-	"보리 할멈|bori|그 왕관, 오랜만이구나.",
+	"보리 할멈|bori_serious|그 왕관, 오랜만이구나.",
 	"소라|surprised|이걸 아세요? 저는 제가 왜 이걸 쓰고 있는지도 몰라요.",
 	"보리 할멈|bori|그건 머리에 쓰는 게 아니라 손에 쥐는 거란다. 언젠가는 알게 될 게다.",
-	"보리 할멈|bori|이 늪은 옛날 달지기들이 가꾸던 정원이었지. 여덟 밤마다 그 왕관으로 땅을 감았단다.",
-	"보리 할멈|bori|감지 않은 땅은 굳어서 벽돌이 돼. 너를 쫓는 녀석들도 그렇게 생겨난 거야.",
+	"보리 할멈|bori_serious|이 늪은 옛날 달지기들이 가꾸던 정원이었지. 여덟 밤마다 그 왕관으로 땅을 감았단다.",
+	"보리 할멈|bori_serious|감지 않은 땅은 굳어서 벽돌이 돼. 너를 쫓는 녀석들도 그렇게 생겨난 거야.",
 	"소라|determined|그럼 집으로 가는 길은요?",
 	"보리 할멈|bori|북쪽 벽돌왕이 늪의 물길을 막고 있어. 그걸 풀면 길이 보일 거야.",
 	"보리 할멈|bori|약이 필요하면 언제든 들르렴. 공짜는 아니지만.",
@@ -45,7 +46,7 @@ const PAINTING := [
 	"||여덟 개의 달. 그 아래 두 사람이 왕관을 받쳐 들고 땅에 빛을 붓고 있다.",
 	"소라|surprised|이 왕관…… 내 것과 똑같아.",
 	"???|jae|그 왕관, 네 것이 아니야.",
-	"재|jae|다음 달지기는 나였어. 백 년을 기다렸다고.",
+	"재|jae_smirk|다음 달지기는 나였어. 백 년을 기다렸다고.",
 	"소라|determined|누구야? 이 왕관에 대해 뭘 알아?",
 	"재|jae|곧 알게 될 거야. 그때까지 잘 들고 있어.",
 	"||회색 망토가 벽돌 가루가 되어 흩어지고, 소년은 사라졌다.",

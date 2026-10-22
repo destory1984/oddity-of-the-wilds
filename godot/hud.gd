@@ -61,12 +61,9 @@ func _draw() -> void:
 	bar(Vector2(x0, 56), 230, p.mp / p.max_mp, Color("#f08a2a"), "기세", "%d/%d" % [int(p.mp), p.max_mp], p.mp >= 60.0)
 	bar(Vector2(x0, 78), 230, p.sp / 100.0, Color("#f2e2b0"), "기력", "%d/100" % int(p.sp))
 	var need: int = p.lv * 25
-	draw_rect(Rect2(Vector2(x0, 101), Vector2(230, 3)), NAVY)
-	draw_rect(Rect2(Vector2(x0, 101), Vector2(230.0 * p.xp / need, 3)), Color("#8de07a"))
-	text(Vector2(x0 - 44, 106), "EXP", 10, DIM)
-	text(Vector2(x0 + 246, 107), "%d/%d" % [p.xp, need], 11, Color("#8de07a"))
+	bar(Vector2(x0, 100), 230, float(p.xp) / need, Color("#8de07a"), "경험", "%d/%d" % [p.xp, need])
 	# ---- sun / moon dial hanging under the portrait
-	var dc := Vector2(70, 196)
+	var dc := Vector2(70, 206)
 	for i in 14:
 		var a0 := PI + PI * i / 14.0
 		var pt := dc + Vector2(cos(a0) * 58, sin(a0) * 32)
@@ -86,8 +83,8 @@ func _draw() -> void:
 		if ph.x < 0.98:
 			draw_circle(sp + Vector2(5.5 * 2.0 * ph.x * ph.y, -0.5), 5.4, Color("#0b1530"))
 	# zone name, small, under the dial
-	text(Vector2(22, 228), main.ui.zone_name.text, 14, TEXT)
-	text(Vector2(22, 246), main.ui.zone_sub.text, 11, DIM)
+	text(Vector2(22, 238), main.ui.zone_name.text, 14, TEXT)
+	text(Vector2(22, 256), main.ui.zone_sub.text, 11, DIM)
 	# ---- quest ornaments
 	if main.ui.quest.visible:
 		var cx := vs.x / 2.0

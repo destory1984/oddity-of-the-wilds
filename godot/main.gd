@@ -271,6 +271,7 @@ const SCENES := {
 	"cave_in": {"play": true, "cave_in": true},
 	"talk": {"play": true, "talk": true},
 	"mole": {"play": true, "mole": true},
+	"scene": {"play": true, "scene": true},
 }
 
 func apply_test_args(args: PackedStringArray) -> void:
@@ -301,6 +302,10 @@ func apply_test_args(args: PackedStringArray) -> void:
 		player.gold = sc.gold
 	if sc.get("shop", false):
 		toggle_shop(true)
+	if sc.get("scene", false):
+		show_story("res://art/story/06_cave_rival.jpg", STORY.PAINTING)
+		for k in 6:
+			next_story()
 	if sc.get("mole", false):
 		story_step = 5
 		enter_cave()
@@ -308,7 +313,7 @@ func apply_test_args(args: PackedStringArray) -> void:
 		player.z = cave_marks.B.y
 	if sc.get("talk", false):
 		story_step = 3
-		show_story("res://art/story/04_cottage.jpg", STORY.BORI)
+		show_story("", STORY.BORI)
 		for k in 4:
 			next_story()
 			next_story()
@@ -1878,30 +1883,65 @@ func build_hud() -> void:
 	back.modulate = Color(0.25, 0.28, 0.4)
 	back.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	story.add_child(back)
+	# the illustration sits in a gold frame in the middle; the game stays visible, dimmed, around it
+	var pic_frame := Control.new()
+	pic_frame.set_script(load("res://frame.gd"))
+	pic_frame.kind = "picture"
+	pic_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	story.add_child(pic_frame)
+	place(pic_frame, Control.PRESET_CENTER, Vector2(-448, -330), Vector2(896, 504))
 	var img := TextureRect.new()
 	img.set_anchors_preset(Control.PRESET_FULL_RECT)
-	img.offset_bottom = -150
 	img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	img.clip_contents = true
 	img.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	story.add_child(img)
-	var cap := panel(story, Vector2(-460, -150), Vector2(920, 128), Control.PRESET_CENTER_BOTTOM)
+	pic_frame.add_child(img)
+	# standing portraits for talk scenes (no big picture): Sora on the left, the other speaker on the right
+	for side in ["left", "right"]:
+		var pr := TextureRect.new()
+		pr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		pr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
+		pr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		story.add_child(pr)
+		if side == "left":
+			place(pr, Control.PRESET_BOTTOM_LEFT, Vector2(20, -640), Vector2(460, 560))
+		else:
+			place(pr, Control.PRESET_BOTTOM_RIGHT, Vector2(-480, -640), Vector2(460, 560))
+		ui["por_" + side] = pr
+	# ornate dialogue box with a name plate on its top edge
+	var cap := Control.new()
+	cap.set_script(load("res://frame.gd"))
+	cap.kind = "box"
+	cap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	story.add_child(cap)
+	place(cap, Control.PRESET_CENTER_BOTTOM, Vector2(-470, -168), Vector2(940, 144))
+	var tab := Control.new()
+	tab.set_script(load("res://frame.gd"))
+	tab.kind = "tab"
+	tab.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cap.add_child(tab)
+	tab.position = Vector2(40, -18)
+	tab.size = Vector2(190, 32)
+	var who := label(tab, "", Vector2(0, 4), 16, Color("#f6d27a"))
+	who.size = Vector2(190, 24)
+	who.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var face := TextureRect.new()
-	face.position = Vector2(14, 14)
+	face.position = Vector2(22, 26)
 	face.size = Vector2(100, 100)
 	face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
 	cap.add_child(face)
-	var who := label(cap, "", Vector2(132, 12), 15, Color("#f6b951"))
-	var cap_text := label(cap, "", Vector2(132, 38), 19)
-	cap_text.size = Vector2(760, 70)
+	var cap_text := label(cap, "", Vector2(140, 34), 20)
+	cap_text.size = Vector2(760, 90)
 	cap_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	var cap_hint := label(cap, "▼", Vector2(890, 100), 12, Color("#e8b018"))
+	var cap_hint := label(cap, "▼", Vector2(905, 116), 13, Color("#e8b018"))
 	cap_hint.size = Vector2(20, 18)
+	ui.story_tab = tab
+	ui.story_frame = pic_frame
 	story.visible = false
 	ui.story = story
 	ui.story_img = img
-	ui.story_back = back
 	ui.story_text = cap_text
 	ui.story_face = face
 	ui.story_who = who
@@ -2004,8 +2044,7 @@ func meet_bori() -> void:
 	story_step = 3
 	save_game()
 	set_quest("북쪽 벽돌왕이 늪의 물길을 막고 있다")
-	var pic := "res://art/story/04_cottage.jpg"
-	show_story(pic if ResourceLoader.exists(pic) else "", STORY.BORI)
+	show_story("", STORY.BORI)
 
 # story step 5: the Brick King falls, the blocked waterway breaks free and a cave mouth opens
 var cave_pos := Vector2(-99, -99)
@@ -2482,13 +2521,17 @@ var story_lines: Array = []
 
 const STORY := preload("res://story_lines.gd")
 var typing := 0.0 # characters shown so far, for the typewriter reveal
+var talk_mode := false
 
 func show_story(path: String, lines: Array) -> void:
 	story_lines = lines.duplicate()
 	var tex: Texture2D = load(path) if path != "" else null
 	ui.story_img.texture = tex
-	ui.story_back.texture = tex
-	ui.story.color.a = 1.0 if path != "" else 0.55
+	ui.story_frame.visible = tex != null
+	talk_mode = path == ""
+	ui.story.color = Color(0.008, 0.016, 0.043, 0.35 if talk_mode else 0.6) # the game stays visible behind
+	for side in ["left", "right"]:
+		ui["por_" + side].texture = null
 	ui.story.modulate.a = 0.0
 	ui.story.visible = true
 	story_open = true
@@ -2501,10 +2544,22 @@ func show_line(line: String) -> void:
 		parts = PackedStringArray(["", "", line])
 	ui.story_who.text = parts[0]
 	var f := parts[1]
-	var path := "res://art/ui/face_sora_%s.png" % f if parts[0] in ["소라"] else "res://art/ui/face_%s.png" % f
+	var is_sora := parts[0] == "소라"
+	var path := "res://art/ui/face_sora_%s.png" % f if is_sora else "res://art/ui/face_%s.png" % f
 	ui.story_face.texture = load(path) if f != "" and ResourceLoader.exists(path) else null
-	ui.story_text.position.x = 132.0 if ui.story_face.texture else 28.0
-	ui.story_who.position.x = ui.story_text.position.x
+	if talk_mode:
+		# speaker's standing portrait lights up; the listener dims; narration dims both
+		var por := "res://art/portrait/sora_%s.png" % f if is_sora else "res://art/portrait/%s.png" % f
+		var side := "left" if is_sora else "right"
+		if f != "" and ResourceLoader.exists(por):
+			ui["por_" + side].texture = load(por)
+		for sd in ["left", "right"]:
+			var lit: bool = f != "" and sd == side
+			ui["por_" + sd].modulate = Color(1, 1, 1) if lit else Color(0.45, 0.45, 0.55)
+			ui["por_" + sd].offset_top = (-650.0 if lit else -630.0)
+		ui.story_face.texture = null # the portrait already shows who is talking
+	ui.story_text.position.x = 140.0 if ui.story_face.texture else 40.0
+	ui.story_tab.visible = parts[0] != ""
 	ui.story_text.text = parts[2]
 	ui.story_text.visible_characters = 0
 	typing = 0.0
@@ -2616,6 +2671,10 @@ func _process(dt: float) -> void:
 				ui.story_text.visible_characters = -1
 		ui.story_more.modulate.a = 0.4 + 0.6 * absf(sin(t * 4.0))
 		t += dt
+		if not intro: # keep the camera on Sora behind the dimmed scene
+			var tg := Vector3(player.x, ground_y + 0.6, player.z)
+			camera.position = tg + Vector3(sin(cam_yaw) * cos(0.78) * cam_dist, sin(0.78) * cam_dist, cos(cam_yaw) * cos(0.78) * cam_dist)
+			camera.look_at(tg)
 		return
 	t += dt
 	if intro:
@@ -2758,7 +2817,9 @@ func _process(dt: float) -> void:
 	if toast_t <= 0: ui.toast.modulate.a = maxf(0, ui.toast.modulate.a - dt * 3)
 	ui.lv.text = str(player.lv)
 	var narrow := get_viewport().get_visible_rect().size.x < 1180.0
-	ui.quest.offset_top = 150.0 if narrow else 62.0
+	ui.quest.offset_top = (200.0 if ui.boss.visible else 150.0) if narrow else 62.0
+	ui.boss.offset_top = 140.0 if narrow else 14.0
+	ui.boss.offset_bottom = ui.boss.offset_top + 40.0
 	ui.quest.offset_bottom = ui.quest.offset_top + 26.0
 	ui.hp.size.x = 200.0 * player.hp / player.max_hp
 	ui.mp.size.x = 200.0 * player.mp / player.max_mp
@@ -3056,6 +3117,20 @@ func hurt_player(dmg: int, gy: float) -> void:
 
 # Sora faints: say so plainly, keep gold and level, heal the boss, and wake her at the start
 func faint() -> void:
+	if in_cave: # wake outside: leave every bit of cave state behind
+		in_cave = false
+		if ui.has("outside_map"):
+			ui.mini.map_tex = ui.outside_map
+		ui.zone_name.text = "갈대늪"
+		ui.zone_sub.text = "등불여울 건널목"
+		ui.boss.visible = false
+		for e in enemies:
+			if e.get("mole", false) and not e.dead:
+				e.hp = float(e.max_hp)
+				e.x = cave_marks.B.x
+				e.z = cave_marks.B.y
+				e.dash = 0.0
+				e.wind = 0.0
 	player.hp = float(player.max_hp)
 	player.x = START.x
 	player.z = START.y

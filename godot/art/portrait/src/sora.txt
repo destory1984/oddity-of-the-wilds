@@ -1,0 +1,8 @@
+Attached: Sora's turnaround (first), the style reference (second), Sora's face sheet (third, keep exactly this face).
+Use your image generation tool to create ONE PNG and save it as sora_stand.png in the current directory.
+Content: dialogue standing portraits of Sora, body turned slightly to the RIGHT (she stands on the left side of the screen), 3 columns x 2 rows: calm smile, surprised, determined, sad with teary eyes, laughing happily, shy blush. Keep crown, ribbon, earrings, dress exactly.
+STYLE: classic 1990s TV anime cel (match the style reference): clean uniform dark ink outlines, flat colors with one hard shadow tone, no gradients, no glow, no sparkles.
+Layout: a strict grid, every cell the same size, the character shown WAIST-UP (head to just below the waist), same size, same position and framing in every cell, only the expression and small hand pose change. No text, no labels, no grid lines.
+ANATOMY: two arms, five fingers, natural shoulders. Wholesome.
+Background: solid flat pure magenta #FF00FF everywhere outside the character.
+When done, reply with only the file path.
