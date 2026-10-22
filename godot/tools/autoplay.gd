@@ -73,6 +73,20 @@ func calm_enemies(on: bool) -> void:
 
 func run() -> void:
 	var want := func(n): return only == "all" or only == n
+	if only == "title_space": # the user's web save, then Space at the title, twice
+		var f := FileAccess.open(main.SAVE_PATH, FileAccess.WRITE)
+		f.store_string('{"atk":37,"boss_dead":true,"chests":[true,true,true,true,true],"day":3,"door_open":false,"gold":786,"has_key":false,"hour":2.13,"hp":208.0,"in_cave":false,"lv":10,"max_hp":208,"pots":7,"saw_painting":false,"story":5,"x":14.65,"z":20.15}')
+		f.close()
+		main.load_game()
+		print("intro before=", main.intro)
+		tap(KEY_SPACE)
+		await wait(1.0)
+		print("after 1st space intro=", main.intro, " story_open=", main.story_open, " title valid=", is_instance_valid(main.ui.title))
+		tap(KEY_SPACE)
+		await wait(1.0)
+		print("after 2nd space intro=", main.intro, " pos=", main.player.x, ",", main.player.z, " in_cave=", main.in_cave)
+		get_tree().quit(0)
+		return
 	if want.call("start_click"):
 		click()
 		await wait(0.3)
