@@ -1,0 +1,6 @@
+The first attached image is this character's design sheet; the second is the style reference.
+Use your image generation tool to create ONE PNG and save it as mulgyeol_stand.png in the current directory.
+Content: dialogue standing portraits of this exact character (keep species, age, outfit and props exactly as in the sheet), body turned slightly LEFT, 2 columns x 1 row, WAIST-UP, same framing in both cells: (1) friendly / cheerful, (2) serious or worried.
+STYLE: classic 1990s TV anime cel, clean ink outlines, flat colors with one hard shadow, no gradients, no glow.
+No text, no labels, no grid lines. Background: solid flat pure magenta #FF00FF.
+When done, reply with only the file path.
