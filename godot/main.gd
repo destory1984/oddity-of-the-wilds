@@ -2732,6 +2732,9 @@ func _process(dt: float) -> void:
 	if hitstop > 0.0:
 		hitstop -= dt
 		return
+	if shop_open: # the world waits while Sora shops: no clock, no monsters
+		ui.shop_hint.visible = false
+		return
 	if story_open:
 		if ui.story_text.visible_characters != -1:
 			typing += dt * 40.0

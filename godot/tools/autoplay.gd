@@ -134,12 +134,15 @@ func run() -> void:
 		tap(KEY_SPACE)
 		await wait(0.2)
 		var opened: bool = main.shop_open
+		var h0: float = main.hour
+		await wait(1.0)
+		var frozen: bool = main.hour == h0
 		tap(KEY_1)
 		await wait(0.2)
 		tap(KEY_ESCAPE)
 		await wait(0.2)
-		check("shop_buy", opened and main.player.pots == pots + 1 and main.player.gold == 70 and not main.shop_open,
-			"opened=%s pots %d->%d gold 100->%d closed=%s" % [opened, pots, main.player.pots, main.player.gold, not main.shop_open])
+		check("shop_buy", frozen and opened and main.player.pots == pots + 1 and main.player.gold == 70 and not main.shop_open,
+			"clock frozen=%s opened=%s pots %d->%d gold 100->%d closed=%s" % [frozen, opened, pots, main.player.pots, main.player.gold, not main.shop_open])
 	if want.call("footsteps"):
 		reset_to(main.START)
 		main.sfx_log.clear()
