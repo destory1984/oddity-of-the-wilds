@@ -798,7 +798,7 @@ addEventListener('keydown', startGame, { capture: true });
 $('title').addEventListener('click', startGame);
 $('helpx').addEventListener('click', () => document.body.classList.add('nohelp'));
 $('helphint').addEventListener('click', () => document.body.classList.remove('nohelp'));
-let camYaw = 0.55, camDist = 18, shake = 0, bannerT = 0, timeIdx = 0, raining = false;
+let groundY = 0, camYaw = 0.55, camDist = 18, shake = 0, bannerT = 0, timeIdx = 0, raining = false;
 addEventListener('keydown', e => {
   if (intro) return;
   const k = e.key.toLowerCase(); if (k.startsWith('arrow')) e.preventDefault(); if (keys[k]) return; keys[k] = true;
@@ -954,7 +954,9 @@ function update(dt) {
   player.anim += dt * (running ? 12 : 8);
   const frame = moving ? (player.anim | 0) % 4 : 0;
   heroSprite.material.map = heroFrames[player.dir][frame];
-  const gy = heightAt(player.x, player.z);
+  // smoothed ground height: stepping onto a 0.18 raised tile used to jolt the camera
+  groundY += (heightAt(player.x, player.z) - groundY) * Math.min(1, dt * 10);
+  const gy = groundY;
   const hop = player.dodge > 0 ? Math.sin((player.dodge / .32) * Math.PI) * .35 : (moving ? Math.abs(Math.sin(player.anim * Math.PI / 2)) * .05 : 0);
   heroSprite.position.set(player.x, gy + hop, player.z);
   heroSprite.material.rotation = player.dodge > 0 ? (1 - player.dodge / .32) * Math.PI * 2 * (sx > 0 ? -1 : 1) : 0;
