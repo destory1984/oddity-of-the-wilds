@@ -1,0 +1,11 @@
+Use your image generation tool to create ONE PNG image and save it as hero_sheet.png in the current directory.
+
+Content: a pixel-art sprite sheet of an original young adventurer hero for a cozy top-down action RPG (HD-2D style, polished 16-bit look).
+- Character: short messy auburn-brown hair, warm orange tunic with brown leather belt, teal trousers, dark brown boots, small steel shortsword, friendly face. Chibi proportions (big head, about 2.5 heads tall).
+- Layout: a strict grid of 4 columns x 3 rows, every cell the same size, character centered in each cell with feet on the same baseline.
+  - Row 1: facing the viewer (down), 4-frame walk cycle.
+  - Row 2: facing away (up), 4-frame walk cycle.
+  - Row 3: facing right (side view), 4-frame walk cycle.
+- Crisp hard pixel edges, limited palette, 1-pixel dark outline, no text, no labels, no grid lines.
+- Background: solid flat pure magenta #FF00FF everywhere outside the character. No ground shadow.
+When done, reply with only the file path.
