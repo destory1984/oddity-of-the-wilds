@@ -8,7 +8,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "village_exit", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "village_exit", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -624,6 +624,33 @@ func run() -> void:
 		main.close_story()
 		check("kongal_errand", asked and held and freed and follows and main.kid_q == 3 and main.player.gold == g0 + 40 and main.player.pots == p0 + 1,
 			"asked=%s guards=%d held=%s freed=%s follows=%s kid_q=%d gold +%d pots +%d" % [asked, guards.size(), held, freed, follows, main.kid_q, main.player.gold - g0, main.player.pots - p0])
+	if want.call("doran_errand"):
+		main.kid_q = 3
+		main.doran_q = 0
+		main.hour = 23.0
+		main.crown_pips = 8
+		var dp: Vector2 = main.village.folk_pos.doran
+		reset_to(dp + Vector2(1.0, 0))
+		tap(KEY_E)
+		await wait(0.3)
+		main.close_story()
+		var asked: bool = main.doran_q == 1
+		tap(KEY_E)
+		await wait(0.3)
+		main.close_story()
+		var read: bool = main.doran_q == 2 and main.crown_pips == 7
+		main.in_village = false
+		reset_to(Vector2(main.shop_pos.x, main.shop_pos.z))
+		var hp0: int = main.player.max_hp
+		main.crown_pips = 2
+		tap(KEY_SPACE)
+		await wait(0.3)
+		var no_shop: bool = not main.shop_open
+		main.close_story()
+		check("doran_errand", asked and read and no_shop and main.doran_q == 3 and main.crown_pips == 8 and main.player.max_hp == hp0 + 10,
+			"asked=%s read=%s delivered(no shop)=%s doran_q=%d pips=%d max_hp +%d" % [asked, read, no_shop, main.doran_q, main.crown_pips, main.player.max_hp - hp0])
+		main.in_village = true
+		reset_to(main.village.marks.M + Vector2(-1.2, 0))
 	if want.call("village_exit"):
 		reset_to(main.village.marks.G + Vector2(0.6, 0))
 		main.player.x = main.village.marks.G.x + 0.3

@@ -1538,6 +1538,9 @@ func dodge() -> void:
 func interact() -> void:
 	if in_cave and cave_interact():
 		return
+	if near_shop() and doran_q == 2 and not shop_open:
+		deliver_letter()
+		return
 	if near_shop():
 		toggle_shop(not shop_open)
 		return
@@ -2225,7 +2228,7 @@ func save_game() -> void:
 			boss_dead = true
 	var d := {"lv": player.lv, "xp": player.xp, "max_hp": player.max_hp, "hp": player.hp, "atk": player.atk,
 		"gold": player.gold, "pots": player.pots, "x": player.x, "z": player.z,
-		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "in_village": in_village, "met": met.keys(), "pips": crown_pips, "errand": errand, "kid_q": kid_q, "vlit": village.dark.map(func(d): return d.lit), "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
+		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "in_village": in_village, "met": met.keys(), "pips": crown_pips, "errand": errand, "kid_q": kid_q, "doran_q": doran_q, "vlit": village.dark.map(func(d): return d.lit), "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
 		"chests": chests.map(func(c): return c.open)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -2251,6 +2254,7 @@ func load_game() -> void:
 	crown_pips = int(d.get("pips", 8))
 	errand = int(d.get("errand", 0))
 	kid_q = int(d.get("kid_q", 0))
+	doran_q = int(d.get("doran_q", 0))
 	for id in d.get("met", []):
 		met[id] = true
 	var vlit: Array = d.get("vlit", [])
@@ -2530,6 +2534,7 @@ var met := {}               # villagers already greeted
 var errand := 0            # 0 not given, 1 lighting lanterns, 2 lanterns done, 3 rewarded
 var kid_q := 0             # Kongal's errand: 0 not given, 1 find the kid goblin, 2 it follows Sora, 3 home
 var kid_node: Node3D
+var doran_q := 0           # Doran's letter: 0 not given, 1 read it with the crown, 2 carry it to Bori, 3 delivered
 
 func enter_village() -> void:
 	in_village = true
@@ -2593,6 +2598,9 @@ func crown_key() -> void:
 				if id == "kongal" and errand >= 3 and kid_q != 1:
 					kongal_errand()
 					return
+				if id == "doran" and kid_q >= 3 and doran_q < 2:
+					doran_errand()
+					return
 				show_story("", STORY.FOLK[id])
 				met[id] = true
 				save_game()
@@ -2618,10 +2626,35 @@ func kongal_errand() -> void:
 		player.gold += 40
 		player.pots += 1
 		show_story("", STORY.KONGAL_DONE)
-		set_quest("마을 사람들에게 말을 걸어 보자 (다음 장에서 계속)")
+		set_quest("우편배달부 도란에게 말을 걸어 보자 (E)")
 		place_kid()
 	else:
 		show_story("", STORY.FOLK.kongal)
+	save_game()
+
+# errand 3: the crown loosens the first line of Doran's century-old letter; it is for Bori
+func doran_errand() -> void:
+	if doran_q == 0:
+		doran_q = 1
+		show_story("", STORY.DORAN_ASK)
+		set_quest("도란의 편지에 왕관을 대 보자 (E, 달빛 눈금 사용)")
+	elif spend_pips(lamp_cost()):
+		doran_q = 2
+		burst(Vector3(player.x, 1.4, player.z), Color("#9fd4ff"), 18, 1.5)
+		sfx(587, 0.4, "sine", 0.3, 300)
+		show_story("", STORY.DORAN_READ)
+		set_quest("편지를 서쪽 늪 오두막의 보리 할머니께 전하자 (Space)")
+	else:
+		return
+	save_game()
+
+func deliver_letter() -> void:
+	doran_q = 3
+	crown_pips = 8
+	player.max_hp += 10
+	player.hp = float(player.max_hp)
+	show_story("", STORY.BORI_LETTER)
+	set_quest("등불 마을로 돌아가자 (다음 장에서 계속)")
 	save_game()
 
 # put the kid goblin where kid_q says: in the field with guards, or beside Kongal
@@ -3098,6 +3131,7 @@ func _process(dt: float) -> void:
 	slowmo -= dt
 	ui.slowmo_tint.visible = slowmo > 0
 	ui.shop_hint.visible = not intro and not shop_open and near_shop()
+	ui.shop_hint.text = "Space  편지 전하기" if doran_q == 2 else "Space  상점 들어가기"
 	if shop_open and not near_shop():
 		toggle_shop(false)
 	if key_down(KEY_J) and player.atk_cd <= 0 and not intro and not shop_open:
