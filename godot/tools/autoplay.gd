@@ -172,7 +172,7 @@ func run() -> void:
 		hold_world(Vector2(0, 1))
 		await wait(1.5)
 		release()
-		var steps: int = main.sfx_log.filter(func(k): return k.begins_with("noise") or k.begins_with("triangle:1")).size()
+		var steps: int = main.sfx_log.filter(func(k): return k.begins_with("step") or k.begins_with("triangle:1")).size()
 		check("footsteps", steps >= 3, "%d steps in 1.5 s of walking" % steps)
 	if want.call("boss_survive"):
 		var boss = main.enemies.filter(func(e): return e.get("boss", false))
@@ -523,7 +523,9 @@ static func sound_report(m: Node, dir: String) -> void:
 		"step_grass": [100.0, 0.06, "noise", 0.12, 0.0],
 		"step_bridge": [150.0, 0.07, "triangle", 0.22, -60.0],
 		"hit": [300.0, 0.08, "square", 0.2, -200.0],
-		"hurt": [90.0, 0.15, "square", 0.25, -40.0],
+		"hurt": [320.0, 0.09, "triangle", 0.13, -140.0],
+		"hurt_body": [160.0, 0.12, "step", 0.08, 0.0],
+		"hurt_old": [90.0, 0.15, "square", 0.25, -40.0],
 		"swing": [180.0, 0.07, "sawtooth", 0.12, 300.0],
 		"stomp": [55.0, 0.5, "square", 0.35, -30.0],
 		"buy": [880.0, 0.08, "square", 0.15, 0.0],

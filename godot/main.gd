@@ -1288,11 +1288,14 @@ func sfx_stream(freq: float, dur := 0.1, wave := "square", vol := 0.25, slide :=
 				"square": v = 1.0 if x < 0.5 else -1.0
 				"sawtooth": v = x * 2.0 - 1.0
 				"triangle": v = 1.0 - 4.0 * absf(x - 0.5)
+				"step": # brushed grass: filtered noise that swells in, then fades
+					lp = lerpf(lp, randf_range(-1.0, 1.0), 0.12)
+					v = lp * 2.4 * minf(1.0, k * 6.0)
 				"noise":
 					lp = lerpf(lp, randf_range(-1.0, 1.0), 0.18) # one-pole low-pass takes the hiss off
 					v = lp * 2.2 * (0.6 + 0.4 * sin(phase * TAU))
 				_: v = sin(phase * TAU)
-			v *= vol * pow(0.0001, k) # exponential fade like the web version
+			v *= vol * pow(0.0001 if wave != "step" else 0.01, k) # exponential fade like the web version
 			data.encode_s16(i * 2, int(clampf(v, -1.0, 1.0) * 32767.0))
 		stream = AudioStreamWAV.new()
 		stream.format = AudioStreamWAV.FORMAT_16_BITS
@@ -1304,11 +1307,20 @@ func sfx_stream(freq: float, dur := 0.1, wave := "square", vol := 0.25, slide :=
 # footsteps: a grass rustle, or a hollow knock on bridge planks; a few cached variants
 var step_frame := -1
 
+# Footsteps: soft and varied so they sit under the music of the marsh, not on top of it.
+# A grass step is a short brush of filtered noise with a gentle fade in; a bridge step is a quiet knock.
+const STEP_GAP := 0.42  # at most ~2.4 steps a second, even when running
+var last_step := -9.0
+
 func footstep() -> void:
+	if t - last_step < STEP_GAP:
+		return
+	last_step = t
+	var v := rnd(0.045, 0.07)
 	if tile_at(player.x, player.z) == BRIDGE:
-		sfx([150.0, 165.0, 140.0][rng.randi() % 3], 0.07, "triangle", 0.22, -60.0)
+		sfx(rnd(130.0, 170.0), 0.05, "triangle", v * 1.6, -40.0)
 	else:
-		sfx([90.0, 110.0, 100.0][rng.randi() % 3], 0.06, "noise", 0.12)
+		sfx(rnd(70.0, 120.0), 0.09, "step", v)
 
 # ---------------------------------------------------------------- combat
 func damage_enemy(e: Dictionary, amt: float, from: Vector2, kb := 4.0, force_crit := false, stop := 0.05) -> void:
@@ -3198,7 +3210,7 @@ func player_hit(dmg: int, src: Vector2, attacker: Dictionary) -> String:
 			toast("섬광 막기! 반격하라")
 			return "flash_guard"
 		player.sp = maxf(0.0, player.sp - 15.0)
-		sfx(400, 0.06, "square", 0.15)
+		sfx(520, 0.05, "triangle", 0.1, -80) # blocked: a light tick
 		hurt_player(int(ceil(dmg * 0.3)), gy)
 		return "guard"
 	hurt_player(dmg, gy)
@@ -3210,7 +3222,9 @@ func hurt_player(dmg: int, gy: float) -> void:
 	player.inv = 0.8
 	shake = maxf(shake, 0.2)
 	pop_num(Vector3(player.x, gy + 1.9, player.z), str(dmg), Color("#ff7a6a"))
-	sfx(90, 0.15, "square", 0.25, -40)
+	# getting hit: a short soft "oof" (two quiet tones) instead of a loud buzzing square thud
+	sfx(rnd(300.0, 340.0), 0.09, "triangle", 0.13, -140.0)
+	sfx(160.0, 0.12, "step", 0.08)
 	if player.hp <= 0:
 		faint()
 
