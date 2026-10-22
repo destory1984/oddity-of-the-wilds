@@ -1,8 +1,10 @@
-# Oddity of the Wilds
+# The Crown Oddity
 
 브라우저에서 바로 하는 작은 액션 RPG다. 3D 블록 지형 위에 픽셀 그림 캐릭터를 세우고, 화면 위아래를 흐리게 하는 틸트시프트와 빛번짐을 걸어 미니어처 정원을 내려다보는 느낌을 냈다. 전투는 이스 시리즈처럼 빠르게 베고 구르고 막는 방식이다.
 
 **지금 하기:** https://destory1984.github.io/oddity-of-the-wilds/ (첫 로딩 약 45MB)
+
+처음 이름은 Oddity of the Wilds였다. 이야기가 왕관과 태엽 정원 쪽으로 커지면서 2026-10-23에 이름을 바꿨다. 저장소 주소는 그대로 둔다.
 
 ![제목 화면](docs/shots/title.jpg)
 

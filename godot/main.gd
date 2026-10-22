@@ -1,4 +1,4 @@
-# Oddity of the Wilds: Godot 4 port of the browser demo.
+# The Crown Oddity: Godot 4 port of the browser demo.
 # Everything (world, actors, HUD) is built from code so the scene file stays tiny.
 extends Node3D
 

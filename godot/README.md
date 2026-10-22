@@ -1,4 +1,4 @@
-# Oddity of the Wilds (Godot 4)
+# The Crown Oddity (Godot 4)
 
 브라우저 데모(`oddity-of-the-wilds`, Three.js)를 Godot 4.7로 옮긴 판이다.
 씬 파일은 거의 비어 있고, 지형, 풀, 나무, 소라, 괴물, 상태창, 미니맵을 모두 `main.gd` 가 코드로 만든다.

@@ -1,4 +1,4 @@
-# Oddity of the Wilds (Godot 4.7) 작업 안내
+# The Crown Oddity (Godot 4.7) 작업 안내
 
 ## 구성
 

@@ -290,7 +290,7 @@ const ENDING := [
 	"소라|sad|저는…… 집을 찾고 있었는데.",
 	"보리 할머니|bori|그래서, 찾았니?",
 	"소라|laugh|……네. 여기요.",
-	"||Oddity of the Wilds — 끝. 함께해 주셔서 고맙습니다.",
+	"||The Crown Oddity — 끝. 함께해 주셔서 고맙습니다.",
 ]
 
 const LAKE_IN := [

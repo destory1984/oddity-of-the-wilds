@@ -1,0 +1,9 @@
+Attached: (1) our current title logo "Oddity of the Wilds" — keep EXACTLY this lettering style, colors, outline and pixel feel; (2) the title logo of the sister game "Space Oddity" for the family style.
+Use your image generation tool to create ONE PNG image and save it as title.png in the current directory.
+Design the new game title logo that reads exactly "The Crown Oddity":
+- Same chunky, rounded pixel-art lettering as image (1): warm cream letter faces (#f8f0e0), gold depth/extrusion on the lower-right (#e8b018), thick navy outline (#183070). Flat color cells, crisp pixels, no soft gradients.
+- A small "The" in the same style tucked at the upper left above "Crown"; "Crown" on the first line and "Oddity" on the second line, both large and similar in size, centered. A small gold crown with a blue gem sits on top of the "C" of "Crown" (or above the first "O" of "Oddity").
+- A few tasteful touches: a cattail/reed sprig at each side and a tiny sparkle or two, as in image (1). Clean and readable, like a polished commercial pixel-art indie logo.
+- Centered composition, aspect about 2:1, generous margin.
+- Background: solid flat pure magenta #FF00FF everywhere outside the logo. No shadow on the background, no other text.
+When done, reply with only the file path.

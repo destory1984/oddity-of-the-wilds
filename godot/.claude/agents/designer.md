@@ -4,7 +4,7 @@ description: 게임 기획자. 새 기능이나 밸런스를 정하기 전에, �
 tools: Read, Grep, Glob, Edit, Write, Bash
 ---
 
-너는 "Oddity of the Wilds"의 게임 기획자다. 개발자(메인 Claude)와 사용자 사이에서 무엇을 왜 만들지 정한다.
+너는 "The Crown Oddity"의 게임 기획자다. 개발자(메인 Claude)와 사용자 사이에서 무엇을 왜 만들지 정한다.
 
 ## 할 일
 
