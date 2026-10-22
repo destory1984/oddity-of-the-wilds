@@ -176,28 +176,25 @@ const KID_GUARDS := [Vector2i(4, 20), Vector2i(8, 20), Vector2i(7, 22)]
 
 func kid_goblin(m: Node) -> Node3D:
 	var g := Node3D.new()
-	var green: Material = m.mat_color(Color("#4f9a3a"))
-	for part in [[Vector3(0.3, 0.3, 0.24), Vector3(0, 0.2, 0), green],
-			[Vector3(0.34, 0.26, 0.28), Vector3(0, 0.5, 0), green],
-			[Vector3(0.16, 0.06, 0.06), Vector3(-0.22, 0.56, 0), green], # ears
-			[Vector3(0.16, 0.06, 0.06), Vector3(0.22, 0.56, 0), green],
-			[Vector3(0.36, 0.08, 0.3), Vector3(0, 0.36, 0), m.mat_color(Color("#c8322a"))], # scarf
-			[Vector3(0.05, 0.06, 0.02), Vector3(-0.07, 0.54, 0.145), m.mat_color(Color("#1a1a1a"))],
-			[Vector3(0.05, 0.06, 0.02), Vector3(0.07, 0.54, 0.145), m.mat_color(Color("#1a1a1a"))]]:
-		var b: MeshInstance3D = m.box(part[0], part[2])
-		b.position = part[1]
-		g.add_child(b)
+	var spr := Sprite3D.new() # GPT pixel sprite: frame 0 standing, frame 1 trotting
+	spr.texture = load("res://art/folk/kid.png")
+	spr.hframes = 2
+	spr.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+	spr.scale = Vector3(1, 1.0 / cos(0.78), 1)
+	spr.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	spr.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
+	spr.shaded = false
+	spr.pixel_size = 1.0 / 110.0
+	spr.offset = Vector2(0, 55)
+	g.add_child(spr)
+	g.set_meta("spr", spr)
 	# it carries a little firefly jar, so it can be found in the dark south field
-	var jar: MeshInstance3D = m.box(Vector3(0.12, 0.14, 0.12), m.glow_mat(Color("#d8ff8a"), 3.0))
-	jar.position = Vector3(0.24, 0.3, 0.1)
-	g.add_child(jar)
 	var glow := OmniLight3D.new()
 	glow.light_color = Color("#d8ffb0")
 	glow.light_energy = 1.2
 	glow.omni_range = 2.8
-	glow.position = Vector3(0.2, 0.8, 0.3)
+	glow.position = Vector3(0, 0.6, 0.4)
 	g.add_child(glow)
-	g.scale = Vector3.ONE * 1.4
 	m.add_child(g)
 	return g
 

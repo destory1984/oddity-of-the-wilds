@@ -2661,8 +2661,9 @@ func update_kid(dt: float) -> void:
 		var to := me - kid_node.position
 		if to.length() > 1.0:
 			kid_node.position += to.normalized() * minf(to.length() - 1.0, dt * 5.0)
-		kid_node.position.y = absf(sin(t * 12.0)) * 0.08 if to.length() > 1.05 else 0.0
-		kid_node.rotation.y = atan2(to.x, to.z)
+		var trot := to.length() > 1.05
+		kid_node.position.y = absf(sin(t * 12.0)) * 0.08 if trot else 0.0
+		kid_node.get_meta("spr").frame = (1 if sin(t * 12.0) > 0.0 else 0) if trot else 0
 
 func light_village_lamp(d: Dictionary) -> void:
 	d.lit = true
