@@ -7,7 +7,10 @@ const SQUASH := 0.62
 
 var main: Node
 var map_tex: Texture2D
-var sora_icon: Texture2D = preload("res://icon.png")
+var sora_icon: Texture2D = preload("res://art/ui/portrait.png")
+
+func _ready() -> void:
+	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR # a smooth painted map, not pixel blocks
 
 func _process(_dt: float) -> void:
 	queue_redraw()

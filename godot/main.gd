@@ -700,10 +700,11 @@ func build_vegetation() -> void:
 		for i in 5:
 			var x := 2 + i * 3 + rng.randi() % 2
 			var h := 18.0 + rng.randf() * 12.0
-			px(img, x, 32 - h, 1, h, Color("#6f9a34") if i % 2 else Color("#86ad3e"))
-			px(img, x - 1, 32 - h - 1, 3, 6, Color("#8a4f22"))
-			px(img, x - 1, 32 - h - 1, 1, 6, Color("#b5733a"))
-			px(img, x, 32 - h - 3, 1, 2, Color("#c7a46a"))
+			px(img, x, 32 - h, 1, h, Color("#7aa63a") if i % 2 else Color("#a2b850"))
+			# a slim dark-brown seed head (cattails are brown, not red) with a pale tip
+			px(img, x - 1, 32 - h, 2, 5, Color("#5a4630"))
+			px(img, x - 1, 32 - h, 1, 5, Color("#76603f"))
+			px(img, x, 32 - h - 2, 1, 2, Color("#d8cf9a"))
 		for i in 6:
 			px(img, rng.randf() * 15, 20 + rng.randf() * 10, 1, 12, Color("#5d8a2a")))
 	var grass_spots: Array = []
