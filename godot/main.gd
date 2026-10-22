@@ -161,6 +161,7 @@ func unstick() -> void:
 # Sora keeps a little room from cave walls so her sprite never sinks into one
 var has_skip := false   # 물수제비 걸음 (story step 7 ability)
 var skipping := false
+var skip_grace := 0.0   # a short let-go of Shift or the arrows mid-river does not drop Sora in
 
 func player_can(x: float, z: float) -> bool:
 	if not walkable(x, z):
@@ -3351,20 +3352,30 @@ func _process(dt: float) -> void:
 		if key_down(KEY_D) or key_down(KEY_RIGHT): mv += right
 		if key_down(KEY_A) or key_down(KEY_LEFT): mv -= right
 	var running: bool = key_down(KEY_SHIFT) and player.sp > 0 and mv.length() > 0
-	skipping = has_skip and running
-	if skipping and tile_at(player.x, player.z) == WATER and player.x < CAVE_X - 0.5:
-		player.sp = maxf(0.0, player.sp - 15.0 * dt) # skipping over water costs extra stamina
+	var on_water: bool = tile_at(player.x, player.z) == WATER and player.x < CAVE_X - 0.5
+	skip_grace = 0.6 if has_skip and running else skip_grace - dt
+	skipping = has_skip and (running or (on_water and skip_grace > 0.0))
+	if has_skip and not running and mv.length() > 0 and not on_water and toast_t <= 0.0:
+		var ahead := Vector2(player.x, player.z) + mv.normalized() * 0.7
+		if ahead.x < CAVE_X - 0.5 and tile_at(ahead.x, ahead.y) == WATER:
+			toast("Shift를 누른 채 달리면 물 위를 건넌다")
+	if skipping and on_water:
+		player.sp = maxf(1.0, player.sp - 6.0 * dt) # costs a little extra, but never runs dry mid-river
 		if int(t * 8.0) != int((t - dt) * 8.0):
 			burst(Vector3(player.x, -0.2, player.z), Color("#9fe0ff"), 4, 1.2)
 	elif not running and tile_at(player.x, player.z) == WATER and player.x < CAVE_X - 0.5 and not skipping:
 		unstick() # stopped on open water: back to the nearest shore
 	player.sp = maxf(0, player.sp - 22 * dt) if running else minf(100, player.sp + 18 * dt)
+	if skipping and on_water:
+		player.sp = maxf(player.sp, 1.0)
 	var speed := 6.2 if running else 3.6
 	var tv := Vector2.ZERO
 	if mv.length() > 0:
 		mv = mv.normalized()
 		tv = mv * speed
 		player.face = mv
+	if skipping and on_water and not running: # let go for a moment: glide on in the same direction
+		tv = player.face * 6.2
 	if player.atk_cd > 0.1:
 		tv *= 0.3
 	if guarding:
