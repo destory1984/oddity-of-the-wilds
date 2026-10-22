@@ -40,7 +40,13 @@ python -m http.server 8765
 
 ## 그림과 글꼴
 
-- 주인공 그림(`art/hero_sheet.png`)은 GPT 이미지 생성(Codex CLI)으로 그렸다. 주문 문구는 `art/prompt.txt` 에 있다.
+- 주인공은 소라다(`art/sora/`). 소라의 디자인과 그림은 저작권자가 모든 권리를 가진다(All rights reserved). MIT 라이선스에 들어가지 않으므로 따로 쓸 수 없다.
+- 예전 주인공 그림(`art/hero_sheet.png`)은 GPT 이미지 생성(Codex CLI)으로 그렸다. 주문 문구는 `art/prompt.txt` 에 있다.
   `art/cut.py` 가 분홍 배경을 지우고 4x3칸으로 다시 잘라 `hero.png` 를 만든다.
-- 풀, 부들, 적, 상자, 물은 코드에서 캔버스에 직접 찍는다.
+- 괴물은 코드에서 레고 블록을 쌓아 만든다.
+- 풀, 부들, 상자, 물은 코드에서 캔버스에 직접 찍는다.
 - 글꼴: Pretendard, 나눔손글씨 펜, 개구(`fonts/`, 모두 SIL 오픈 폰트 라이선스 1.1, 각 폴더에 LICENSE.txt). 제목은 Google Fonts의 Cinzel이다.
+
+## 라이선스
+
+코드는 MIT, 글꼴은 SIL 오픈 폰트 라이선스 1.1, 소라 그림은 All rights reserved다. 자세한 내용은 `LICENSE` 에 있다.
