@@ -91,17 +91,17 @@ const CAVE_ROWS := """################################
 #........###..wwww..##.........#
 #........###........##....B....#
 #........###........##.........#
-######################.........#
-######################.........E
-######################.........#
-######################.........#
-################################
+####.#################.........#
+#.............########.........E
+#.............########.........#
+#...1...2...3.########.........#
+#.............##################
 ################################
 ################################"""
 var cave_grid: Array = []   # rows of characters
 var in_cave := false
 var cave_door_open := false
-var cave_marks := {}        # letter -> world Vector2 (S, P, K, D, B, E)
+var cave_marks := {}        # letter -> world Vector2 (S, P, K, D, B, E; 1 2 3 the shrine's stones)
 
 func cave_char(x: float, z: float) -> String:
 	var tx := int(round(x)) - CAVE_X
@@ -259,6 +259,7 @@ func _ready() -> void:
 	build_cottage()
 	darken_first_lamp()
 	build_cave()
+	build_shrine()
 	village.build(self)
 	forest.build(self)
 	garden.build(self)
@@ -325,6 +326,7 @@ const SCENES := {
 	"scarecrow": {"play": true, "village": true, "cloud": true, "scare": true, "hour": 16.0},
 	"castle": {"play": true, "village": true, "castle": true, "hour": 15.0},
 	"knight": {"play": true, "village": true, "castle": true, "knight": true, "hour": 15.0},
+	"shrine": {"play": true, "shrine": true},
 	"scrap": {"play": true, "at": Vector2(42.5, 5.5), "hour": 17.0},
 }
 
@@ -501,6 +503,13 @@ func apply_test_args(args: PackedStringArray) -> void:
 				player.x = e.x
 				player.z = e.z + 3.5
 		close_story()
+	if sc.get("shrine", false): # the shrine of three stones under the cave, the whirl woken
+		enter_cave()
+		close_story()
+		shrine_seen = true
+		skill_up = 0
+		player.x = CAVE_X + 8.0
+		player.z = 18.6
 	if sc.get("opening", false):
 		begin_opening()
 	if sc.has("faint"):
@@ -1848,42 +1857,53 @@ func light_blade(f: Vector2) -> void:
 
 const SKILL_MP := [30, 15, 60]
 const SKILL_CD := [3.0, 1.2, 6.0]
+var skill_up := -1           # the skill woken at the cave shrine: 0 whirl, 1 ember bolt, 2 radiant nova
+var shrine_seen := false
+var shrine_nodes: Array = []
+
+func skill_cost(i: int) -> int:
+	return 45 if i == 2 and skill_up == 2 else SKILL_MP[i]
 
 func use_skill(i: int) -> void:
 	if player.cds[i] > 0:
 		return
-	if player.mp < SKILL_MP[i]:
+	if player.mp < skill_cost(i):
 		toast("기세가 모자라다")
 		return
-	player.mp -= SKILL_MP[i]
+	player.mp -= skill_cost(i)
 	player.cds[i] = SKILL_CD[i]
 	var here := Vector3(player.x, height_at(player.x, player.z), player.z)
 	var me := Vector2(player.x, player.z)
 	match i:
-		0: # whirl
+		0: # whirl (woken: wider and harder)
+			var woke := skill_up == 0
 			sfx(140, 0.3, "sawtooth", 0.2, 400)
 			slash_fx(here, 0.0, true)
+			if woke: # the woken whirl throws a wider ring of wind
+				burst(here + Vector3(0, 0.5, 0), Color("#9fd4ff"), 30, 5.0)
 			for e in enemies:
-				if not e.dead and Vector2(e.x, e.z).distance_to(me) < 2.6:
-					damage_enemy(e, player.atk * 1.4, me, 6.0)
+				if not e.dead and Vector2(e.x, e.z).distance_to(me) < (3.4 if woke else 2.6):
+					damage_enemy(e, player.atk * (1.9 if woke else 1.4), me, 6.0)
 		1: # ember bolt
 			sfx(400, 0.2, "triangle", 0.2, -250)
 			var tg = nearest_enemy(12.0)
 			var dir: Vector2 = (Vector2(tg.x, tg.z) - me).normalized() if tg != null else player.face
-			var b := MeshInstance3D.new()
-			var sp := SphereMesh.new()
-			sp.radius = 0.16
-			sp.height = 0.32
-			b.mesh = sp
-			b.material_override = glow_mat(Color("#ff8a2a"), 4.0)
-			var l := OmniLight3D.new()
-			l.light_color = Color("#ff8a3a")
-			l.light_energy = 2.0
-			l.omni_range = 4.0
-			b.add_child(l)
-			b.position = here + Vector3(0, 0.6, 0)
-			add_child(b)
-			projectiles.append({"node": b, "v": dir * 14.0, "life": 1.2})
+			for a in ([-0.22, 0.0, 0.22] if skill_up == 1 else [0.0]): # woken: three bolts in a fan
+				var b := MeshInstance3D.new()
+				var sp := SphereMesh.new()
+				sp.radius = 0.16
+				sp.height = 0.32
+				b.mesh = sp
+				b.material_override = glow_mat(Color("#ff8a2a"), 4.0)
+				if a == 0.0: # one light is enough; the web renderer lights a mesh with at most 8
+					var l := OmniLight3D.new()
+					l.light_color = Color("#ff8a3a")
+					l.light_energy = 2.0
+					l.omni_range = 4.0
+					b.add_child(l)
+				b.position = here + Vector3(0, 0.6, 0)
+				add_child(b)
+				projectiles.append({"node": b, "v": dir.rotated(a) * 14.0, "life": 1.2})
 		2: # radiant nova
 			var m := MeshInstance3D.new()
 			m.mesh = ring_mesh(0.2, 0.6, 0.0, TAU)
@@ -1899,6 +1919,10 @@ func use_skill(i: int) -> void:
 					damage_enemy(e, player.atk * 2.2, me, 9.0)
 			shake = 0.3
 			sfx(220, 0.6, "sine", 0.4, 600)
+			if skill_up == 2: # woken: the light mends her too
+				var heal := int(player.max_hp * 0.15)
+				player.hp = minf(float(player.max_hp), player.hp + heal)
+				pop_num(here + Vector3(0, 1.6, 0), "+" + str(heal), Color("#7aff8a"))
 
 func drink_potion() -> void:
 	if player.pots <= 0:
@@ -2649,6 +2673,7 @@ func save_game() -> void:
 		"fly_q": fly_q, "flies": marsh.flies.map(func(f): return f.caught),
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
+		"skill_up": skill_up, "shrine_seen": shrine_seen,
 		"castle_q": castle_q, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -2765,6 +2790,8 @@ func load_game() -> void:
 	if cloud_chest:
 		cloud.opened_look()
 	has_feather = bool(d.get("has_feather", false))
+	skill_up = int(d.get("skill_up", -1))
+	shrine_seen = bool(d.get("shrine_seen", false))
 	castle_q = int(d.get("castle_q", 0))
 	if castle_q == 2:
 		castle_q = 1 # the knight fight starts over
@@ -2871,7 +2898,7 @@ func build_cave() -> void:
 		for x in CAVE_W:
 			var c: String = cave_grid[z][x]
 			var w := Vector2(CAVE_X + x, z)
-			if c in "SPKDBE":
+			if c in "SPKDBE123":
 				cave_marks[c] = w
 			if c == "#":
 				# only walls that touch the floor get built, to keep the count small
@@ -3166,6 +3193,8 @@ func spend_pips(n: int) -> bool:
 # E key: talk to Simji, light a dark village lantern, or (in the marsh opening) touch the crown
 func crown_key() -> void:
 	var me := Vector2(player.x, player.z)
+	if in_cave and shrine_key():
+		return
 	if in_forest:
 		if grove_key():
 			return
@@ -4691,7 +4720,7 @@ func hawk_beaten() -> void:
 	player.gold += 250
 	gain_xp(300)
 	show_story("", STORY.HAWK_DOWN)
-	set_quest("언덕 동쪽 끝 길로, 정원 한가운데에 가자")
+	set_quest("언덕 동쪽 끝 길로, 달지기들의 성에 가자")
 	save_game()
 
 # ---- the heart of the garden (story steps 11 and 12)
@@ -5061,8 +5090,58 @@ func build_cave_props() -> void:
 	wall.position = Vector3(p.x, 0.9, p.y - 1.45)
 	add_child(wall)
 
+# the shrine of three stones under the cave's west hall: E or Space by a stone wakes that skill (it can be changed back)
+func build_shrine() -> void:
+	var stone: Material = mat_color(Color("#6a6a74"))
+	var cols := [Color("#3a9cff"), Color("#ff7a1a"), Color("#ffd23a")] # whirl, ember, nova
+	for i in 3:
+		var at: Vector2 = cave_marks[str(i + 1)]
+		var g := Node3D.new()
+		var post := box(Vector3(0.7, 0.8, 0.7), stone)
+		post.position = Vector3(0, 0.4, 0)
+		g.add_child(post)
+		var gm := StandardMaterial3D.new() # flat unshaded colour: an additive glow would bloom to white in the cave
+		gm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		gm.albedo_color = cols[i]
+		var gem := box(Vector3(0.32, 0.32, 0.32), gm)
+		gem.name = "gem"
+		gem.position = Vector3(0, 1.15, 0)
+		g.add_child(gem)
+		g.position = Vector3(at.x, 0, at.y)
+		add_child(g)
+		shrine_nodes.append(g)
+		rocks.append({"x": at.x, "z": at.y, "r": 0.5})
+
+func update_shrine(dt: float) -> void:
+	for i in shrine_nodes.size():
+		var gem: Node3D = shrine_nodes[i].get_node("gem")
+		gem.rotation.y += dt * (2.5 if skill_up == i else 0.6)
+		gem.scale = Vector3.ONE * (1.4 + sin(t * 3.0) * 0.1 if skill_up == i else 1.0)
+	if in_cave and not shrine_seen and player.z > 17.6 and not story_open:
+		shrine_seen = true
+		show_story("", STORY.SHRINE_IN)
+		save_game()
+
+func shrine_key() -> bool:
+	var me := Vector2(player.x, player.z)
+	for i in 3:
+		if me.distance_to(cave_marks[str(i + 1)]) < 1.4:
+			if skill_up == i:
+				toast("이미 깨어난 기술이다")
+				return true
+			skill_up = i
+			burst(Vector3(cave_marks[str(i + 1)].x, 1.2, cave_marks[str(i + 1)].y), [Color("#9fd4ff"), Color("#ff8a2a"), Color("#fff1a0")][i], 30, 3.0)
+			sfx(523, 0.15, "triangle", 0.22)
+			get_tree().create_timer(0.12).timeout.connect(func(): sfx(784, 0.25, "triangle", 0.22))
+			show_story("", [STORY.SHRINE_WHIRL, STORY.SHRINE_EMBER, STORY.SHRINE_NOVA][i])
+			save_game()
+			return true
+	return false
+
 func cave_interact() -> bool:
 	var me := Vector2(player.x, player.z)
+	if shrine_key():
+		return true
 	if not has_key and me.distance_to(cave_marks.K) < 1.5:
 		has_key = true
 		key_chest.modulate = Color(0.55, 0.55, 0.55)
@@ -5537,6 +5616,7 @@ func _process(dt: float) -> void:
 		jar_node.visible = night > 0.5
 		jar_node.position = Vector3(player.x + 0.35, ground_y + 0.55 + sin(t * 2.0) * 0.04, player.z + 0.1)
 	update_night(dt)
+	update_shrine(dt)
 	if in_cave:
 		check_painting()
 	if in_cave and not has_skip and Vector2(player.x, player.z).distance_to(cave_marks.E) < 1.6 and toast_t <= 0.0:

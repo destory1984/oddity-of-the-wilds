@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -181,6 +181,7 @@ func run() -> void:
 			check("boss_survive", false, "no boss on the map")
 		else:
 			var b0: Dictionary = boss[0]
+			calm_enemies(true) # the boss alone: a marsh archer that happens to stand nearby would add its own hits
 			reset_to(Vector2(b0.x, b0.z + 2.0))
 			main.player.max_hp = 100
 			main.player.hp = 100.0
@@ -191,6 +192,7 @@ func run() -> void:
 				if Vector2(main.player.x, main.player.z).distance_to(start) < 0.5:
 					faints[0] += 1
 					break
+			calm_enemies(false)
 			check("boss_survive", faints[0] == 0, "level 1 Sora standing still beside the boss for 12 s: hp %d" % int(main.player.hp))
 	if want.call("faint_resets"):
 		var boss = main.enemies.filter(func(e): return e.get("boss", false) and not e.dead)
@@ -459,7 +461,7 @@ func run() -> void:
 		check("cave_enter", main.in_cave and main.story_step == 6 and main.walkable(main.player.x, main.player.z),
 			"stepping on the cave mouth: in cave=%s step=%d at %.1f,%.1f" % [main.in_cave, main.story_step, main.player.x, main.player.z])
 	if want.call("cave_layout"):
-		var ok: bool = main.cave_marks.size() == 6 and not main.walkable(main.cave_marks.D.x, main.cave_marks.D.y) and main.walkable(main.cave_marks.K.x, main.cave_marks.K.y)
+		var ok: bool = main.cave_marks.size() == 9 and not main.walkable(main.cave_marks.D.x, main.cave_marks.D.y) and main.walkable(main.cave_marks.K.x, main.cave_marks.K.y)
 		check("cave_layout", ok, "marks %s, locked door blocks, key spot open" % [main.cave_marks.keys()])
 	if want.call("archer_telegraph"):
 		var ar = main.enemies.filter(func(e): return e.get("archer", false) and not e.dead)
@@ -1300,6 +1302,45 @@ func run() -> void:
 		calm_enemies(false)
 		check("castle", entered and shut and gate and skipped and vented and shut_door and door and woke and shield and flank and guard_opens and beaten and to_garden and back,
 			"entered=%s gate shut/open=%s/%s skip=%s vent=%s door shut=%s pages open door=%s knight woke=%s front blocked=%s flank hits=%s flash guard opens=%s beaten=%s to garden=%s back=%s" % [entered, shut, gate, skipped, vented, shut_door, door, woke, shield, flank, guard_opens, beaten, to_garden, back])
+	if want.call("shrine"):
+		main.in_village = false
+		main.in_forest = false
+		main.in_lake = false
+		main.in_garden = false
+		main.in_hill = false
+		main.skill_up = -1
+		main.shrine_seen = false
+		main.story_step = maxi(main.story_step, 6)
+		main.enter_cave()
+		main.close_story()
+		await wait(0.1)
+		calm_enemies(true)
+		var cx: float = main.CAVE_X
+		var reach: bool = main.player_can(cx + 4, 17) and main.player_can(cx + 4, 19)
+		reset_to(Vector2(cx + 4, 18.5))
+		await wait(0.3)
+		var seen: bool = main.shrine_seen and main.story_open
+		main.close_story()
+		reset_to(main.cave_marks["1"] + Vector2(0, -1.0))
+		tap(KEY_E)
+		await wait(0.2)
+		main.close_story()
+		var whirl: bool = main.skill_up == 0
+		reset_to(main.cave_marks["3"] + Vector2(0, -1.0))
+		tap(KEY_SPACE)
+		await wait(0.2)
+		main.close_story()
+		var nova: bool = main.skill_up == 2 and main.skill_cost(2) == 45
+		main.player.hp = 50.0
+		main.player.mp = 100.0
+		main.player.cds[2] = 0.0
+		tap(KEY_O)
+		await wait(0.1)
+		var healed: bool = main.player.hp > 50.0 and main.player.mp < 60.0 # 45 spent, a little drained by idling
+		main.leave_cave()
+		await wait(0.2)
+		calm_enemies(false)
+		check("shrine", reach and seen and whirl and nova and healed, "room reachable=%s shrine scene=%s whirl woke=%s nova woke (cost 45)=%s nova heals=%s (hp %.0f, mp %.0f)" % [reach, seen, whirl, nova, healed, main.player.hp, main.player.mp])
 	calm_enemies(false)
 	var failed := results.count(false)
 	print("TESTS %d passed, %d failed" % [results.size() - failed, failed])

@@ -119,7 +119,7 @@ func _draw() -> void:
 		var sc := Vector2(vs.x - 300 + i * 74, vs.y - 74)
 		draw_texture_rect(icons[i], Rect2(sc - Vector2(34, 34), Vector2(68, 68)), false)
 		var frac: float = cds[i] / cd_max[i]
-		var cant: bool = i < 3 and p.mp < main.SKILL_MP[i]
+		var cant: bool = i < 3 and p.mp < main.skill_cost(i)
 		if frac > 0.0 or cant: # cooldown sweep, or dim when there is not enough momentum
 			var pts := PackedVector2Array([sc])
 			var sweep := TAU * (frac if frac > 0.0 else 1.0)
