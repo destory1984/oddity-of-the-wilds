@@ -1,0 +1,10 @@
+You are our art director. Attached:
+1) cave_now2.png - the cave in our Godot 4 game RIGHT NOW (GL Compatibility renderer for the web, top-down 3/4 camera, voxel blocks, pixel heroine).
+2) cave_e.png - the concept the owner chose ("bioluminescent grotto").
+3) marsh_now2.png - the outdoor marsh right now.
+
+Compare 1 and 2 honestly. Reply in KOREAN, short plain sentences, max ~300 words:
+- What still separates our screen from the concept (top 5, most visible first).
+- For each, the exact fix in Godot terms we can code without 3D modelling: which node/material/shader/light, and concrete numbers (colors hex, emission energy, light energy/range, fog density, glow/bloom settings, block sizes, counts). Remember the web renderer: max 8 lights per mesh, no SDFGI/volumetric fog; prefer emission + glow + vertex color + simple shader tricks.
+- One quick note on what in the marsh screen should change so both areas feel like the same game.
+Do not generate images this time.

@@ -1,0 +1,10 @@
+The attached image is our current game screen (cave). The owner says the HUD looks lazy, not "minimal and stylish". Use your image generation tool to create ONE image and save it as hud_concept.png in the current directory.
+
+Design a premium, cohesive in-game HUD for a cozy fantasy action RPG with a moon / crown motif (heroine wears a gold crown with a blue gem; the world is a dark bioluminescent cave and golden reed marshes). Show it as a full 16:9 game screenshot over the same dark crystal-cave scene, top-down 3/4 view, small pixel heroine in the middle.
+HUD elements to design (Korean labels are fine but keep text minimal):
+- top-left: a compact character frame: small round portrait of the heroine in an ornate gold-trim circle with a level number badge; next to it slim curved bars for HP (red), Momentum (orange) and Stamina (cream); a very thin XP line under them. No big dark rectangle.
+- a small moon-phase / sun dial ornament attached to the frame (not a separate box).
+- top-right: a round minimap with an ornate gold ring and a tiny compass N, dark translucent map with glowing paths (not beige paper).
+- bottom-right: 4 skill slots as small diamond/rounded shapes with gold rims, glowing icons, key letters (U, I, O, 4) in tiny badges, cooldown sweep; gold counter as a small pill above.
+- top-center: a quest line in elegant small text with a thin ornamental divider.
+Style: dark navy translucent glass, thin gold (#E8B018) linework, subtle glow, consistent corner ornaments, generous spacing, readable at small size. No clutter.

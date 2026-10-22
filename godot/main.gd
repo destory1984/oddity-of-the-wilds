@@ -1523,16 +1523,20 @@ func skip_time(hours: float) -> void:
 func update_daylight(dt: float) -> void:
 	if in_cave:
 		sun.light_energy = 0.0
-		env.ambient_light_color = Color("#5a8ab8")
-		env.ambient_light_energy = 1.1
-		env.fog_light_color = Color("#05050a")
-		env.background_color = Color("#05050a")
+		env.ambient_light_color = Color("#4a6aa0")
+		env.ambient_light_energy = 0.9
+		env.glow_intensity = 0.6
+		env.glow_bloom = 0.05
+		env.fog_light_color = Color("#081426")
+		env.background_color = Color("#050a14")
 		cave_light.light_energy = 2.2
 		cave_light.position = Vector3(player.x, 1.6, player.z)
 		motes.emitting = false
 		motes.visible = false
 		return
 	cave_light.light_energy = 0.0
+	env.glow_intensity = 0.8
+	env.glow_bloom = 0.05
 	var before := hour
 	hour = fmod(hour + dt / DAY_SPEED, 24.0)
 	if before < 12.0 and hour >= 12.0:
@@ -2118,124 +2122,134 @@ func build_cave() -> void:
 					walls.append(w)
 			else:
 				floors.append(w)
-	# the web renderer lights each mesh with at most 8 lights, so build the cave in 6x6 chunks
-	# and every crystal light reaches the floor around it
-	for pair in [[floors, Vector3(1, 0.4, 1), -0.2, Color("#34465a")], [walls, Vector3(1, 1.0, 1), 0.5, Color("#3a4a60")]]:
-		var chunks := {}
-		for w in pair[0]:
-			var key := Vector2i(int(w.x - CAVE_X) / 6, int(w.y) / 6)
-			if not chunks.has(key):
-				chunks[key] = []
-			chunks[key].append(w)
-		for key in chunks:
-			var list: Array = chunks[key]
-			var mm := MultiMesh.new()
-			mm.transform_format = MultiMesh.TRANSFORM_3D
-			mm.use_colors = true
-			mm.mesh = BoxMesh.new()
-			mm.instance_count = list.size()
-			for i in list.size():
-				var w: Vector2 = list[i]
-				mm.set_instance_transform(i, Transform3D(Basis().scaled(pair[1]), Vector3(w.x, pair[2], w.y)))
-				mm.set_instance_color(i, (pair[3] as Color).lightened(rnd(0, 0.12)).srgb_to_linear())
-			var mmi := MultiMeshInstance3D.new()
-			mmi.multimesh = mm
-			var cm := StandardMaterial3D.new()
-			cm.vertex_color_use_as_albedo = true
-			cm.roughness = 0.85
-			mmi.material_override = cm
-			add_child(mmi)
-	# stone pillars at room corners and rubble along the walls give a sense of scale
-	var stone := mat_color(Color("#4a5a74"))
-	var cap_moss := mat_color(Color("#3a5a4a"))
-	for c in [Vector2(1, 1), Vector2(6, 1), Vector2(1, 6), Vector2(6, 6), Vector2(10, 1), Vector2(17, 1), Vector2(21, 1), Vector2(30, 1),
-			Vector2(1, 10), Vector2(8, 16), Vector2(12, 10), Vector2(19, 16), Vector2(22, 10), Vector2(30, 20)]:
-		if cave_char(CAVE_X + c.x, c.y) == "#":
-			continue
-		var pil := box(Vector3(0.55, 1.6, 0.55), stone)
-		pil.position = Vector3(CAVE_X + c.x, 0.8, c.y)
-		add_child(pil)
-		var top := box(Vector3(0.7, 0.15, 0.7), cap_moss)
-		top.position = pil.position + Vector3(0, 0.85, 0)
-		add_child(top)
-	var rubble := mat_color(Color("#56667e"))
-	for i in 50:
-		var w: Vector2 = floors[rng.randi() % floors.size()]
-		var near_wall := false
-		for d in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
-			if cave_char(w.x + d.x, w.y + d.y) == "#":
-				near_wall = true
-		if not near_wall:
-			continue
-		var r := rnd(0.12, 0.3)
-		var rb := box(Vector3(r, r * 0.7, r), rubble)
-		rb.position = Vector3(w.x + rnd(-0.35, 0.35), r * 0.35, w.y + rnd(-0.35, 0.35))
-		rb.rotation.y = rnd(0, PI)
-		add_child(rb)
-	# glowing pools: the water itself is the light
-	var pool_mat := glow_mat(Color("#3fe0e0"), 1.6)
-	pool_mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
-	pool_mat.blend_mode = BaseMaterial3D.BLEND_MODE_MIX
-	var pool_tiles: Array = []
-	for z in CAVE_H:
-		for x in CAVE_W:
-			if cave_grid[z][x] == "w":
-				var b := box(Vector3(1, 0.05, 1), pool_mat)
-				b.position = Vector3(CAVE_X + x, 0.02, z)
-				add_child(b)
-				pool_tiles.append(Vector2(CAVE_X + x, z))
+	# Concept E, second pass (art direction from GPT, 2026-10-23).
+	# Walls on the camera side of a floor stay low so they never hide Sora; the rest stand tall
+	# with irregular protrusions. Everything uses a world-space slate shader, built in 6x6 chunks
+	# because the web renderer lights each mesh with at most 8 lights.
+	var pool_tiles: Array = floors.filter(func(f): return cave_char(f.x, f.y) == "w")
+	floors = floors.filter(func(f): return cave_char(f.x, f.y) != "w")
+	var blocks: Array = [] # [Transform3D, Color]
+	for w in floors:
+		blocks.append([Transform3D(Basis().scaled(Vector3(1, 0.4, 1)), Vector3(w.x, -0.2, w.y)), Color(1.15, 1.15, 1.2)])
+	for w in walls:
+		var camera_side := cave_char(w.x, w.y - 1) != "#" or cave_char(w.x, w.y - 2) != "#" # floor within two tiles north: this wall is in front
+		var h := 0.35 if camera_side else rnd(2.4, 3.0)
+		blocks.append([Transform3D(Basis().scaled(Vector3(1, h, 1)), Vector3(w.x, h / 2.0, w.y)), Color(1, 1, 1)])
+		if not camera_side and rng.randf() < 0.6: # a jutting stone on the face
+			var j := rnd(0.4, 0.6)
+			var off := Vector3(rnd(-0.25, 0.25), rnd(0.3, h - 0.4), rnd(-0.25, 0.25))
+			for d in [Vector2(0, 1), Vector2(1, 0), Vector2(-1, 0)]:
+				if cave_char(w.x + d.x, w.y + d.y) != "#":
+					off += Vector3(d.x, 0, d.y) * 0.5
+					break
+			blocks.append([Transform3D(Basis(Vector3.UP, rnd(0, 0.6)).scaled(Vector3(j, j, j)), Vector3(w.x, 0, w.y) + off), Color(1.1, 1.1, 1.1)])
+	var stone := ShaderMaterial.new()
+	stone.shader = load("res://shaders/cave_stone.gdshader")
+	var chunks := {}
+	for bl in blocks:
+		var o: Vector3 = bl[0].origin
+		var key := Vector2i(int(o.x - CAVE_X) / 6, int(o.z) / 6)
+		if not chunks.has(key):
+			chunks[key] = []
+		chunks[key].append(bl)
+	for key in chunks:
+		var list: Array = chunks[key]
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.use_colors = true
+		mm.mesh = BoxMesh.new()
+		mm.instance_count = list.size()
+		for i in list.size():
+			mm.set_instance_transform(i, list[i][0])
+			mm.set_instance_color(i, list[i][1])
+		var mmi := MultiMeshInstance3D.new()
+		mmi.multimesh = mm
+		mmi.material_override = stone
+		add_child(mmi)
+	# glowing pools, sunk 0.15 below the floor
+	var pool := ShaderMaterial.new()
+	pool.shader = load("res://shaders/cave_pool.gdshader")
+	for t2 in pool_tiles:
+		var pb := box(Vector3(1, 0.1, 1), pool)
+		pb.position = Vector3(t2.x, -0.2, t2.y)
+		add_child(pb)
 	if not pool_tiles.is_empty():
 		var c := Vector2.ZERO
 		for t2 in pool_tiles:
 			c += t2
 		c /= pool_tiles.size()
 		var pl := OmniLight3D.new()
-		pl.light_color = Color("#3fe0e0")
-		pl.light_energy = 3.0
-		pl.omni_range = 6.0
-		pl.position = Vector3(c.x, 0.6, c.y)
+		pl.light_color = Color("#25dce8")
+		pl.light_energy = 1.6
+		pl.omni_range = 4.5
+		pl.position = Vector3(c.x, 0.5, c.y)
 		add_child(pl)
-	# crystal clusters (teal and violet) at the foot of the walls, each with a small light;
-	# the middle of every room stays clear
-	var wall_feet: Array = floors.filter(func(f):
-		for d in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
-			if cave_char(f.x + d.x, f.y + d.y) == "#":
-				return true
-		return false)
+	# crystals: five-sided cones in clusters of three at the foot of the back walls; violet mushrooms in pairs
+	var wall_feet: Array = floors.filter(func(f): return cave_char(f.x, f.y - 1) == "#" or cave_char(f.x - 1, f.y) == "#" or cave_char(f.x + 1, f.y) == "#")
 	wall_feet.shuffle()
-	var teal := glow_mat(Color("#5af0ff"), 2.6)
-	var violet := glow_mat(Color("#c06aff"), 2.6)
-	for gl in [teal, violet]:
-		gl.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
-		gl.blend_mode = BaseMaterial3D.BLEND_MODE_MIX
-	for i in mini(22, wall_feet.size()):
+	var teal := StandardMaterial3D.new()
+	teal.albedo_color = Color("#55efff")
+	teal.emission_enabled = true
+	teal.emission = Color("#55efff")
+	teal.emission_energy_multiplier = 2.5
+	var violet := teal.duplicate()
+	violet.albedo_color = Color("#c35beb")
+	violet.emission = Color("#c35beb")
+	violet.emission_energy_multiplier = 1.5
+	var cone := CylinderMesh.new()
+	cone.top_radius = 0.0
+	cone.bottom_radius = 0.12
+	cone.height = 0.7
+	cone.radial_segments = 5
+	cone.rings = 1
+	for i in mini(14, wall_feet.size()):
 		var w: Vector2 = wall_feet[i]
-		var violet_one := i % 3 == 0
 		var cl := Node3D.new()
-		cl.position = Vector3(w.x + rnd(-0.25, 0.25), 0.0, w.y + rnd(-0.25, 0.25))
+		cl.position = Vector3(w.x + rnd(-0.2, 0.2), 0.0, w.y + rnd(-0.2, 0.2))
 		add_child(cl)
-		for k in 3 + rng.randi() % 3: # a little bundle of tilted shards
-			var h := rnd(0.25, 0.7)
-			var shard := box(Vector3(0.12, h, 0.12), violet if violet_one else teal)
-			shard.position = Vector3(rnd(-0.2, 0.2), h / 2.0, rnd(-0.2, 0.2))
-			shard.rotation = Vector3(rnd(-0.4, 0.4), rnd(0, PI), rnd(-0.4, 0.4))
-			cl.add_child(shard)
-		if i < 18: # a light for most clusters; chunked meshes let each one reach the floor
-			var cll := OmniLight3D.new()
-			cll.light_color = Color("#c06aff") if violet_one else Color("#5af0ff")
-			cll.light_energy = 1.8
-			cll.omni_range = 3.5
-			cll.position = Vector3(0, 0.5, 0)
-			cl.add_child(cll)
-	# glowing violet mushrooms scattered near walls
-	for i in range(22, mini(40, wall_feet.size())):
+		for k in 3:
+			var sc := rnd(0.6, 1.2)
+			var sh := MeshInstance3D.new()
+			sh.mesh = cone
+			sh.material_override = teal
+			sh.scale = Vector3.ONE * sc
+			sh.position = Vector3(rnd(-0.18, 0.18), 0.35 * sc, rnd(-0.18, 0.18))
+			sh.rotation = Vector3(rnd(-0.35, 0.35), rnd(0, TAU), rnd(-0.35, 0.35))
+			cl.add_child(sh)
+		var cll := OmniLight3D.new()
+		cll.light_color = Color("#55efff")
+		cll.light_energy = 1.2
+		cll.omni_range = 3.0
+		cll.position = Vector3(0, 0.6, 0)
+		cl.add_child(cll)
+	for i in range(14, mini(30, wall_feet.size())):
 		var w: Vector2 = wall_feet[i]
-		var stem := box(Vector3(0.05, 0.14, 0.05), mat_color(Color("#d8d0e8")))
-		stem.position = Vector3(w.x + rnd(-0.3, 0.3), 0.07, w.y + rnd(-0.3, 0.3))
-		add_child(stem)
-		var cap := box(Vector3(0.16, 0.06, 0.16), violet)
-		cap.position = stem.position + Vector3(0, 0.09, 0)
-		add_child(cap)
+		for k in 2:
+			var at := Vector3(w.x + rnd(-0.3, 0.3), 0, w.y + rnd(-0.3, 0.3))
+			var stem := box(Vector3(0.05, 0.16, 0.05), mat_color(Color("#d8d0e8")))
+			stem.position = at + Vector3(0, 0.08, 0)
+			add_child(stem)
+			var capm := box(Vector3(0.2, 0.07, 0.2), violet)
+			capm.position = at + Vector3(0, 0.18, 0)
+			add_child(capm)
+		if i % 4 == 0:
+			var vl := OmniLight3D.new()
+			vl.light_color = Color("#c35beb")
+			vl.light_energy = 0.6
+			vl.omni_range = 2.0
+			vl.position = Vector3(w.x, 0.4, w.y)
+			add_child(vl)
+	# rubble along the walls gives a sense of scale
+	var rubble_mat := ShaderMaterial.new()
+	rubble_mat.shader = load("res://shaders/cave_stone.gdshader")
+	rubble_mat.set_shader_parameter("lift", 2.2)
+	for i in 50:
+		var w: Vector2 = wall_feet[rng.randi() % wall_feet.size()]
+		var r := rnd(0.12, 0.3)
+		var rb := box(Vector3(r, r * 0.7, r), rubble_mat)
+		rb.position = Vector3(w.x + rnd(-0.35, 0.35), r * 0.35, w.y + rnd(-0.35, 0.35))
+		rb.rotation.y = rnd(0, PI)
+		add_child(rb)
 	# low mist drifting over the floor
 	var mist := CPUParticles3D.new()
 	mist.amount = 60
