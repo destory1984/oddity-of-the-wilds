@@ -15,7 +15,7 @@ const ROWS := """################################
 #.........L.oooooooo.L...=.....#
 #...........oooooooo.....=.....#
 #L..........ooooMooo.....=.....#
-G=S=========oooooooo===========#
+G=S=========oooooooo===========F
 #L..........oooooooo.....=.....#
 #.........L.oooooooo.L...=.....#
 #..............=.........=.....#
@@ -67,7 +67,7 @@ func build(m: Node) -> void:
 		for x in W:
 			var c: String = grid[z][x]
 			var w := Vector2(VILLAGE_X + x, z)
-			if c in "SGM":
+			if c in "SGMF":
 				marks[c] = w
 			var col := Color("#5e8f30")
 			match c:

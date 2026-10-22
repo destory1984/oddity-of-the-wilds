@@ -8,7 +8,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "village_exit", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "forest", "village_exit", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -543,7 +543,7 @@ func run() -> void:
 		await wait(0.6)
 		check("village_enter", main.in_village and main.story_step == 8 and talk, "east edge -> village=%s step=%d arrival talk=%s" % [main.in_village, main.story_step, talk])
 	if want.call("village_layout"):
-		var lamps: int = main.lanterns.filter(func(l): return l.position.x > 130.0).size()
+		var lamps: int = main.village_lamps().size()
 		check("village_layout", lamps == 12 and main.village.dark.size() == 3 and main.walkable(main.village.marks.M.x - 1.5, main.village.marks.M.y),
 			"12 lanterns (%d), 3 dark (%d), square walkable" % [lamps, main.village.dark.size()])
 	if want.call("simji_talk"):
@@ -742,6 +742,44 @@ func run() -> void:
 		var said: String = main.ui.story_text.text
 		main.close_story()
 		check("folk_again", said.contains("배달을 마쳤"), "Doran after the letter: %s" % said.left(30))
+	if want.call("forest"):
+		main.night_q = 4
+		main.forest_q = 0
+		main.hour = 22.0
+		reset_to(main.village.marks.F + Vector2(-0.3, 0))
+		await wait(1.5)
+		var entered: bool = main.in_forest and main.forest_q == 1
+		main.close_story()
+		await wait(0.2)
+		var w0: Dictionary = main.forest.walls[0]
+		var shut: bool = not main.walkable(w0.pos.x, w0.pos.y)
+		main.crown_pips = 8
+		reset_to(w0.pos + Vector2(-1.0, 0))
+		main.player.inv = 9.0
+		tap(KEY_E)
+		await wait(0.2)
+		var opened: bool = w0.open and main.walkable(w0.pos.x, w0.pos.y) and main.crown_pips == 6
+		reset_to(main.forest.marks.N + Vector2(-4.0, 0))
+		main.player.inv = 9.0
+		await wait(0.3)
+		var met: bool = main.forest_q == 2
+		main.close_story()
+		await wait(0.3)
+		var duel: Array = main.enemies.filter(func(e): return e.get("second", false) and not e.dead)
+		if duel.size() == 1:
+			main.damage_enemy(duel[0], 10000.0, Vector2(main.player.x, main.player.z))
+			await wait(1.4)
+		main.close_story()
+		check("forest", entered and shut and opened and met and duel.size() == 1 and main.forest_q == 3,
+			"entered=%s wall shut=%s opened=%s met Noeul=%s duel=%d forest_q=%d" % [entered, shut, opened, met, duel.size(), main.forest_q])
+		for e in main.enemies.filter(func(e): return not e.dead and e.x > 170.0):
+			e.dead = true
+			e.node.visible = false
+		reset_to(main.forest.marks.S + Vector2(0.3, 0))
+		await wait(1.5)
+		main.hour = 12.0
+		main.in_village = true
+		reset_to(main.village.marks.M + Vector2(-1.2, 0))
 	if want.call("village_exit"):
 		reset_to(main.village.marks.G + Vector2(0.6, 0))
 		main.player.x = main.village.marks.G.x + 0.3

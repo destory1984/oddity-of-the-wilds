@@ -114,6 +114,8 @@ func cave_char(x: float, z: float) -> String:
 	return c
 
 func tile_at(x: float, z: float) -> int:
+	if x >= FOREST.FOREST_X - 0.5:
+		return WATER if forest.blocked(x, z) else (SAND if forest.char_at(x, z) == "=" else GRASS)
 	if x >= VILLAGE.VILLAGE_X - 0.5:
 		return WATER if village.blocked(x, z) else (SAND if village.char_at(x, z) == "=" else GRASS)
 	if x >= CAVE_X - 0.5:
@@ -240,6 +242,7 @@ func _ready() -> void:
 	darken_first_lamp()
 	build_cave()
 	village.build(self)
+	forest.build(self)
 	build_player()
 	for i in 9:
 		spawn_enemy()
@@ -282,6 +285,8 @@ const SCENES := {
 	"scene": {"play": true, "scene": true},
 	"village": {"play": true, "village": true},
 	"village_night": {"play": true, "village": true, "hour": 22.0},
+	"forest": {"play": true, "village": true, "forest": true, "hour": 16.0},
+	"forest_night": {"play": true, "village": true, "forest": true, "hour": 22.0},
 	"kid": {"play": true, "village": true, "kid": true, "hour": 20.5},
 }
 
@@ -320,6 +325,12 @@ func apply_test_args(args: PackedStringArray) -> void:
 		enter_village()
 		player.x = village.marks.M.x - 2.0
 		player.z = village.marks.M.y + 1.0
+		if sc.get("forest", false): # the hardened forest, first wall ahead
+			night_q = 4
+			forest_q = 1
+			enter_forest()
+			player.x = forest.walls[0].pos.x - 2.5
+			player.z = forest.walls[0].pos.y
 		if sc.get("kid", false): # Kongal's kid goblin trotting after Sora in the south field
 			errand = 3
 			player.x = VILLAGE.VILLAGE_X + 9.0
@@ -1376,7 +1387,7 @@ func damage_enemy(e: Dictionary, amt: float, from: Vector2, kb := 4.0, force_cri
 		e.shadow.queue_free()
 		burst(Vector3(e.x, y + 0.4, e.z), Color("#ff9a4a"), 26, 3.5)
 		if e.get("noeul", false):
-			get_tree().create_timer(1.0).timeout.connect(noeul_beaten)
+			get_tree().create_timer(1.0).timeout.connect(noeul_turned if e.get("second", false) else noeul_beaten)
 		elif e.get("mole", false):
 			player.gold += 150
 			gain_xp(120)
@@ -2231,7 +2242,7 @@ func save_game() -> void:
 			boss_dead = true
 	var d := {"lv": player.lv, "xp": player.xp, "max_hp": player.max_hp, "hp": player.hp, "atk": player.atk,
 		"gold": player.gold, "pots": player.pots, "x": player.x, "z": player.z,
-		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "in_village": in_village, "met": met.keys(), "pips": crown_pips, "errand": errand, "kid_q": kid_q, "doran_q": doran_q, "mul_q": mul_q, "night_q": night_q, "has_unbrick": has_unbrick, "vlit": village.dark.map(func(d): return d.lit), "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
+		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "in_village": in_village, "met": met.keys(), "pips": crown_pips, "errand": errand, "kid_q": kid_q, "doran_q": doran_q, "mul_q": mul_q, "night_q": night_q, "in_forest": in_forest, "forest_q": forest_q, "walls": forest.walls.map(func(w): return w.open), "has_unbrick": has_unbrick, "vlit": village.dark.map(func(d): return d.lit), "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
 		"chests": chests.map(func(c): return c.open)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -2260,6 +2271,13 @@ func load_game() -> void:
 	doran_q = int(d.get("doran_q", 0))
 	mul_q = int(d.get("mul_q", 0))
 	night_q = int(d.get("night_q", 0))
+	forest_q = int(d.get("forest_q", 0))
+	var wo: Array = d.get("walls", [])
+	for i in mini(wo.size(), forest.walls.size()):
+		if wo[i]:
+			forest.open_wall(forest.walls[i])
+	if forest_q == 2:
+		forest_q = 1 # the duel starts over when she walks back to the clearing
 	has_unbrick = bool(d.get("has_unbrick", false))
 	if night_q == 1 or night_q == 2:
 		night_q = 0 # a chase cut short by quitting starts over the next night
@@ -2287,6 +2305,12 @@ func load_game() -> void:
 		player.z = vz
 		if kid_q > 0:
 			place_kid()
+	if bool(d.get("in_forest", false)):
+		var fx: float = player.x
+		var fz: float = player.z
+		enter_forest()
+		player.x = fx
+		player.z = fz
 	has_skip = bool(d.get("has_skip", false))
 	cave_exit_seen = bool(d.get("cave_exit_seen", false))
 	var opened: Array = d.get("chests", [])
@@ -2538,6 +2562,10 @@ var cave_light: OmniLight3D
 # ---------------------------------------------------------------- village (story step 8)
 const VILLAGE := preload("res://village.gd")
 var village = VILLAGE.new()
+const FOREST := preload("res://forest.gd")
+var forest = FOREST.new()
+var in_forest := false
+var forest_q := 0          # 0 never entered, 1 walking the forest, 2 second duel, 3 Noeul turned
 var in_village := false
 var crown_pips := 8        # the crown's moon gauge, 0..8
 var pip_flash := 0.0
@@ -2600,6 +2628,9 @@ func spend_pips(n: int) -> bool:
 # E key: talk to Simji, light a dark village lantern, or (in the marsh opening) touch the crown
 func crown_key() -> void:
 	var me := Vector2(player.x, player.z)
+	if in_forest:
+		if try_unbrick():
+			return
 	if in_village:
 		if me.distance_to(village.marks.M) < 1.8:
 			if errand == 0:
@@ -2756,7 +2787,7 @@ func noeul_sprite() -> Sprite3D:
 	return spr
 
 func village_lamps() -> Array:
-	return lanterns.filter(func(l): return l.position.x > VILLAGE.VILLAGE_X - 1.0)
+	return lanterns.filter(func(l): return l.position.x > VILLAGE.VILLAGE_X - 1.0 and l.position.x < VILLAGE.VILLAGE_X + VILLAGE.W + 1.0)
 
 func set_village_lamps(on: bool) -> void:
 	for l in village_lamps():
@@ -2836,16 +2867,17 @@ func rise_together() -> void:
 	set_quest("동쪽 들판의 노을과 겨루자")
 	save_game()
 
-func spawn_noeul_duel() -> void:
+func spawn_noeul_duel(second := false) -> void:
 	if enemies.any(func(e): return e.get("noeul", false) and not e.dead):
 		return
-	var at: Vector2 = NOEUL_DUEL_AT + Vector2(VILLAGE.VILLAGE_X, 0)
+	var at: Vector2 = forest.marks.N if second else NOEUL_DUEL_AT + Vector2(VILLAGE.VILLAGE_X, 0)
 	var node := Node3D.new()
 	node.add_child(noeul_sprite())
 	add_child(node)
-	enemies.append({"x": at.x, "z": at.y, "hp": 420.0, "max_hp": 420, "node": node, "shadow": blob(0.8), "t": 0.0,
+	var hp := 640.0 if second else 420.0
+	enemies.append({"x": at.x, "z": at.y, "hp": hp, "max_hp": int(hp), "node": node, "shadow": blob(0.8), "t": 0.0,
 		"atk_cd": 2.0, "hurt": 0.0, "kx": 0.0, "kz": 0.0, "wx": at.x, "wz": at.y, "dead": false, "respawn": 0.0,
-		"noeul": true, "cave": true, "wind": 0.0, "dash": 0.0, "dir": Vector2.ZERO, "stun": 0.0, "next": "dash", "rings": []})
+		"noeul": true, "second": second, "cave": true, "wind": 0.0, "dash": 0.0, "dir": Vector2.ZERO, "stun": 0.0, "next": "dash", "rings": []})
 
 # Noeul's duel: a quick telegraphed dash, then rings of brick dust around Sora; below half HP, three rings
 func update_noeul(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
@@ -2900,8 +2932,8 @@ func update_noeul(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
 			else:
 				e.wind = 0.8
 				e.rings = [Vector2(player.x, player.z)]
-				if e.hp < e.max_hp / 2.0:
-					for k in 2:
+				if e.hp < e.max_hp / 2.0 or e.get("second", false):
+					for k in (4 if e.get("second", false) and e.hp < e.max_hp / 2.0 else 2):
 						e.rings.append(Vector2(player.x, player.z) + Vector2(rnd(-2.2, 2.2), rnd(-2.2, 2.2)))
 				for r in e.rings:
 					warn_ring(Vector3(r.x, 0.0, r.y), 1.2, 0.8)
@@ -2922,6 +2954,76 @@ func noeul_beaten() -> void:
 	gain_xp(150)
 	set_quest("굳은 숲으로 가는 길을 찾자 (다음 장에서 계속)")
 	show_story("", STORY.NOEUL_LOSES)
+	save_game()
+
+# ---- the hardened forest (story step 10)
+func enter_forest() -> void:
+	in_village = false
+	in_forest = true
+	story_step = maxi(story_step, 10)
+	player.x = forest.marks.S.x + 1.2
+	player.z = forest.marks.S.y
+	ground_y = 0.0
+	if not ui.has("outside_map"):
+		ui.outside_map = ui.mini.map_tex
+	ui.mini.map_tex = forest.map_tex(FOREST.FOREST_X + FOREST.W)
+	ui.zone_name.text = "굳은 숲"
+	ui.zone_sub.text = "회색 오솔길"
+	if forest_q == 0:
+		forest_q = 1
+		for g in forest.goblins:
+			spawn_enemy(g)
+			enemies[enemies.size() - 1].cave = true
+		show_story("", STORY.FOREST_IN)
+	if forest_q < 3:
+		set_quest("벽돌 벽을 왕관으로 풀며 숲 동쪽 끝의 노을에게 가자 (E)")
+	save_game()
+
+func leave_forest() -> void:
+	in_forest = false
+	in_village = true
+	player.x = village.marks.F.x - 1.2
+	player.z = village.marks.F.y
+	ground_y = 0.0
+	ui.mini.map_tex = village.map_tex(VILLAGE.VILLAGE_X + VILLAGE.W)
+	ui.zone_name.text = "등불 마을"
+	ui.zone_sub.text = "동쪽 문"
+	save_game()
+
+func unbrick_cost() -> int:
+	return 2 if (hour >= 19.0 or hour < 5.0) else 3 # the crown is weaker by day
+
+# E next to a closed brick wall: the crown turns it back into soil, and the noise wakes nearby bricks
+func try_unbrick() -> bool:
+	for w in forest.walls:
+		if not w.open and Vector2(player.x, player.z).distance_to(w.pos) < 1.6:
+			if not spend_pips(unbrick_cost()):
+				return true
+			forest.open_wall(w)
+			burst(Vector3(w.pos.x, 0.7, w.pos.y), Color("#8a6a4a"), 36, 3.5)
+			burst(Vector3(player.x, 1.6, player.z), Color("#9fd4ff"), 14, 1.5)
+			shake = 0.25
+			sfx(196, 0.5, "triangle", 0.3, -60)
+			toast("벽돌 벽이 흙으로 풀렸다")
+			save_game()
+			return true
+	return false
+
+func update_forest() -> void:
+	if forest_q == 1 and not story_open and Vector2(player.x, player.z).distance_to(forest.marks.N) < 6.0:
+		forest_q = 2
+		show_story("", STORY.NOEUL_DUEL2)
+		after_story = spawn_noeul_duel.bind(true)
+		set_quest("노을과 다시 겨루자")
+		save_game()
+
+func noeul_turned() -> void:
+	forest_q = 3
+	ui.boss.visible = false
+	player.gold += 150
+	gain_xp(250)
+	show_story("res://art/story/10_jae_turns.jpg", STORY.NOEUL_TURNS)
+	set_quest("정원 한가운데로 가는 길을 찾자 (다음 장에서 계속)")
 	save_game()
 
 # put the kid goblin where kid_q says: in the field with guards, or beside Kongal
@@ -3452,6 +3554,15 @@ func _process(dt: float) -> void:
 		fade_then(enter_village)
 	if in_village and Vector2(player.x, player.z).distance_to(village.marks.G) < 0.9 and fade_rect.color.a == 0.0:
 		fade_then(leave_village)
+	if in_village and Vector2(player.x, player.z).distance_to(village.marks.F) < 0.9 and fade_rect.color.a == 0.0:
+		if night_q >= 4:
+			fade_then(enter_forest)
+		elif toast_t <= 0.0:
+			toast("동쪽 숲길은 회색 벽돌로 막혀 있다")
+	if in_forest and Vector2(player.x, player.z).distance_to(forest.marks.S) < 0.9 and fade_rect.color.a == 0.0:
+		fade_then(leave_forest)
+	if in_forest:
+		update_forest()
 	update_pips(dt)
 	update_kid(dt)
 	update_oar()
@@ -3821,6 +3932,29 @@ func hurt_player(dmg: int, gy: float) -> void:
 
 # Sora faints: say so plainly, keep gold and level, heal the boss, and wake her at the start
 func faint() -> void:
+	if in_village or in_forest:
+		in_forest = false
+		in_village = true
+		ui.mini.map_tex = village.map_tex(VILLAGE.VILLAGE_X + VILLAGE.W)
+		ui.zone_name.text = "등불 마을"
+		ui.zone_sub.text = "돌 광장"
+		ui.boss.visible = false
+		for e in enemies:
+			if e.get("noeul", false) and not e.dead:
+				e.hp = float(e.max_hp)
+				e.x = e.wx
+				e.z = e.wz
+				e.dash = 0.0
+				e.wind = 0.0
+		player.hp = float(player.max_hp)
+		player.x = village.marks.M.x - 1.5
+		player.z = village.marks.M.y + 1.5
+		player.inv = 2.0
+		ground_y = 0.0
+		ui.banner_title.text = "쓰러졌다"
+		ui.banner_sub.text = "광장에서 다시 눈을 떴다 · 금화와 레벨은 그대로"
+		ui.banner.modulate.a = 1.0
+		return
 	if in_cave: # wake outside: leave every bit of cave state behind
 		in_cave = false
 		if ui.has("outside_map"):
