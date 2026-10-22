@@ -166,7 +166,7 @@ scene.fog = new THREE.Fog(0xe8c98a, 18, 46);
 scene.background = new THREE.Color(0xe8c98a);
 const camera = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 0.1, 200);
 
-const hemi = new THREE.HemisphereLight(0xfff0d0, 0x3a4a20, 0.9);
+const hemi = new THREE.HemisphereLight(0xfff0d0, 0x6a7a40, 0.9);
 scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xffc77a, 2.6);
 sun.castShadow = true;
@@ -251,7 +251,7 @@ const plankTex = canvasTex(16, 16, (g) => {
 });
 const tuftTex = canvasTex(48, 48, (g) => {
   // tapered blades: dark at the root, sunlit at the tip, leaning in a shared breeze
-  const ramp = ['#4f8a2e', '#5c9a32', '#6eaa36', '#82ba3e', '#9ccb48', '#b8dc62', '#d8ee90'];
+  const ramp = ['#5e9a34', '#68a636', '#6eaa36', '#82ba3e', '#9ccb48', '#b8dc62', '#d8ee90'];
   for (let i = 0; i < 46; i++) {
     let x = 6 + Math.random() * 36;
     const h = 14 + Math.random() * 32, lean = (Math.random() - .3) * .5;
@@ -767,8 +767,8 @@ addEventListener('wheel', e => { camDist = THREE.MathUtils.clamp(camDist + Math.
 
 // ---------- time of day ----------
 const TIMES = [
-  { name: 'Golden Hour', arcT: .82, moon: false, sky: 'linear-gradient(#f2b866,#7a4a3a)', sun: 0xffc06a, si: 2.6, hemi: 0xfff0d0, hi: 1.3, fog: 0xe8c98a, el: .55, motes: .9, hl: 0 },
-  { name: 'High Noon', arcT: .5, moon: false, sky: 'linear-gradient(#7fb6e8,#d8ecff)', sun: 0xfff4e0, si: 2.8, hemi: 0xeaf4ff, hi: 1.4, fog: 0xcfe2ee, el: 1.1, motes: .35, hl: 0 },
+  { name: 'Golden Hour', arcT: .82, moon: false, sky: 'linear-gradient(#f2b866,#7a4a3a)', sun: 0xffc06a, si: 2.6, hemi: 0xfff0d0, hi: 1.7, fog: 0xe8c98a, el: .55, motes: .9, hl: 0 },
+  { name: 'High Noon', arcT: .5, moon: false, sky: 'linear-gradient(#7fb6e8,#d8ecff)', sun: 0xfff4e0, si: 2.8, hemi: 0xeaf4ff, hi: 1.8, fog: 0xcfe2ee, el: 1.1, motes: .35, hl: 0 },
   { name: 'Dusk', arcT: .95, moon: false, sky: 'linear-gradient(#4a3a6a,#d8735a)', sun: 0xff7a4a, si: 1.6, hemi: 0xb08ab8, hi: .7, fog: 0xc98a8a, el: .25, motes: 1, hl: .8 },
   { name: 'Moonlit', arcT: .45, moon: true, sky: 'linear-gradient(#0b1230,#26305a)', sun: 0x8aa6ff, si: .7, hemi: 0x4a5a8a, hi: .5, fog: 0x1c2440, el: .9, motes: 1, hl: 2.5 },
 ];
@@ -812,7 +812,7 @@ const tiltShift = new ShaderPass({
       float l = dot(c.rgb, vec3(.299,.587,.114));
       c.rgb = mix(vec3(l), c.rgb, 1.18);
       c.rgb *= vec3(1.04, 1.0, .93);
-      vec2 v = vUv - .5; c.rgb *= 1. - dot(v, v) * .9;
+      vec2 v = vUv - .5; c.rgb *= 1. - dot(v, v) * .45;
       gl_FragColor = c;
     }`,
 });
