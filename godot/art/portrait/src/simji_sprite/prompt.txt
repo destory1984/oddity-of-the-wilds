@@ -1,0 +1,6 @@
+Attached: (1) our in-game pixel sprite sheet of villagers (pixel style, line weight, palette softness and chibi proportions are correct), (2) the design of Simji, the village lamplighter: a tall thin kind old man with a long white beard, round spectacles, a long brass lamp-lighting pole with a small glowing lantern hook at the top, a ring of keys and small lantern charms on his belt, a long navy-blue coat.
+Use your image generation tool to create ONE PNG and save it as simji.png in the current directory.
+Content: one row of 2 equal cells of Simji, full body, three-quarter view facing the viewer, holding the brass pole upright in one hand: cell 1 standing; cell 2 the same with a small idle change (blinking, lantern on the pole glowing brighter). Keep his design as in image (2) but drawn in exactly the same pixel-art style and chibi proportions as image (1). He is a little taller than the other villagers. Feet on one baseline near the bottom of each cell.
+ANATOMY: two arms, two legs, natural. Wholesome.
+No text, no grid lines. Background: solid flat pure magenta #FF00FF.
+When done, reply with only the file path.

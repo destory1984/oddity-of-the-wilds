@@ -114,6 +114,8 @@ func cave_char(x: float, z: float) -> String:
 	return c
 
 func tile_at(x: float, z: float) -> int:
+	if x >= HILL.HILL_X - 0.5:
+		return WATER if hill.blocked(x, z) else (SAND if hill.char_at(x, z) == "=" else GRASS)
 	if x >= LAKE.LAKE_X - 0.5:
 		return WATER if lake.blocked(x, z) else (SAND if lake.char_at(x, z) in "=PQ" else GRASS)
 	if x >= GARDEN.GARDEN_X - 0.5:
@@ -249,6 +251,7 @@ func _ready() -> void:
 	forest.build(self)
 	garden.build(self)
 	lake.build(self)
+	hill.build(self)
 	build_player()
 	for i in 9:
 		spawn_enemy()
@@ -295,6 +298,7 @@ const SCENES := {
 	"forest_night": {"play": true, "village": true, "forest": true, "hour": 22.0},
 	"mold": {"play": true, "village": true, "mold": true, "hour": 21.0},
 	"turtle": {"play": true, "village": true, "turtle": true, "hour": 15.0},
+	"hill": {"play": true, "village": true, "hill": true, "hour": 10.0},
 	"kid": {"play": true, "village": true, "kid": true, "hour": 20.5},
 }
 
@@ -360,6 +364,18 @@ func apply_test_args(args: PackedStringArray) -> void:
 			player.x = lake.marks.T.x + 2.5
 			player.z = lake.marks.T.y + 1.0
 			snap_mate()
+		if sc.get("hill", false): # the wind hills, one mill turning, Mulgyeol and Noeul along
+			night_q = 4
+			lake_q = 4
+			forest_q = 3
+			join_mate()
+			join_noeul()
+			enter_hill()
+			close_story()
+			hill.wind_mill(hill.mills[0], self)
+			player.x = hill.mills[0].pos.x + 2.5
+			player.z = hill.mills[0].pos.y + 2.0
+			snap_mates()
 		if sc.get("kid", false): # Kongal's kid goblin trotting after Sora in the south field
 			errand = 3
 			player.x = VILLAGE.VILLAGE_X + 9.0
@@ -1430,8 +1446,17 @@ func footstep() -> void:
 
 # ---------------------------------------------------------------- combat
 func damage_enemy(e: Dictionary, amt: float, from: Vector2, kb := 4.0, force_crit := false, stop := 0.05) -> void:
-	if e.get("locked", false):
-		return # the mold at its last sliver only breaks to the wind
+	if e.get("locked", false) or e.get("air", false):
+		return # the mold at its last sliver only breaks to the wind; the hawk is out of reach in the air
+	if e.get("shield", 0) > 0 and e.get("wind", 0.0) <= 0.0:
+		e.shield -= 1
+		pop_num(Vector3(e.x, 1.4, e.z), "막음", Color("#c8c8d0"))
+		burst(Vector3(e.x, 0.6, e.z), Color("#c8962a"), 8, 2.0)
+		sfx(700, 0.06, "square", 0.15, -300)
+		if e.shield <= 0:
+			e.shield_node.queue_free()
+			toast("방패가 깨졌다")
+		return
 	if e.dead or e.get("roar", 0.0) > 0.0:
 		return
 	var crit := force_crit or rng.randf() < 0.15
@@ -1465,6 +1490,8 @@ func damage_enemy(e: Dictionary, amt: float, from: Vector2, kb := 4.0, force_cri
 			get_tree().create_timer(1.0).timeout.connect(noeul_turned if e.get("second", false) else noeul_beaten)
 		elif e.get("turtle", false):
 			get_tree().create_timer(1.0).timeout.connect(turtle_beaten)
+		elif e.get("hawk", false):
+			get_tree().create_timer(1.0).timeout.connect(hawk_beaten)
 		elif e.get("mole", false):
 			player.gold += 150
 			gain_xp(120)
@@ -2319,7 +2346,7 @@ func save_game() -> void:
 			boss_dead = true
 	var d := {"lv": player.lv, "xp": player.xp, "max_hp": player.max_hp, "hp": player.hp, "atk": player.atk,
 		"gold": player.gold, "pots": player.pots, "x": player.x, "z": player.z,
-		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "in_village": in_village, "met": met.keys(), "pips": crown_pips, "errand": errand, "kid_q": kid_q, "doran_q": doran_q, "mul_q": mul_q, "night_q": night_q, "in_forest": in_forest, "in_garden": in_garden, "in_lake": in_lake, "lake_q": lake_q, "garden_q": garden_q, "forest_q": forest_q, "walls": forest.walls.map(func(w): return w.open), "has_unbrick": has_unbrick, "vlit": village.dark.map(func(d): return d.lit), "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
+		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "in_village": in_village, "met": met.keys(), "pips": crown_pips, "errand": errand, "kid_q": kid_q, "doran_q": doran_q, "mul_q": mul_q, "night_q": night_q, "in_forest": in_forest, "in_garden": in_garden, "in_hill": in_hill, "hill_q": hill_q, "mills": hill.mills.map(func(mm): return mm.turning), "in_lake": in_lake, "lake_q": lake_q, "garden_q": garden_q, "forest_q": forest_q, "walls": forest.walls.map(func(w): return w.open), "has_unbrick": has_unbrick, "vlit": village.dark.map(func(d): return d.lit), "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
 		"chests": chests.map(func(c): return c.open)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -2350,6 +2377,15 @@ func load_game() -> void:
 	night_q = int(d.get("night_q", 0))
 	forest_q = int(d.get("forest_q", 0))
 	garden_q = int(d.get("garden_q", 0))
+	hill_q = int(d.get("hill_q", 0))
+	var ms: Array = d.get("mills", [])
+	for i in mini(ms.size(), hill.mills.size()):
+		if ms[i]:
+			hill.wind_mill(hill.mills[i], self)
+	if hill_q >= 2:
+		hill.raise_bridge()
+	if forest_q >= 3:
+		join_noeul()
 	lake_q = int(d.get("lake_q", 0))
 	if lake_q == 3:
 		lake_q = 2 # the turtle fight starts over from the pier
@@ -2399,6 +2435,13 @@ func load_game() -> void:
 		player.x = lx
 		player.z = lz
 		snap_mate()
+	if bool(d.get("in_hill", false)):
+		var hx: float = player.x
+		var hz: float = player.z
+		enter_hill()
+		player.x = hx
+		player.z = hz
+		snap_mates()
 	if bool(d.get("in_garden", false)):
 		var gx: float = player.x
 		var gz: float = player.z
@@ -2665,6 +2708,12 @@ var village = VILLAGE.new()
 const FOREST := preload("res://forest.gd")
 var forest = FOREST.new()
 var in_forest := false
+const HILL := preload("res://hill.gd")
+var hill = HILL.new()
+var in_hill := false
+var hill_q := 0            # 0 never entered, 1 winding the mills, 2 bridge up, 3 hawk beaten
+var mate2: Node3D          # Noeul as a second companion (after he turns in the forest)
+var mate2_cd := 0.0
 const LAKE := preload("res://lake.gd")
 var lake = LAKE.new()
 var in_lake := false
@@ -2747,6 +2796,8 @@ func crown_key() -> void:
 		final_wind()
 		return
 	if in_lake and lake_key():
+		return
+	if in_hill and hill_key():
 		return
 	if in_village:
 		if me.distance_to(village.marks.M) < 1.8:
@@ -3136,11 +3187,12 @@ func update_forest() -> void:
 
 func noeul_turned() -> void:
 	forest_q = 3
+	join_noeul()
 	ui.boss.visible = false
 	player.gold += 150
 	gain_xp(250)
 	show_story("res://art/story/10_jae_turns.jpg", STORY.NOEUL_TURNS)
-	set_quest("정원 한가운데로 가는 길을 찾자 (다음 장에서 계속)")
+	set_quest("숲 동쪽 끝 길로, 바람 언덕에 가자")
 	save_game()
 
 # ---- the south lake and Mulgyeol joining (between the lantern night and the forest)
@@ -3345,7 +3397,51 @@ func join_mate() -> void:
 
 func snap_mate() -> void:
 	if mate != null:
-		mate.position = Vector3(player.x - 0.9, 0, player.z + 0.5)
+		mate.position = Vector3(player.x - 1.3, 0, player.z - 0.6)
+
+func snap_mates() -> void:
+	snap_mate()
+	if mate2 != null:
+		mate2.position = Vector3(player.x + 1.3, 0, player.z - 0.6)
+
+func join_noeul() -> void:
+	if mate2 != null:
+		return
+	mate2 = Node3D.new()
+	mate2.add_child(noeul_sprite())
+	add_child(mate2)
+	snap_mates()
+
+# Noeul keeps a step to Sora's right and throws brick dust at enemies within 4 m
+func update_mate2(dt: float) -> void:
+	if mate2 == null:
+		return
+	mate2.visible = not in_cave
+	var me := Vector3(player.x, 0, player.z)
+	if mate2.position.distance_to(me) > 8.0:
+		mate2.position = me + Vector3(1.3, 0, -0.6)
+	var spr: Sprite3D = mate2.get_child(0)
+	mate2_cd -= dt
+	var goal := me + Vector3(1.3, 0, -0.6)
+	var to := goal - mate2.position
+	if to.length() > 0.3:
+		mate2.position += to.normalized() * minf(to.length() - 0.3, dt * 5.5)
+		spr.frame = 1
+		spr.flip_h = to.x < 0.0
+	else:
+		spr.frame = 0
+	var target = null
+	var best := 4.0
+	for e in enemies:
+		var dd := Vector2(e.x, e.z).distance_to(Vector2(mate2.position.x, mate2.position.z))
+		if not e.dead and dd < best and not e.get("air", false):
+			best = dd
+			target = e
+	if target != null and mate2_cd <= 0.0 and not story_open:
+		mate2_cd = 1.4
+		spr.frame = 2
+		damage_enemy(target, player.atk * 0.7, Vector2(mate2.position.x, mate2.position.z), 2.0)
+		burst(Vector3(target.x, 0.8, target.z), Color("#9a9a9a"), 12, 2.0)
 
 func update_mate(dt: float) -> void:
 	if mate == null:
@@ -3362,7 +3458,7 @@ func update_mate(dt: float) -> void:
 		if not e.dead and Vector2(e.x, e.z).distance_to(Vector2(mate.position.x, mate.position.z)) < best:
 			best = Vector2(e.x, e.z).distance_to(Vector2(mate.position.x, mate.position.z))
 			target = e
-	var goal := me + Vector3(-0.9, 0, 0.5)
+	var goal := me + Vector3(-1.3, 0, -0.6)
 	if target != null:
 		goal = Vector3(target.x, 0, target.z)
 	var to := goal - mate.position
@@ -3379,9 +3475,200 @@ func update_mate(dt: float) -> void:
 		damage_enemy(target, player.atk * 0.6, Vector2(mate.position.x, mate.position.z), 3.0)
 		burst(Vector3(target.x, 0.8, target.z), Color("#7fd8d0"), 8, 1.6)
 
+# ---- the wind hills (between the forest and the garden)
+func enter_hill() -> void:
+	in_forest = false
+	in_hill = true
+	player.x = hill.marks.S.x + 1.2
+	player.z = hill.marks.S.y
+	ground_y = 0.0
+	ui.mini.map_tex = hill.map_tex(HILL.HILL_X + HILL.W)
+	ui.zone_name.text = "바람 언덕"
+	ui.zone_sub.text = "멈춘 풍차들"
+	snap_mates()
+	if hill_q == 0:
+		hill_q = 1
+		for f in hill.foes:
+			spawn_enemy(f[0], f[1] == "a")
+			var e: Dictionary = enemies[enemies.size() - 1]
+			e.cave = true
+			if f[1] == "s":
+				give_shield(e)
+		show_story("", STORY.HILL_IN)
+	if hill_q == 1:
+		set_quest(tr("풍차를 왕관으로 감자 (E) %d/3") % hill.turning_count())
+	elif hill_q == 2:
+		set_quest("바람 다리를 건너 벽돌 매를 물리치자")
+	save_game()
+
+func leave_hill() -> void:
+	in_hill = false
+	in_forest = true
+	player.x = forest.marks.E.x - 1.2
+	player.z = forest.marks.E.y
+	ground_y = 0.0
+	ui.mini.map_tex = forest.map_tex(FOREST.FOREST_X + FOREST.W)
+	ui.zone_name.text = "굳은 숲"
+	ui.zone_sub.text = "노을의 빈터"
+	ui.boss.visible = false
+	snap_mates()
+	save_game()
+
+# a shield goblin: a round brick shield in front that takes three hits to break,
+# and is lowered while the goblin winds up its own attack
+func give_shield(e: Dictionary) -> void:
+	e.shield = 3
+	var sh := box(Vector3(0.7, 0.7, 0.12), mat_color(Color("#c8962a")))
+	sh.position = Vector3(0, 0.5, 0.36)
+	(e.node.get_meta("body") as Node3D).add_child(sh)
+	e.shield_node = sh
+
+func hill_key() -> bool:
+	for mill in hill.mills:
+		if not mill.turning and Vector2(player.x, player.z).distance_to(mill.pos) < 1.9:
+			if not spend_pips(1):
+				return true
+			hill.wind_mill(mill, self)
+			burst(Vector3(mill.pos.x, 3.0, mill.pos.y + 0.7), Color("#f2ead8"), 30, 3.0)
+			sfx(330, 0.5, "sine", 0.25, 200)
+			var n: int = hill.turning_count()
+			if n >= 3:
+				hill_q = 2
+				hill.raise_bridge()
+				ui.mini.map_tex = hill.map_tex(HILL.HILL_X + HILL.W)
+				show_story("", STORY.WIND_BRIDGE)
+				set_quest("바람 다리를 건너 벽돌 매를 물리치자")
+			else:
+				set_quest(tr("풍차를 왕관으로 감자 (E) %d/3") % n)
+			save_game()
+			return true
+	return false
+
+func update_hill(dt: float) -> void:
+	for mill in hill.mills:
+		if mill.turning:
+			mill.blades.rotation.z += dt * 1.6
+	if hill_q == 2 and not story_open and Vector2(player.x, player.z).distance_to(hill.marks.B) < 6.0 \
+			and not enemies.any(func(e): return e.get("hawk", false) and not e.dead):
+		show_story("", STORY.HAWK_IN)
+		after_story = spawn_hawk
+
+func spawn_hawk() -> void:
+	if enemies.any(func(e): return e.get("hawk", false) and not e.dead):
+		return
+	var at: Vector2 = hill.marks.B
+	var root := Node3D.new()
+	var body := Node3D.new()
+	body.name = "body"
+	root.add_child(body)
+	var brown: Material = mat_color(Color("#8a6a4a"))
+	var grey: Material = mat_color(Color("#9a9aa2"))
+	for part in [[Vector3(0.7, 0.6, 1.2), Vector3(0, 0, 0), brown], [Vector3(0.5, 0.5, 0.5), Vector3(0, 0.25, 0.75), grey],
+			[Vector3(0.18, 0.14, 0.3), Vector3(0, 0.18, 1.1), mat_color(Color("#e8a020"))], [Vector3(0.5, 0.15, 0.6), Vector3(0, 0, -0.85), brown]]:
+		var b := box(part[0], part[2])
+		b.position = part[1]
+		body.add_child(b)
+	for side in [-1.0, 1.0]:
+		var wing := Node3D.new()
+		wing.name = "wing_l" if side < 0 else "wing_r"
+		wing.position = Vector3(side * 0.35, 0.1, 0)
+		body.add_child(wing)
+		var w := box(Vector3(1.6, 0.1, 0.8), grey)
+		w.position = Vector3(side * 0.8, 0, 0)
+		wing.add_child(w)
+	for side in [-0.14, 0.14]:
+		var eye := box(Vector3(0.08, 0.08, 0.05), glow_mat(Color("#ffb040"), 2.0))
+		eye.position = Vector3(side, 0.35, 1.0)
+		body.add_child(eye)
+	root.scale = Vector3.ONE * 1.4
+	add_child(root)
+	enemies.append({"x": at.x, "z": at.y, "hp": 600.0, "max_hp": 600, "node": root, "shadow": blob(1.2), "t": 0.0,
+		"atk_cd": 2.5, "hurt": 0.0, "kx": 0.0, "kz": 0.0, "wx": at.x, "wz": at.y, "dead": false, "respawn": 0.0,
+		"hawk": true, "cave": true, "air": true, "y": 2.8, "wind": 0.0, "dash": 0.0, "dir": Vector2.ZERO,
+		"stun": 0.0, "target": Vector2.ZERO, "egg_cd": 1.5, "eggs": []})
+
+# the brick hawk circles out of reach (no damage while "air"); it marks Sora's spot, dives onto it,
+# and sits stunned on the ground for 2 s. Below half HP it drops brick eggs while circling.
+func update_hawk(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
+	var node: Node3D = e.node
+	var body: Node3D = node.get_node("body")
+	ui.boss.visible = true
+	ui.boss_name.text = "벽돌 매"
+	ui.boss_bar.size.x = 420.0 * maxf(0.0, e.hp) / e.max_hp
+	e.t += dt
+	e.hurt -= dt
+	e.stun -= dt
+	var flap := sin(e.t * (14.0 if e.air else 3.0)) * 0.5
+	body.get_node("wing_l").rotation.z = flap
+	body.get_node("wing_r").rotation.z = -flap
+	var c: Vector2 = hill.marks.B
+	if e.dash > 0.0: # diving onto the marked spot
+		e.dash -= dt
+		var k: float = 1.0 - e.dash / 0.5
+		e.x = lerpf(e.wx, e.target.x, k)
+		e.z = lerpf(e.wz, e.target.y, k)
+		e.y = lerpf(2.8, 0.4, k)
+		if e.dash <= 0.0:
+			e.air = false
+			e.stun = 2.0
+			shake = 0.3
+			burst(Vector3(e.x, 0.3, e.z), Color("#9a9aa2"), 24, 3.0)
+			sfx(80, 0.3, "square", 0.3, -40)
+			if Vector2(player.x, player.z).distance_to(e.target) < 1.4:
+				player_hit(24, e.target, e)
+	elif e.stun > 0.0:
+		pass
+	elif not e.air: # take off again
+		e.y = minf(2.8, e.y + dt * 3.0)
+		if e.y >= 2.8:
+			e.air = true
+			e.atk_cd = 2.6
+	elif e.wind > 0.0:
+		e.wind -= dt
+		if e.wind <= 0.0:
+			e.dash = 0.5
+			e.wx = e.x
+			e.wz = e.z
+	else:
+		var a: float = e.t * 0.9
+		var goal := c + Vector2(cos(a), sin(a)) * 3.0
+		e.x = lerpf(e.x, goal.x, dt * 2.0)
+		e.z = lerpf(e.z, goal.y, dt * 2.0)
+		e.atk_cd -= dt
+		if e.atk_cd <= 0.0:
+			e.wind = 1.0
+			e.target = Vector2(player.x, player.z)
+			warn_ring(Vector3(e.target.x, 0.0, e.target.y), 1.4, 1.5)
+			sfx(900, 0.4, "sawtooth", 0.15, -500)
+		if e.hp < e.max_hp / 2.0:
+			e.egg_cd -= dt
+			if e.egg_cd <= 0.0:
+				e.egg_cd = 1.3
+				var p := Vector2(player.x, player.z) + Vector2(rnd(-2, 2), rnd(-2, 2))
+				warn_ring(Vector3(p.x, 0.0, p.y), 1.0, 0.8)
+				get_tree().create_timer(0.8).timeout.connect(func():
+					burst(Vector3(p.x, 0.3, p.y), Color("#c8322a"), 14, 2.5)
+					if Vector2(player.x, player.z).distance_to(p) < 1.0:
+						player_hit(14, p, e))
+	var face := Vector2(e.target.x - e.x, e.target.y - e.z) if e.wind > 0.0 or e.dash > 0.0 else Vector2(cos(e.t * 0.9 + PI / 2), sin(e.t * 0.9 + PI / 2))
+	if face.length() > 0.1:
+		node.rotation.y = atan2(face.x, face.y)
+	node.position = Vector3(e.x, e.y, e.z)
+	e.shadow.position = Vector3(e.x, 0.02, e.z)
+
+func hawk_beaten() -> void:
+	hill_q = 3
+	ui.boss.visible = false
+	player.gold += 250
+	gain_xp(300)
+	show_story("", STORY.HAWK_DOWN)
+	set_quest("언덕 동쪽 끝 길로, 정원 한가운데에 가자")
+	save_game()
+
 # ---- the heart of the garden (story steps 11 and 12)
 func enter_garden() -> void:
 	in_forest = false
+	in_hill = false
 	in_garden = true
 	story_step = maxi(story_step, 11)
 	player.x = garden.marks.S.x + 1.5
@@ -3401,13 +3688,14 @@ func enter_garden() -> void:
 
 func leave_garden() -> void:
 	in_garden = false
-	in_forest = true
-	player.x = forest.marks.E.x - 1.2
-	player.z = forest.marks.E.y
+	in_hill = true
+	player.x = hill.marks.X.x - 1.2
+	player.z = hill.marks.X.y
 	ground_y = 0.0
-	ui.mini.map_tex = forest.map_tex(FOREST.FOREST_X + FOREST.W)
-	ui.zone_name.text = "굳은 숲"
-	ui.zone_sub.text = "노을의 빈터"
+	ui.mini.map_tex = hill.map_tex(HILL.HILL_X + HILL.W)
+	ui.zone_name.text = "바람 언덕"
+	ui.zone_sub.text = "매의 벼랑"
+	snap_mates()
 	ui.boss.visible = false
 	save_game()
 
@@ -4112,9 +4400,18 @@ func _process(dt: float) -> void:
 		update_forest()
 	if in_forest and Vector2(player.x, player.z).distance_to(forest.marks.E) < 0.9 and fade_rect.color.a == 0.0:
 		if forest_q >= 3:
-			fade_then(enter_garden)
+			fade_then(enter_hill)
 		elif toast_t <= 0.0:
 			toast("노을이 길을 막고 있다")
+	if in_hill and Vector2(player.x, player.z).distance_to(hill.marks.S) < 0.9 and fade_rect.color.a == 0.0:
+		fade_then(leave_hill)
+	if in_hill and Vector2(player.x, player.z).distance_to(hill.marks.X) < 0.9 and fade_rect.color.a == 0.0:
+		if hill_q >= 3:
+			fade_then(enter_garden)
+		elif toast_t <= 0.0:
+			toast("벽돌 매가 하늘을 지키고 있다")
+	if in_hill:
+		update_hill(dt)
 	if in_garden and Vector2(player.x, player.z).distance_to(garden.marks.S) < 0.9 and fade_rect.color.a == 0.0:
 		fade_then(leave_garden)
 	if in_garden:
@@ -4127,6 +4424,7 @@ func _process(dt: float) -> void:
 	if in_lake and Vector2(player.x, player.z).distance_to(lake.marks.S) < 0.9 and fade_rect.color.a == 0.0:
 		fade_then(leave_lake)
 	update_mate(dt)
+	update_mate2(dt)
 	update_pips(dt)
 	update_kid(dt)
 	update_oar()
@@ -4243,6 +4541,9 @@ func update_enemies(dt: float, gy: float) -> void:
 			continue
 		if e.get("turtle", false):
 			update_turtle(e, dt, d, to)
+			continue
+		if e.get("hawk", false):
+			update_hawk(e, dt, d, to)
 			continue
 		if d < 7 and not intro and e.get("archer", false):
 			if d < 4.0:
@@ -4526,6 +4827,12 @@ func faint() -> void:
 			lake_q = 2 # row out again from the pier
 			if lake_npc != null:
 				lake_npc.visible = true
+	if in_hill:
+		in_hill = false
+		in_village = true
+		for e in enemies:
+			if e.get("hawk", false) and not e.dead:
+				e.hp = float(e.max_hp)
 	if in_village or in_forest:
 		in_forest = false
 		in_village = true
