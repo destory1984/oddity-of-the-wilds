@@ -22,7 +22,8 @@ var chests: Array = []
 var projectiles: Array = []
 var fx: Array = []           # {node, life, t, update: Callable}
 
-var cam_yaw := 0.55
+const CAM_YAW := 0.55
+var cam_yaw := CAM_YAW
 var cam_dist := 18.0
 var shake := 0.0
 var intro := true
@@ -2247,6 +2248,7 @@ func load_game() -> void:
 
 # keep level, gold and story, but put Sora back at the starting crossing (F8)
 func return_to_start() -> void:
+	cam_yaw = CAM_YAW
 	if in_cave and ui.has("outside_map"):
 		ui.mini.map_tex = ui.outside_map
 	in_cave = false
@@ -2670,6 +2672,7 @@ func start_game(with_story := true) -> void:
 	if not intro:
 		return
 	intro = false
+	cam_yaw = CAM_YAW # the title screen orbits the camera; play always starts from the same angle
 	if with_story and not loaded:
 		show_story("res://art/story/01_wake.jpg", STORY.WAKE)
 	sfx(392, 0.3, "triangle", 0.25)

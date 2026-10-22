@@ -88,9 +88,10 @@ func run() -> void:
 		get_tree().quit(0)
 		return
 	if want.call("start_click"):
+		await wait(1.0) # let the title orbit drift the camera first
 		click()
 		await wait(0.3)
-		check("start_click", not main.intro, "title closes on a mouse click")
+		check("start_click", not main.intro and absf(main.cam_yaw - main.CAM_YAW) < 0.001, "title closes on a mouse click, camera back to the fixed angle (yaw %.3f)" % main.cam_yaw)
 		check("story_opens", main.story_open, "opening illustration shows after the title")
 		for k in 30:
 			if not main.story_open:
