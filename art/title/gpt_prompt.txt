@@ -1,0 +1,11 @@
+The attached image is the title logo of a sister game ("Space Oddity"). Use it only as a STYLE reference; do not copy its words.
+Use your image generation tool to create ONE PNG image and save it as title_gpt.png in the current directory.
+
+Design a beautiful game title logo that reads exactly "Oddity of the Wilds" in the same family style:
+- Chunky, rounded pixel-art lettering. Letter faces in warm cream (#f8f0e0), a gold depth/extrusion on the lower-right side (#e8b018), wrapped in a thick navy outline (#183070). Flat color cells, no soft gradients, crisp pixels.
+- "Oddity" large on the first line with a small gold crown sitting on the first "O" (as in the reference).
+- "of the Wilds" smaller on a second line, centered, same treatment.
+- Add a few tasteful nature touches that fit a reed-marsh adventure: a couple of small pixel leaves or a cattail/reed sprig tucked beside the words, maybe a tiny sparkle. Keep it clean and readable, polished like a commercial pixel-art indie game logo.
+- Centered composition, wide aspect (about 3:1), generous margin.
+- Background: solid flat pure magenta #FF00FF everywhere outside the logo (for chroma keying). No shadow cast on the background, no text other than the title.
+When done, reply with only the file path.
