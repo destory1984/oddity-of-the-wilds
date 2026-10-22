@@ -34,11 +34,11 @@ var grid: Array = []
 var marks := {}          # S, G, M -> world Vector2
 var dark: Array = []     # [{"pos": Vector2, "light": OmniLight3D, "glass": MeshInstance3D, "lit": bool, "brick": Vector2}]
 var simji_node: Node3D
-# villagers you can talk to with E: id, tile in the village grid, body colours
+# villagers you can talk to with E: id and tile in the village grid
 const FOLK := [
-	{"id": "doran", "at": Vector2i(14, 3), "body": "#2f3f8a", "head": "#8a6a4a"},
-	{"id": "kongal", "at": Vector2i(10, 15), "body": "#b8442a", "head": "#f1c08f"},
-	{"id": "mulgyeol", "at": Vector2i(28, 21), "body": "#2a5a5a", "head": "#8a6a4a"},
+	{"id": "doran", "at": Vector2i(14, 3)},
+	{"id": "kongal", "at": Vector2i(10, 15)},
+	{"id": "mulgyeol", "at": Vector2i(28, 21)},
 ]
 var folk_pos := {}
 
@@ -146,20 +146,24 @@ func build(m: Node) -> void:
 	for f in FOLK:
 		var w := Vector2(VILLAGE_X + f.at.x, f.at.y)
 		folk_pos[f.id] = w
-		var g := Node3D.new()
-		for part in [[Vector3(0.4, 0.55, 0.32), Vector3(0, 0.28, 0), f.body], [Vector3(0.36, 0.32, 0.32), Vector3(0, 0.72, 0), f.head]]:
-			var b: MeshInstance3D = m.box(part[0], m.mat_color(Color(part[2])))
-			b.position = part[1]
-			g.add_child(b)
-		var lamp := OmniLight3D.new()
-		lamp.light_color = Color("#ffd8a0")
-		lamp.light_energy = 0.8
-		lamp.omni_range = 1.8
-		lamp.position = Vector3(0, 1.2, 0.4)
-		g.add_child(lamp)
-		g.position = Vector3(w.x, 0, w.y)
-		g.scale = Vector3.ONE * 1.2
-		m.add_child(g)
+		# GPT pixel sprite, two idle frames side by side (art/folk/<id>.png)
+		var spr := Sprite3D.new()
+		spr.texture = load("res://art/folk/%s.png" % f.id)
+		spr.hframes = 2
+		spr.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+		spr.scale = Vector3(1, 1.0 / cos(0.78), 1)
+		spr.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+		spr.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
+		spr.shaded = false
+		spr.pixel_size = 1.75 / 170.0
+		spr.offset = Vector2(0, 85)
+		spr.position = Vector3(w.x, 0, w.y)
+		m.add_child(spr)
+		var tw := spr.create_tween().set_loops() # blink / idle beat every few seconds
+		tw.tween_interval(2.4 + m.rnd(0, 1.2))
+		tw.tween_callback(func(): spr.frame = 1)
+		tw.tween_interval(0.35)
+		tw.tween_callback(func(): spr.frame = 0)
 		m.rocks.append({"x": w.x, "z": w.y, "r": 0.45})
 	simji_node = simji(m)
 	simji_node.position = Vector3(marks.M.x, 0, marks.M.y)
