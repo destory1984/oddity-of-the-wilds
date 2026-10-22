@@ -8,7 +8,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "cave_exit", "start_key", "bridges", "shop_buy", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_exit", "water_skip", "start_key", "bridges", "shop_buy", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -65,7 +65,7 @@ func reset_to(p: Vector2) -> void:
 
 func calm_enemies(on: bool) -> void:
 	for e in main.enemies:
-		if not e.get("boss", false):
+		if not e.get("boss", false) and not e.get("mole", false) and is_instance_valid(e.node):
 			e.node.visible = not on
 			if on:
 				e.x = 2.0 # parked in the corner water, out of the way
@@ -421,11 +421,57 @@ func run() -> void:
 		await wait(0.6)
 		release()
 		check("unstick", main.player_can(main.player.x, main.player.z) and main.player.x > x0, "freed from the wall and walking: x %.1f -> %.1f" % [x0, main.player.x])
+	if want.call("mole_charge"):
+		var mo = main.enemies.filter(func(e): return e.get("mole", false) and not e.dead)
+		if mo.is_empty():
+			check("mole_charge", false, "no mole in the cave")
+		else:
+			var m0: Dictionary = mo[0]
+			m0.x = main.cave_marks.B.x
+			m0.z = main.cave_marks.B.y
+			main.player.max_hp = 200
+			reset_to(main.cave_marks.B - Vector2(3.0, 0))
+			main.player.hp = 200.0
+			m0.atk_cd = 0.0
+			m0.next = "charge"
+			m0.dash = 0.0
+			m0.stun = 0.0
+			m0.wind = 0.0
+			calm_enemies(true)
+			await wait(0.4)
+			var winding: bool = m0.wind > 0.0
+			var hp_wind: float = main.player.hp
+			await wait(1.5)
+			check("mole_charge", winding and hp_wind == 200.0 and main.player.hp < 200.0,
+				"winds up=%s, no damage during wind-up=%s, charge hit for %d" % [winding, hp_wind == 200.0, int(200.0 - main.player.hp)])
+	if want.call("mole_grants_skip"):
+		var mo = main.enemies.filter(func(e): return e.get("mole", false) and not e.dead)
+		if not mo.is_empty():
+			mo[0].hp = 1.0
+			mo[0].stun = 0.0
+			main.damage_enemy(mo[0], 50.0, Vector2(main.player.x, main.player.z))
+		await wait(1.6)
+		var shown: bool = main.story_open
+		main.close_story()
+		await wait(0.6)
+		check("mole_grants_skip", main.has_skip and shown, "mole down -> water skip=%s, scene shown=%s" % [main.has_skip, shown])
 	if want.call("cave_exit"):
 		main.in_cave = true
 		reset_to(main.cave_marks.E + Vector2(-0.5, 0))
 		await wait(1.2)
 		check("cave_exit", not main.in_cave and main.story_step == 7, "exit -> outside=%s step=%d" % [not main.in_cave, main.story_step])
+	if want.call("water_skip"):
+		main.in_cave = false
+		main.has_skip = true
+		reset_to(Vector2(19.0, 15.0)) # west bank of the river
+		main.player.sp = 100.0
+		main.fake_keys[KEY_SHIFT] = true
+		hold_world(Vector2(1, 0))
+		main.fake_keys[KEY_SHIFT] = true
+		await wait(1.6)
+		release()
+		await wait(0.2)
+		check("water_skip", main.player.x > 27.0, "with Shift held Sora runs across the river: x 19.0 -> %.1f" % main.player.x)
 	calm_enemies(false)
 	var failed := results.count(false)
 	print("TESTS %d passed, %d failed" % [results.size() - failed, failed])

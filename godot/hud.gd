@@ -91,8 +91,9 @@ func _draw() -> void:
 	# ---- quest ornaments
 	if main.ui.quest.visible:
 		var cx := vs.x / 2.0
-		for y in [54.0, 96.0]:
-			var half := 140.0 if y < 60 else 80.0
+		var qy: float = main.ui.quest.position.y
+		for y in [qy - 8.0, qy + 34.0]:
+			var half := 140.0 if y < qy else 80.0
 			draw_line(Vector2(cx - half, y), Vector2(cx - 10, y), GOLD_DIM, 1.0)
 			draw_line(Vector2(cx + 10, y), Vector2(cx + half, y), GOLD_DIM, 1.0)
 			diamond(Vector2(cx, y), 4, GOLD)

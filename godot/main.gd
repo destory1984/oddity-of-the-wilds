@@ -156,8 +156,13 @@ func unstick() -> void:
 	player.z = best.y
 
 # Sora keeps a little room from cave walls so her sprite never sinks into one
+var has_skip := false   # 물수제비 걸음 (story step 7 ability)
+var skipping := false
+
 func player_can(x: float, z: float) -> bool:
 	if not walkable(x, z):
+		if skipping and x < CAVE_X - 0.5 and tile_at(x, z) == WATER and x > 1.0 and z > 1.0 and x < N - 2.0 and z < N - 2.0:
+			return true
 		return false
 	if x >= CAVE_X - 0.5:
 		for d in [Vector2(0.35, 0), Vector2(-0.35, 0), Vector2(0, 0.35), Vector2(0, -0.35)]:
@@ -265,6 +270,7 @@ const SCENES := {
 	"cave": {"play": true, "cave": true},
 	"cave_in": {"play": true, "cave_in": true},
 	"talk": {"play": true, "talk": true},
+	"mole": {"play": true, "mole": true},
 }
 
 func apply_test_args(args: PackedStringArray) -> void:
@@ -295,6 +301,11 @@ func apply_test_args(args: PackedStringArray) -> void:
 		player.gold = sc.gold
 	if sc.get("shop", false):
 		toggle_shop(true)
+	if sc.get("mole", false):
+		story_step = 5
+		enter_cave()
+		player.x = cave_marks.B.x - 4.0
+		player.z = cave_marks.B.y
 	if sc.get("talk", false):
 		story_step = 3
 		show_story("res://art/story/04_cottage.jpg", STORY.BORI)
@@ -1291,7 +1302,7 @@ func damage_enemy(e: Dictionary, amt: float, from: Vector2, kb := 4.0, force_cri
 	if e.dead or e.get("roar", 0.0) > 0.0:
 		return
 	var crit := force_crit or rng.randf() < 0.15
-	if e.get("boss", false) and e.get("stun", 0.0) > 0.0:
+	if (e.get("boss", false) or e.get("mole", false)) and e.get("stun", 0.0) > 0.0:
 		amt *= 1.5
 	var dmg := int(round(amt * rnd(0.85, 1.15) * (1.0 if force_crit else (1.8 if crit else 1.0))))
 	hitstop = maxf(hitstop, 0.09 if crit and stop < 0.09 else stop)
@@ -1317,7 +1328,11 @@ func damage_enemy(e: Dictionary, amt: float, from: Vector2, kb := 4.0, force_cri
 		e.node.queue_free()
 		e.shadow.queue_free()
 		burst(Vector3(e.x, y + 0.4, e.z), Color("#ff9a4a"), 26, 3.5)
-		if e.get("boss", false):
+		if e.get("mole", false):
+			player.gold += 150
+			gain_xp(120)
+			get_tree().create_timer(1.2).timeout.connect(mole_defeated)
+		elif e.get("boss", false):
 			player.gold += 300
 			toast("벽돌왕을 쓰러뜨렸다! 금화 +300")
 			get_tree().create_timer(1.5).timeout.connect(open_cave.bind(Vector2(e.x, e.z)))
@@ -1690,6 +1705,7 @@ func build_hud() -> void:
 	# boss health bar, top centre, shown while the Brick King is awake
 	var bb := panel(root, Vector2(-220, 14), Vector2(440, 40), Control.PRESET_CENTER_TOP)
 	var bn := label(bb, "벽돌왕", Vector2(0, 2), 13, Color("#f6b951"))
+	ui.boss_name = bn
 	bn.size = Vector2(440, 18)
 	bn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var bbg := ColorRect.new()
@@ -2062,7 +2078,7 @@ func save_game() -> void:
 			boss_dead = true
 	var d := {"lv": player.lv, "xp": player.xp, "max_hp": player.max_hp, "hp": player.hp, "atk": player.atk,
 		"gold": player.gold, "pots": player.pots, "x": player.x, "z": player.z,
-		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
+		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
 		"chests": chests.map(func(c): return c.open)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -2085,6 +2101,7 @@ func load_game() -> void:
 	day = int(d.get("day", day))
 	story_step = int(d.get("story", 0))
 	var was_in_cave := bool(d.get("in_cave", false))
+	has_skip = bool(d.get("has_skip", false))
 	var opened: Array = d.get("chests", [])
 	for i in mini(opened.size(), chests.size()):
 		if opened[i]:
@@ -2430,6 +2447,7 @@ func enter_cave() -> void:
 	if not cave_spawned:
 		cave_spawned = true
 		build_cave_props()
+		spawn_mole()
 		for c in CAVE_SPAWNS:
 			spawn_enemy(Vector2(CAVE_X + c[0], c[1]), c[2])
 	story_step = maxi(story_step, 6)
@@ -2618,6 +2636,13 @@ func _process(dt: float) -> void:
 		if key_down(KEY_D) or key_down(KEY_RIGHT): mv += right
 		if key_down(KEY_A) or key_down(KEY_LEFT): mv -= right
 	var running: bool = key_down(KEY_SHIFT) and player.sp > 0 and mv.length() > 0
+	skipping = has_skip and running
+	if skipping and tile_at(player.x, player.z) == WATER and player.x < CAVE_X - 0.5:
+		player.sp = maxf(0.0, player.sp - 15.0 * dt) # skipping over water costs extra stamina
+		if int(t * 8.0) != int((t - dt) * 8.0):
+			burst(Vector3(player.x, -0.2, player.z), Color("#9fe0ff"), 4, 1.2)
+	elif not running and tile_at(player.x, player.z) == WATER and player.x < CAVE_X - 0.5 and not skipping:
+		unstick() # stopped on open water: back to the nearest shore
 	player.sp = maxf(0, player.sp - 22 * dt) if running else minf(100, player.sp + 18 * dt)
 	var speed := 6.2 if running else 3.6
 	var tv := Vector2.ZERO
@@ -2732,6 +2757,9 @@ func _process(dt: float) -> void:
 	toast_t -= dt
 	if toast_t <= 0: ui.toast.modulate.a = maxf(0, ui.toast.modulate.a - dt * 3)
 	ui.lv.text = str(player.lv)
+	var narrow := get_viewport().get_visible_rect().size.x < 1180.0
+	ui.quest.offset_top = 150.0 if narrow else 62.0
+	ui.quest.offset_bottom = ui.quest.offset_top + 26.0
 	ui.hp.size.x = 200.0 * player.hp / player.max_hp
 	ui.mp.size.x = 200.0 * player.mp / player.max_mp
 	ui.mp.modulate.a = 0.45 + 0.55 * absf(sin(t * 6.0)) if player.mp >= 60.0 else 1.0 # enough for 빛파동
@@ -2768,6 +2796,9 @@ func update_enemies(dt: float, gy: float) -> void:
 		var boss: bool = e.get("boss", false)
 		if boss:
 			update_boss(e, dt, d, to, gy)
+			continue
+		if e.get("mole", false):
+			update_mole(e, dt, d, to)
 			continue
 		if d < 7 and not intro and e.get("archer", false):
 			if d < 4.0:
@@ -2837,6 +2868,7 @@ func update_boss(e: Dictionary, dt: float, d: float, to: Vector2, gy: float) -> 
 	var awake := d < 11.0 and not intro
 	ui.boss.visible = awake or (ui.boss.visible and d < 16.0)
 	ui.boss_bar.size.x = 420.0 * maxf(0.0, e.hp) / e.max_hp
+	ui.boss_name.text = "벽돌왕"
 	var me := Vector2(e.x, e.z)
 	var ground := height_at(e.x, e.z)
 	e.t += dt
@@ -3063,6 +3095,112 @@ func update_enemy_shots(dt: float) -> void:
 		if hit or sh.life <= 0.0 or not walkable(n.position.x, n.position.z):
 			n.queue_free()
 			enemy_shots.remove_at(i)
+
+# ---------------------------------------------------------------- 굴파기 수레두더지 (cave mid-boss)
+# Charge: 1.0 s wind-up, then a straight dash at 9 tiles/s until it hits a wall (stuck 1.5 s, takes x1.5).
+# Dirt: a 0.7 s red ring under Sora, then earth bursts up (two rings below half health).
+func spawn_mole() -> void:
+	var b: Vector2 = cave_marks.B
+	var node := make_monster(true)
+	var mats: Array = node.get_meta("mats")
+	mats[2].albedo_color = Color("#6a4a2a") # brown body
+	mats[5].albedo_color = Color("#3a2a20") # dark snout head
+	node.scale = Vector3.ONE * 2.2
+	var g: Node3D = node.get_meta("body")
+	for side in [-0.32, 0.32]: # cart wheels
+		var wheel := MeshInstance3D.new()
+		var cyl := CylinderMesh.new()
+		cyl.top_radius = 0.16
+		cyl.bottom_radius = 0.16
+		cyl.height = 0.08
+		wheel.mesh = cyl
+		wheel.material_override = mat_color(Color("#c8962a"))
+		wheel.rotation.z = PI / 2
+		wheel.position = Vector3(side, 0.12, 0.18)
+		g.add_child(wheel)
+	add_child(node)
+	enemies.append({"x": b.x, "z": b.y, "hp": 500.0, "max_hp": 500, "node": node, "shadow": blob(1.8), "t": 0.0,
+		"atk_cd": 2.0, "hurt": 0.0, "kx": 0.0, "kz": 0.0, "wx": b.x, "wz": b.y, "dead": false, "respawn": 0.0,
+		"mole": true, "cave": true, "wind": 0.0, "dash": 0.0, "dir": Vector2.ZERO, "stun": 0.0, "next": "charge", "rings": []})
+
+func update_mole(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
+	var node: Node3D = e.node
+	var awake := d < 8.0
+	ui.boss.visible = awake or (ui.boss.visible and d < 12.0)
+	ui.boss_name.text = "굴파기 수레두더지"
+	ui.boss_bar.size.x = 420.0 * maxf(0.0, e.hp) / e.max_hp
+	e.t += dt
+	e.hurt -= dt
+	e.stun -= dt
+	var me := Vector2(e.x, e.z)
+	if e.dash > 0.0:
+		e.dash -= dt
+		var nx: float = e.x + e.dir.x * 9.0 * dt
+		var nz: float = e.z + e.dir.y * 9.0 * dt
+		if walkable(nx, nz):
+			e.x = nx
+			e.z = nz
+			if Vector2(player.x - e.x, player.z - e.z).length() < 1.1:
+				player_hit(25, me - e.dir, e)
+		else: # crashed into the wall
+			e.dash = 0.0
+			e.stun = 1.5
+			shake = 0.35
+			sfx(80, 0.3, "square", 0.3, -40)
+			burst(Vector3(e.x, 0.6, e.z), Color("#8a7a6a"), 20, 3.0)
+	elif e.stun > 0.0:
+		pass
+	elif e.wind > 0.0:
+		e.wind -= dt
+		if e.wind <= 0.0:
+			if e.next == "charge":
+				e.dash = 1.2
+				e.next = "dirt"
+			else:
+				for r in e.rings:
+					burst(Vector3(r.x, 0.3, r.y), Color("#8a6a4a"), 18, 3.5)
+					if Vector2(player.x, player.z).distance_to(r) < 1.2:
+						player_hit(18, r, e)
+				sfx(70, 0.25, "square", 0.25, -30)
+				e.next = "charge"
+			e.atk_cd = 1.6
+	elif awake:
+		e.atk_cd -= dt
+		if e.atk_cd <= 0.0:
+			if e.next == "charge":
+				e.wind = 1.0
+				e.dir = to / maxf(d, 0.01)
+				pop_num(Vector3(e.x, 2.6, e.z), "!", Color("#ff5a4a"))
+				sfx(120, 0.5, "sawtooth", 0.2, 120)
+			else:
+				e.wind = 0.7
+				e.rings = [Vector2(player.x, player.z)]
+				if e.hp < e.max_hp / 2.0:
+					e.rings.append(Vector2(player.x, player.z) + Vector2(rnd(-2, 2), rnd(-2, 2)))
+				for r in e.rings:
+					warn_ring(Vector3(r.x, 0.0, r.y), 1.2, 0.7)
+		elif d > 2.0: # trundle toward Sora
+			var nx: float = e.x + to.x / d * 1.2 * dt
+			var nz: float = e.z + to.y / d * 1.2 * dt
+			if walkable(nx, e.z): e.x = nx
+			if walkable(e.x, nz): e.z = nz
+	node.position = Vector3(e.x, absf(sin(e.t * (12.0 if e.dash > 0 else 3.0))) * 0.08, e.z)
+	var face: Vector2 = e.dir if e.dash > 0.0 or e.wind > 0.0 else to
+	if face.length() > 0.1:
+		node.rotation.y = atan2(face.x, face.y)
+	var glowing: bool = e.hurt > 0 or e.wind > 0.0 or e.stun > 0.0
+	for m in node.get_meta("mats"):
+		m.emission_enabled = glowing
+		m.emission = Color("#ff3a2a") if e.wind > 0.0 else (Color("#9fd4ff") if e.stun > 0.0 else Color.WHITE)
+		m.emission_energy_multiplier = 0.9
+	e.shadow.position = Vector3(e.x, 0.02, e.z)
+
+func mole_defeated() -> void:
+	has_skip = true
+	ui.boss.visible = false
+	set_quest("동쪽 출구로 나가자 (Shift를 누르고 물 위를 달릴 수 있다)")
+	save_game()
+	show_story("res://art/story/07_water_skip.jpg", STORY.WATER_SKIP)
 
 func update_projectiles(dt: float) -> void:
 	for i in range(projectiles.size() - 1, -1, -1):
