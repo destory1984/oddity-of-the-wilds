@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -939,7 +939,8 @@ func run() -> void:
 		main.garden_q = 0
 		main.in_village = false
 		main.in_hill = true
-		reset_to(main.hill.marks.X + Vector2(-0.3, 0))
+		main.castle_q = 3
+		reset_to(main.castle.marks.E + Vector2(-0.3, 0))
 		await wait(1.5)
 		var entered: bool = main.in_garden and main.garden_q == 1
 		main.close_story()
@@ -1209,6 +1210,96 @@ func run() -> void:
 		calm_enemies(false)
 		check("cloud", entered and flew and chest and woke and flung and cheap_roll,
 			"entered=%s hops=%s chest=%s scarecrow woke=%s flung bricks=%s feather roll=%s (sp %.0f)" % [entered, hops, chest, woke, flung, cheap_roll, main.player.sp])
+	if want.call("castle"):
+		main.in_village = false
+		main.in_forest = false
+		main.in_lake = false
+		main.in_garden = false
+		main.in_hill = true
+		main.hill_q = 3
+		main.castle_q = 0
+		main.has_unbrick = true
+		main.has_skip = true
+		main.crown_pips = 8
+		main.hour = 22.0
+		main.story_step = maxi(main.story_step, 10)
+		var cx: float = main.CASTLE.CASTLE_X
+		reset_to(main.hill.marks.X + Vector2(-0.3, 0))
+		await wait(1.0)
+		var entered: bool = main.in_castle() and main.castle_q == 1
+		main.close_story()
+		await wait(0.1)
+		calm_enemies(true)
+		var shut: bool = not main.player_can(cx + 9, 13)
+		reset_to(Vector2(cx + 7.8, 13.5))
+		tap(KEY_E)
+		await wait(0.2)
+		var gate: bool = main.castle.gate_open and main.player_can(cx + 9, 13)
+		reset_to(Vector2(cx + 11.6, 13.5))
+		main.player.sp = 100.0
+		hold_world(Vector2(1, 0))
+		main.fake_keys[KEY_SHIFT] = true
+		await wait(1.0)
+		release()
+		var skipped: bool = main.player.x > cx + 16.0
+		reset_to(Vector2(cx + 21.6, 13))
+		hold_world(Vector2(1, 0))
+		await wait(1.4)
+		release()
+		await wait(0.1)
+		var vented: bool = main.player.x > cx + 27.0 and main.gust_dir == Vector2.ZERO
+		var shut_door: bool = not main.player_can(cx + 31, 13)
+		for pg in main.castle.pages:
+			reset_to(pg.pos + Vector2(1.0, 0))
+			tap(KEY_E)
+			await wait(0.2)
+			main.close_story()
+			await wait(0.1)
+		var door: bool = main.castle.pages_read() == 3 and main.castle.door_open and main.player_can(cx + 31, 13)
+		reset_to(main.castle.marks.K + Vector2(-4.0, 0))
+		await wait(0.3)
+		var woke: bool = main.castle_q == 2
+		main.close_story()
+		await wait(0.2)
+		var ks: Array = main.enemies.filter(func(e): return e.get("knight", false) and not e.dead)
+		var shield := false
+		var flank := false
+		var guard_opens := false
+		if ks.size() == 1:
+			var k: Dictionary = ks[0]
+			k.atk_cd = 99.0
+			var front: Vector2 = Vector2(k.x, k.z) + k.face * 1.5
+			var hp0: float = k.hp
+			main.damage_enemy(k, 40.0, front)
+			shield = k.hp == hp0
+			main.damage_enemy(k, 40.0, Vector2(k.x, k.z) - k.face * 1.5)
+			flank = k.hp < hp0
+			reset_to(front)
+			main.player.face = -k.face
+			main.guarding = true
+			main.guard_since = main.t
+			var res: String = main.player_hit(10, Vector2(k.x, k.z), k)
+			main.guarding = false
+			var hp1: float = k.hp
+			main.damage_enemy(k, 40.0, front)
+			guard_opens = res == "flash_guard" and k.hp < hp1
+			k.hp = 1.0
+			k.stun = 1.0
+			main.damage_enemy(k, 40.0, front)
+		await wait(1.3)
+		main.close_story()
+		var beaten: bool = main.castle_q == 3
+		reset_to(main.castle.marks.E + Vector2(-0.3, 0))
+		await wait(1.5)
+		var to_garden: bool = main.in_garden
+		main.close_story()
+		reset_to(main.garden.marks.S + Vector2(0.3, 0))
+		await wait(1.5)
+		var back: bool = main.in_castle()
+		main.in_hill = false
+		calm_enemies(false)
+		check("castle", entered and shut and gate and skipped and vented and shut_door and door and woke and shield and flank and guard_opens and beaten and to_garden and back,
+			"entered=%s gate shut/open=%s/%s skip=%s vent=%s door shut=%s pages open door=%s knight woke=%s front blocked=%s flank hits=%s flash guard opens=%s beaten=%s to garden=%s back=%s" % [entered, shut, gate, skipped, vented, shut_door, door, woke, shield, flank, guard_opens, beaten, to_garden, back])
 	calm_enemies(false)
 	var failed := results.count(false)
 	print("TESTS %d passed, %d failed" % [results.size() - failed, failed])

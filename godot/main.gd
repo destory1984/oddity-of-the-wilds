@@ -114,6 +114,8 @@ func cave_char(x: float, z: float) -> String:
 	return c
 
 func tile_at(x: float, z: float) -> int:
+	if x >= CASTLE.CASTLE_X - 0.5:
+		return WATER if castle.blocked(x, z) else GRASS
 	if x >= CLOUD.CLOUD_X - 0.5:
 		return WATER if cloud.blocked(x, z) else GRASS
 	if x >= GROTTO.GROTTO_X - 0.5:
@@ -177,6 +179,8 @@ var skip_grace := 0.0   # a short let-go of Shift or the arrows mid-river does n
 
 # water the water skip can run over: the marsh rivers and ponds, and the deep runs in the grotto
 func skip_water(x: float, z: float) -> bool:
+	if x >= CASTLE.CASTLE_X - 0.5:
+		return castle.char_at(x, z) == "~"
 	if x >= GROTTO.GROTTO_X - 0.5:
 		return grotto.char_at(x, z) == "~"
 	return x < CAVE_X - 0.5 and tile_at(x, z) == WATER and x > 1.0 and z > 1.0 and z < N - 2.0 and (x < N - 2.0 or (z > 17.5 and z < 23.5))
@@ -264,6 +268,7 @@ func _ready() -> void:
 	grotto_steps()
 	cloud.build(self)
 	cloud.build_updraft(self, hill.marks.U)
+	castle.build(self)
 	build_player()
 	for i in 9:
 		spawn_enemy(Vector2(-1, -1), i >= 6) # the last three are brick archers
@@ -318,6 +323,8 @@ const SCENES := {
 	"crab": {"play": true, "village": true, "crab": true, "hour": 14.0},
 	"cloud": {"play": true, "village": true, "cloud": true, "hour": 11.0},
 	"scarecrow": {"play": true, "village": true, "cloud": true, "scare": true, "hour": 16.0},
+	"castle": {"play": true, "village": true, "castle": true, "hour": 15.0},
+	"knight": {"play": true, "village": true, "castle": true, "knight": true, "hour": 15.0},
 	"scrap": {"play": true, "at": Vector2(42.5, 5.5), "hour": 17.0},
 }
 
@@ -435,6 +442,28 @@ func apply_test_args(args: PackedStringArray) -> void:
 				spawn_scarecrow()
 				player.x = cloud.marks.K.x - 3.0
 				player.z = cloud.marks.K.y + 1.5
+			snap_mates()
+		if sc.get("castle", false): # the sunken castle's great hall; with "knight" the throne room fight
+			night_q = 4
+			lake_q = 4
+			forest_q = 3
+			hill_q = 3
+			has_skip = true
+			join_mate()
+			join_noeul()
+			enter_castle()
+			close_story()
+			castle.open_gate()
+			player.x = CASTLE.CASTLE_X + 18.0
+			player.z = 12.0
+			if sc.has("knight"):
+				for pg in castle.pages:
+					pg.read = true
+				castle.open_door()
+				castle_q = 2
+				spawn_knight()
+				player.x = castle.marks.K.x - 3.5
+				player.z = castle.marks.K.y + 1.0
 			snap_mates()
 		if sc.get("kid", false): # Kongal's kid goblin trotting after Sora in the south field
 			errand = 3
@@ -1592,6 +1621,13 @@ func damage_enemy(e: Dictionary, amt: float, from: Vector2, kb := 4.0, force_cri
 		return
 	if e.dead or e.get("roar", 0.0) > 0.0:
 		return
+	if e.get("knight", false) and e.stun <= 0.0 and e.tired <= 0.0 and e.dash <= 0.0:
+		var from_dir := (from - Vector2(e.x, e.z)).normalized()
+		if from_dir.dot(e.face) > 0.34: # within about 70 degrees either side of where the shield points
+			pop_num(Vector3(e.x, 2.2, e.z), "막음", Color("#c8c8d0"))
+			burst(Vector3(e.x + e.face.x * 0.6, 1.2, e.z + e.face.y * 0.6), Color("#c8962a"), 6, 2.0)
+			sfx(700, 0.06, "square", 0.15, -300)
+			return
 	var crit := force_crit or rng.randf() < 0.15
 	if (e.get("boss", false) or e.get("mole", false)) and e.get("stun", 0.0) > 0.0:
 		amt *= 1.5
@@ -1627,6 +1663,8 @@ func damage_enemy(e: Dictionary, amt: float, from: Vector2, kb := 4.0, force_cri
 			get_tree().create_timer(1.0).timeout.connect(crab_beaten)
 		elif e.get("scare", false):
 			get_tree().create_timer(1.0).timeout.connect(scarecrow_beaten)
+		elif e.get("knight", false):
+			get_tree().create_timer(1.0).timeout.connect(knight_beaten)
 		elif e.get("hawk", false):
 			get_tree().create_timer(1.0).timeout.connect(hawk_beaten)
 		elif e.get("mole", false):
@@ -2610,7 +2648,8 @@ func save_game() -> void:
 		"chests": chests.map(func(c): return c.open), "scraps": marsh.found, "moon_chest": marsh.chest_open,
 		"fly_q": fly_q, "flies": marsh.flies.map(func(f): return f.caught),
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
-		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather}
+		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
+		"castle_q": castle_q, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify(d))
@@ -2726,11 +2765,23 @@ func load_game() -> void:
 	if cloud_chest:
 		cloud.opened_look()
 	has_feather = bool(d.get("has_feather", false))
+	castle_q = int(d.get("castle_q", 0))
+	if castle_q == 2:
+		castle_q = 1 # the knight fight starts over
+	if bool(d.get("castle_gate", false)):
+		castle.open_gate()
+	var cps: Array = d.get("castle_pages", [])
+	for i in mini(cps.size(), castle.pages.size()):
+		castle.pages[i].read = bool(cps[i])
+	if castle.pages_read() == 3:
+		castle.open_door()
 	if bool(d.get("in_hill", false)):
 		var hx: float = player.x
 		var hz: float = player.z
 		enter_hill()
-		if hx >= CLOUD.CLOUD_X - 0.5:
+		if hx >= CASTLE.CASTLE_X - 0.5:
+			enter_castle()
+		elif hx >= CLOUD.CLOUD_X - 0.5:
 			enter_cloud()
 		player.x = hx
 		player.z = hz
@@ -3026,6 +3077,10 @@ const GARDEN := preload("res://garden.gd")
 const MARSH := preload("res://marsh.gd")
 const GROTTO := preload("res://grotto.gd")
 const CLOUD := preload("res://cloud.gd")
+const CASTLE := preload("res://castle.gd")
+var castle = CASTLE.new()   # 가라앉은 달지기 성 between the hill and the garden (Sora is still in_hill in there)
+var castle_q := 0           # 0 never entered, 1 inside, 2 fighting the knight, 3 knight beaten (east gate open)
+var castle_spawned := false
 var cloud = CLOUD.new()     # 구름 둔덕 above the hill (Sora is still in_hill up there)
 var cloud_q := 0            # 0 never entered, 1 inside, 2 fighting the scarecrow, 3 scarecrow beaten
 var cloud_chest := false
@@ -3122,6 +3177,8 @@ func crown_key() -> void:
 	if in_grotto() and grotto_key():
 		return
 	if in_cloud() and cloud_key():
+		return
+	if in_castle() and castle_key():
 		return
 	if in_lake and lake_key():
 		return
@@ -3918,7 +3975,18 @@ func crab_beaten() -> void:
 
 # ---- 구름 둔덕 above the hill (after the hawk): wind vents across open sky, the brick scarecrow, the wind feather
 func in_cloud() -> bool:
-	return in_hill and player.x >= CLOUD.CLOUD_X - 0.5
+	return in_hill and player.x >= CLOUD.CLOUD_X - 0.5 and player.x < CASTLE.CASTLE_X - 0.5
+
+# wind vents exist on the cloud mound and on the castle's broken floor
+func vent_here(x: float, z: float) -> Vector2:
+	if in_castle():
+		return castle.vent_at(x, z)
+	if in_cloud():
+		return cloud.vent_at(x, z)
+	return Vector2.ZERO
+
+func gust_char(x: float, z: float) -> String:
+	return castle.char_at(x, z) if x >= CASTLE.CASTLE_X - 0.5 else cloud.char_at(x, z)
 
 func enter_cloud() -> void:
 	player.x = cloud.marks.S.x + 1.2
@@ -3966,16 +4034,16 @@ func update_gust(dt: float) -> void:
 	gust_t += dt
 	var step := gust_dir * 8.0 * dt
 	var np := Vector2(player.x, player.z) + step
-	if cloud.char_at(np.x, np.y) == "#" or gust_t > 3.0:
+	if gust_char(np.x, np.y) == "#" or gust_t > 3.0:
 		gust_dir = Vector2.ZERO
 		return
 	player.x = np.x
 	player.z = np.y
-	if cloud.char_at(np.x, np.y) == "_":
+	if gust_char(np.x, np.y) == "_":
 		gust_gap = true
 	elif gust_gap:
 		gust_solid += step.length()
-		if gust_solid >= 0.6 and not cloud.blocked(np.x, np.y):
+		if gust_solid >= 0.6 and walkable(np.x, np.y):
 			gust_dir = Vector2.ZERO
 	if int(gust_t * 10.0) != int((gust_t - dt) * 10.0):
 		burst(Vector3(player.x, 0.5, player.z), Color("#ffffff"), 3, 0.8)
@@ -4096,6 +4164,242 @@ func scarecrow_beaten() -> void:
 	player.gold += 160
 	gain_xp(240)
 	show_story("", STORY.SCARE_DOWN)
+	save_game()
+
+# ---- 가라앉은 달지기 성 (chapter 7) between the hill and the garden: the bricked gate, the flooded hall,
+# the broken floor with vents, Hangyeol's three diary pages, the moon door and the brick knight
+func in_castle() -> bool:
+	return in_hill and player.x >= CASTLE.CASTLE_X - 0.5
+
+func enter_castle() -> void:
+	in_hill = true
+	in_garden = false
+	story_step = maxi(story_step, 10)
+	player.x = castle.marks.S.x + 1.2
+	player.z = castle.marks.S.y
+	ground_y = 0.0
+	gust_dir = Vector2.ZERO
+	ui.mini.map_tex = castle.map_tex(CASTLE.CASTLE_X + CASTLE.W)
+	ui.zone_name.text = "가라앉은 달지기 성"
+	ui.zone_sub.text = "굳은 성문"
+	snap_mates()
+	if not castle_spawned:
+		castle_spawned = true
+		for f in castle.foes:
+			spawn_enemy(f[0], f[1] == "a")
+			if f[1] == "s":
+				give_shield(enemies[enemies.size() - 1])
+	if castle_q == 0:
+		castle_q = 1
+		show_story("", STORY.CASTLE_IN)
+	if castle_q < 3:
+		set_quest(castle_quest())
+	save_game()
+
+func castle_quest() -> String:
+	if not castle.gate_open:
+		return "성문의 벽돌을 왕관으로 풀자 (E)"
+	if not castle.door_open:
+		return tr("성 안에 흩어진 한결의 일기를 찾자 (E) %d/3") % castle.pages_read()
+	return "옥좌의 방으로 가자"
+
+func leave_castle() -> void:
+	player.x = hill.marks.X.x - 1.2
+	player.z = hill.marks.X.y
+	ground_y = 0.0
+	gust_dir = Vector2.ZERO
+	ui.mini.map_tex = hill.map_tex(HILL.HILL_X + HILL.W)
+	ui.zone_name.text = "바람 언덕"
+	ui.zone_sub.text = "매의 벼랑"
+	ui.boss.visible = false
+	snap_mates()
+	save_game()
+
+# E in the castle: unbrick the gate, or read a diary page; the third page opens the moon door
+func castle_key() -> bool:
+	var me := Vector2(player.x, player.z)
+	if not castle.gate_open:
+		for n in castle.gate_nodes:
+			if me.distance_to(Vector2(n.position.x, n.position.z)) < 1.6:
+				if not spend_pips(unbrick_cost()):
+					return true
+				castle.open_gate()
+				burst(Vector3(n.position.x, 0.7, n.position.z), Color("#8a6a4a"), 36, 3.5)
+				burst(Vector3(player.x, 1.6, player.z), Color("#9fd4ff"), 14, 1.5)
+				shake = 0.25
+				sfx(196, 0.5, "triangle", 0.3, -60)
+				toast("성문의 벽돌이 흙으로 풀렸다")
+				ui.mini.map_tex = castle.map_tex(CASTLE.CASTLE_X + CASTLE.W)
+				set_quest(castle_quest())
+				save_game()
+				return true
+	for i in castle.pages.size():
+		var p: Dictionary = castle.pages[i]
+		if me.distance_to(p.pos) < 1.5:
+			var first: bool = not p.read
+			p.read = true
+			show_story("", [STORY.PAGE_1, STORY.PAGE_2, STORY.PAGE_3][castle.pages_read() - 1] if first else STORY.PAGE_AGAIN)
+			if first:
+				sfx(660, 0.2, "triangle", 0.2)
+				if castle.pages_read() == 3 and not castle.door_open:
+					castle.open_door()
+					shake = 0.3
+					sfx(150, 0.6, "triangle", 0.3, -40)
+					ui.mini.map_tex = castle.map_tex(CASTLE.CASTLE_X + CASTLE.W)
+				set_quest(castle_quest())
+				save_game()
+			return true
+	return false
+
+func spawn_knight() -> void:
+	if enemies.any(func(e): return e.get("knight", false) and not e.dead):
+		return
+	var at: Vector2 = castle.marks.K
+	var root := Node3D.new()
+	var body := Node3D.new()
+	body.name = "body"
+	root.add_child(body)
+	var plate: Material = mat_color(Color("#7a7a86"))
+	var dark: Material = mat_color(Color("#3a3a46"))
+	var red: Material = mat_color(Color("#a8322a"))
+	for part in [[Vector3(0.3, 0.6, 0.3), Vector3(-0.22, 0.3, 0), dark], [Vector3(0.3, 0.6, 0.3), Vector3(0.22, 0.3, 0), dark],
+			[Vector3(0.9, 0.8, 0.55), Vector3(0, 1.0, 0), plate], [Vector3(0.6, 0.55, 0.55), Vector3(0, 1.7, 0), plate],
+			[Vector3(0.5, 0.08, 0.06), Vector3(0, 1.72, 0.29), dark], [Vector3(0.12, 0.35, 0.12), Vector3(0, 2.1, 0), red],
+			[Vector3(1.0, 0.7, 0.12), Vector3(0, 0.75, -0.32), red]]:
+		var b := box(part[0], part[2])
+		b.position = part[1]
+		body.add_child(b)
+	var shield := box(Vector3(0.9, 1.1, 0.14), mat_color(Color("#c8962a"))) # the big shield, held in front
+	shield.position = Vector3(-0.35, 1.0, 0.45)
+	body.add_child(shield)
+	var sword := box(Vector3(0.12, 0.12, 1.3), mat_color(Color("#d8d8e0")))
+	sword.name = "sword"
+	sword.position = Vector3(0.62, 1.0, 0.5)
+	body.add_child(sword)
+	var eye := box(Vector3(0.3, 0.06, 0.05), glow_mat(Color("#ffb040"), 2.5))
+	eye.position = Vector3(0, 1.74, 0.3)
+	body.add_child(eye)
+	root.scale = Vector3.ONE * 1.25
+	add_child(root)
+	enemies.append({"x": at.x, "z": at.y, "hp": 1100.0, "max_hp": 1100, "node": root, "shadow": blob(1.3), "t": 0.0,
+		"atk_cd": 1.5, "hurt": 0.0, "kx": 0.0, "kz": 0.0, "wx": at.x, "wz": at.y, "dead": false, "respawn": 0.0,
+		"knight": true, "cave": true, "wind": 0.0, "stun": 0.0, "tired": 0.0, "dash": 0.0, "dir": Vector2.ZERO,
+		"next": "", "combo": 0, "slam_cd": 0.0, "hit_done": false, "face": Vector2(-1, 0)})
+
+# the brick knight keeps his shield toward Sora: hits from his front 140 degrees are blocked unless he is
+# stunned (flash guard: 2 s) or tired (1.2 s after a lunge, 0.6 s after his third slash).
+# Close in: a three-slash combo (0.45 s wind-up each, 2.4-tile cone). From 2.4 to 8 tiles: a 0.7 s wind-up, then a lunge.
+# Below half health: a 1.0 s ground slam (3-tile ring) every 6 s.
+func update_knight(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
+	var node: Node3D = e.node
+	var body: Node3D = node.get_node("body")
+	var sword: Node3D = body.get_node("sword")
+	ui.boss.visible = d < 13.0
+	ui.boss_name.text = "벽돌 기사"
+	ui.boss_bar.size.x = 420.0 * maxf(0.0, e.hp) / e.max_hp
+	e.t += dt
+	e.hurt -= dt
+	e.stun -= dt
+	e.tired -= dt
+	e.slam_cd -= dt
+	var angry: bool = e.hp < e.max_hp / 2.0
+	var dirn: Vector2 = to / maxf(d, 0.01)
+	body.rotation.x = 0.3 if (e.stun > 0.0 or e.tired > 0.0) else 0.0 # slumps forward while open
+	sword.rotation.y = lerpf(sword.rotation.y, 0.0, dt * 8.0)
+	if e.stun > 0.0 or e.tired > 0.0:
+		e.dash = 0.0
+		e.wind = 0.0
+	elif e.dash > 0.0:
+		e.dash -= dt
+		var nx: float = e.x + e.dir.x * 10.0 * dt
+		var nz: float = e.z + e.dir.y * 10.0 * dt
+		if walkable(nx, nz):
+			e.x = nx
+			e.z = nz
+		else:
+			e.dash = 0.0
+		if not e.hit_done and Vector2(player.x - e.x, player.z - e.z).length() < 1.3:
+			e.hit_done = true
+			if player_hit(22 + player.lv, Vector2(e.x, e.z) - e.dir, e) == "flash_guard":
+				e.stun = 2.0
+		if e.dash <= 0.0 and e.stun <= 0.0:
+			e.tired = 1.2
+	elif e.wind > 0.0:
+		e.wind -= dt
+		if e.wind <= 0.0:
+			match e.next:
+				"slash":
+					sword.rotation.y = -1.2
+					burst(Vector3(e.x + e.face.x * 1.3, 1.0, e.z + e.face.y * 1.3), Color("#e8e8f0"), 10, 2.5)
+					sfx(240, 0.08, "sawtooth", 0.15, 300)
+					if d < 2.4 and dirn.dot(e.face) > 0.5:
+						if player_hit(14 + player.lv, Vector2(e.x, e.z), e) == "flash_guard":
+							e.stun = 2.0
+					var sx: float = e.x + e.face.x * 0.5
+					var sz: float = e.z + e.face.y * 0.5
+					if walkable(sx, sz) and d > 1.2:
+						e.x = sx
+						e.z = sz
+					e.combo -= 1
+					if e.combo > 0 and e.stun <= 0.0:
+						e.wind = 0.45
+						e.face = dirn
+						pop_num(Vector3(e.x, 2.9, e.z), "!", Color("#ff5a4a"))
+					else:
+						e.atk_cd = 1.0 if angry else 1.4
+						if e.stun <= 0.0:
+							e.tired = 0.6
+				"lunge":
+					e.dash = 0.45
+					e.dir = e.face
+					e.hit_done = false
+					sfx(160, 0.3, "sawtooth", 0.2, 200)
+				"slam":
+					ring_wave(Vector3(e.x, 0.05, e.z))
+					shake = 0.4
+					sfx(60, 0.4, "square", 0.3, -30)
+					burst(Vector3(e.x, 0.3, e.z), Color("#9a9284"), 30, 4.0)
+					if d < 3.0:
+						player_hit(24 + player.lv, Vector2(e.x, e.z), e)
+					e.atk_cd = 1.2
+	else:
+		var want := atan2(dirn.y, dirn.x)
+		var have := atan2(e.face.y, e.face.x)
+		var turn := clampf(wrapf(want - have, -PI, PI), -3.0 * dt, 3.0 * dt) # slow to turn: get behind him
+		e.face = e.face.rotated(turn)
+		e.atk_cd -= dt
+		if e.atk_cd <= 0.0 and d < 9.0:
+			if angry and e.slam_cd <= 0.0 and d < 3.5:
+				e.next = "slam"
+				e.wind = 1.0
+				e.slam_cd = 6.0
+				warn_ring(Vector3(e.x, 0.0, e.z), 3.0, 1.0)
+			elif d < 2.4:
+				e.next = "slash"
+				e.combo = 3
+				e.wind = 0.45
+				pop_num(Vector3(e.x, 2.9, e.z), "!", Color("#ff5a4a"))
+			else:
+				e.next = "lunge"
+				e.wind = 0.7
+				e.face = dirn
+				pop_num(Vector3(e.x, 2.9, e.z), "!", Color("#ffd84a"))
+		elif d > 2.0:
+			var nx: float = e.x + dirn.x * 1.4 * dt
+			var nz: float = e.z + dirn.y * 1.4 * dt
+			if walkable(nx, e.z): e.x = nx
+			if walkable(e.x, nz): e.z = nz
+	node.rotation.y = atan2(e.face.x, e.face.y)
+	node.position = Vector3(e.x, 0, e.z)
+	e.shadow.position = Vector3(e.x, 0.02, e.z)
+
+func knight_beaten() -> void:
+	castle_q = 3
+	ui.boss.visible = false
+	player.gold += 250
+	gain_xp(300)
+	show_story("", STORY.KNIGHT_DOWN)
+	set_quest("동쪽 문을 지나 정원 한가운데로 가자")
 	save_game()
 
 func turtle_beaten() -> void:
@@ -4414,12 +4718,12 @@ func enter_garden() -> void:
 func leave_garden() -> void:
 	in_garden = false
 	in_hill = true
-	player.x = hill.marks.X.x - 1.2
-	player.z = hill.marks.X.y
+	player.x = castle.marks.E.x - 1.2
+	player.z = castle.marks.E.y
 	ground_y = 0.0
-	ui.mini.map_tex = hill.map_tex(HILL.HILL_X + HILL.W)
-	ui.zone_name.text = "바람 언덕"
-	ui.zone_sub.text = "매의 벼랑"
+	ui.mini.map_tex = castle.map_tex(CASTLE.CASTLE_X + CASTLE.W)
+	ui.zone_name.text = "가라앉은 달지기 성"
+	ui.zone_sub.text = "옥좌의 방"
 	snap_mates()
 	ui.boss.visible = false
 	save_game()
@@ -5076,7 +5380,7 @@ func _process(dt: float) -> void:
 	if player.dodge > 0:
 		v = Vector2(player.dvx, player.dvz)
 		player.dodge -= dt
-	var vent: Vector2 = cloud.vent_at(player.x, player.z) if in_cloud() else Vector2.ZERO
+	var vent: Vector2 = vent_here(player.x, player.z)
 	if gust_dir == Vector2.ZERO and vent != Vector2.ZERO and not on_vent_prev and player.dodge <= 0.0:
 		start_gust(vent)
 	on_vent_prev = vent != Vector2.ZERO
@@ -5172,7 +5476,7 @@ func _process(dt: float) -> void:
 		fade_then(leave_hill)
 	if in_hill and Vector2(player.x, player.z).distance_to(hill.marks.X) < 0.9 and fade_rect.color.a == 0.0:
 		if hill_q >= 3:
-			fade_then(enter_garden)
+			fade_then(enter_castle)
 		elif toast_t <= 0.0:
 			toast("벽돌 매가 하늘을 지키고 있다")
 	if in_hill and not in_cloud() and Vector2(player.x, player.z).distance_to(hill.marks.U) < 0.8 and fade_rect.color.a == 0.0:
@@ -5186,6 +5490,18 @@ func _process(dt: float) -> void:
 		cloud_q = 2
 		show_story("", STORY.SCARE_IN)
 		after_story = spawn_scarecrow
+		save_game()
+	if in_castle() and gust_dir == Vector2.ZERO and Vector2(player.x, player.z).distance_to(castle.marks.S) < 0.7 and fade_rect.color.a == 0.0:
+		fade_then(leave_castle)
+	if in_castle() and Vector2(player.x, player.z).distance_to(castle.marks.E) < 0.8 and fade_rect.color.a == 0.0:
+		if castle_q >= 3 or garden_q >= 1:
+			fade_then(enter_garden)
+		elif toast_t <= 0.0:
+			toast("동쪽 문이 굳게 닫혀 있다")
+	if in_castle() and castle_q == 1 and castle.door_open and not story_open and gust_dir == Vector2.ZERO and Vector2(player.x, player.z).distance_to(castle.marks.K) < 5.0:
+		castle_q = 2
+		show_story("", STORY.KNIGHT_IN)
+		after_story = spawn_knight
 		save_game()
 	if in_hill:
 		update_hill(dt)
@@ -5339,6 +5655,9 @@ func update_enemies(dt: float, gy: float) -> void:
 			continue
 		if e.get("scare", false):
 			update_scarecrow(e, dt, d, to)
+			continue
+		if e.get("knight", false):
+			update_knight(e, dt, d, to)
 			continue
 		if e.get("hawk", false):
 			update_hawk(e, dt, d, to)
@@ -5639,12 +5958,14 @@ func faint() -> void:
 		for e in enemies:
 			if e.get("hawk", false) and not e.dead:
 				e.hp = float(e.max_hp)
-			if e.get("scare", false) and not e.dead:
+			if (e.get("scare", false) or e.get("knight", false)) and not e.dead:
 				e.dead = true
 				e.node.queue_free()
 				e.shadow.queue_free()
 		if cloud_q == 2:
 			cloud_q = 1
+		if castle_q == 2:
+			castle_q = 1
 	if in_village or in_forest:
 		in_forest = false
 		in_village = true
