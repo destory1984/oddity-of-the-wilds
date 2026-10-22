@@ -840,8 +840,11 @@ function drawMinimap() {
   const s = 96 / N;
   for (const e of enemies) if (!e.dead) px(mm, e.x * s - 1, e.z * s - 1, 2, 2, '#ff6a4a');
   for (const c of chests) if (!c.open) px(mm, c.x * s - 1, c.z * s - 1, 2, 2, '#ffd84a');
-  mm.save(); mm.translate(player.x * s, player.z * s); mm.rotate(Math.atan2(player.face.x, -player.face.y));
-  mm.fillStyle = '#fff'; mm.beginPath(); mm.moveTo(0, -4); mm.lineTo(3, 3); mm.lineTo(0, 1.5); mm.lineTo(-3, 3); mm.fill(); mm.restore();
+  // tiny person: dark outline, orange tunic, skin head, auburn hair
+  const ux = Math.round(player.x * s), uy = Math.round(player.z * s);
+  px(mm, ux - 3, uy - 6, 7, 10, '#1a1410');
+  px(mm, ux - 1, uy - 5, 3, 3, '#f1c08f'); px(mm, ux - 2, uy - 6, 5, 1, '#a0482a'); px(mm, ux - 2, uy - 5, 1, 2, '#a0482a');
+  px(mm, ux - 2, uy - 2, 5, 3, '#ff8a2e'); px(mm, ux - 2, uy + 1, 2, 2, '#2f6f68'); px(mm, ux + 1, uy + 1, 2, 2, '#2f6f68');
 }
 
 // ---------- main loop ----------
