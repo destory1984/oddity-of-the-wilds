@@ -2212,7 +2212,7 @@ func save_game() -> void:
 			boss_dead = true
 	var d := {"lv": player.lv, "xp": player.xp, "max_hp": player.max_hp, "hp": player.hp, "atk": player.atk,
 		"gold": player.gold, "pots": player.pots, "x": player.x, "z": player.z,
-		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "in_village": in_village, "pips": crown_pips, "errand": errand, "vlit": village.dark.map(func(d): return d.lit), "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
+		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "in_village": in_village, "met": met.keys(), "pips": crown_pips, "errand": errand, "vlit": village.dark.map(func(d): return d.lit), "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
 		"chests": chests.map(func(c): return c.open)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -2237,6 +2237,8 @@ func load_game() -> void:
 	var was_in_cave := bool(d.get("in_cave", false))
 	crown_pips = int(d.get("pips", 8))
 	errand = int(d.get("errand", 0))
+	for id in d.get("met", []):
+		met[id] = true
 	var vlit: Array = d.get("vlit", [])
 	for i in mini(vlit.size(), village.dark.size()):
 		if vlit[i]:
@@ -2508,6 +2510,7 @@ var in_village := false
 var crown_pips := 8        # the crown's moon gauge, 0..8
 var pip_flash := 0.0
 var rest_t := 0.0
+var met := {}               # villagers already greeted
 var errand := 0            # 0 not given, 1 lighting lanterns, 2 lanterns done, 3 rewarded
 
 func enter_village() -> void:
@@ -2567,6 +2570,12 @@ func crown_key() -> void:
 				set_quest("마을 사람들에게 말을 걸어 보자 (다음 장에서 계속)")
 			save_game()
 			return
+		for id in village.folk_pos:
+			if me.distance_to(village.folk_pos[id]) < 1.6:
+				show_story("", STORY.FOLK[id])
+				met[id] = true
+				save_game()
+				return
 		if errand == 1:
 			for d in village.dark:
 				if not d.lit and me.distance_to(d.pos) < 1.6:
