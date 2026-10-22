@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -1076,6 +1076,77 @@ func run() -> void:
 		main.in_village = false
 		calm_enemies(false)
 		check("firefly_errand", asked and hidden_by_day and walk_ok and full and lent, "asked=%s hidden by day=%s spots walkable=%s caught=%d lent jar=%s" % [asked, hidden_by_day, walk_ok, main.marsh.caught(), lent])
+	if want.call("grotto"):
+		main.in_village = false
+		main.in_forest = false
+		main.in_hill = false
+		main.in_garden = false
+		main.in_lake = true
+		main.lake_q = 4
+		main.grotto_q = 0
+		main.story_step = maxi(main.story_step, 10)
+		main.has_skip = true
+		var gx: float = main.GROTTO.GROTTO_X
+		reset_to(main.lake.marks.G + Vector2(0, -0.3))
+		await wait(1.0)
+		var entered: bool = main.in_grotto() and main.grotto_q == 1
+		main.close_story()
+		await wait(0.1)
+		calm_enemies(true)
+		reset_to(Vector2(gx + 7.6, 4))
+		hold_world(Vector2(1, 0))
+		await wait(1.0)
+		release()
+		var no_skip: bool = main.player.x < gx + 9.0
+		reset_to(Vector2(gx + 7.6, 4))
+		main.player.sp = 100.0
+		hold_world(Vector2(1, 0))
+		main.fake_keys[KEY_SHIFT] = true
+		await wait(1.0)
+		release()
+		var crossed: bool = main.player.x > gx + 12.0
+		reset_to(Vector2(gx + 16, 9.5))
+		main.player.sp = 100.0
+		hold_world(Vector2(0, 1))
+		main.fake_keys[KEY_SHIFT] = true
+		await wait(1.0)
+		release()
+		await wait(0.2)
+		var met_crab: bool = main.grotto_q == 2
+		main.close_story()
+		await wait(0.2)
+		var crabs: Array = main.enemies.filter(func(e): return e.get("crab", false) and not e.dead)
+		var spat := false
+		if crabs.size() == 1:
+			var c: Dictionary = crabs[0]
+			main.player.inv = 99.0
+			for i in 40:
+				reset_to(Vector2(c.x + 6.0, c.z)) # keep backing off: from afar the crab spits
+				main.player.inv = 99.0
+				await wait(0.1)
+				if main.enemy_shots.size() >= 3:
+					spat = true
+					break
+			main.player.inv = 0.0
+			c.hp = 1.0
+			main.damage_enemy(c, 50.0, Vector2(c.x, c.z - 1.0))
+		await wait(1.3)
+		main.close_story()
+		var beaten: bool = main.grotto_q == 3 and main.grotto.chest.visible
+		reset_to(main.grotto.marks.c + Vector2(-1.0, 0))
+		tap(KEY_E)
+		await wait(0.2)
+		main.close_story()
+		var pearl: bool = main.has_pearl and main.grotto_q == 4
+		var g0: int = main.player.gold
+		reset_to(main.grotto.marks.p + Vector2(0, 1.0))
+		tap(KEY_SPACE)
+		await wait(0.2)
+		var side: bool = main.grotto_side and main.player.gold == g0 + 60
+		main.in_lake = false
+		calm_enemies(false)
+		check("grotto", entered and no_skip and crossed and met_crab and spat and beaten and pearl and side,
+			"entered=%s walk stops at water=%s skip crossed=%s crab woke=%s spat bricks=%s beaten=%s pearl=%s side chest=%s" % [entered, no_skip, crossed, met_crab, spat, beaten, pearl, side])
 	calm_enemies(false)
 	var failed := results.count(false)
 	print("TESTS %d passed, %d failed" % [results.size() - failed, failed])

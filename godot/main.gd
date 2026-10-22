@@ -114,6 +114,8 @@ func cave_char(x: float, z: float) -> String:
 	return c
 
 func tile_at(x: float, z: float) -> int:
+	if x >= GROTTO.GROTTO_X - 0.5:
+		return WATER if grotto.blocked(x, z) else GRASS
 	if x >= HILL.HILL_X - 0.5:
 		return WATER if hill.blocked(x, z) else (SAND if hill.char_at(x, z) == "=" else GRASS)
 	if x >= LAKE.LAKE_X - 0.5:
@@ -171,14 +173,18 @@ var has_skip := false   # 물수제비 걸음 (story step 7 ability)
 var skipping := false
 var skip_grace := 0.0   # a short let-go of Shift or the arrows mid-river does not drop Sora in
 
+# water the water skip can run over: the marsh rivers and ponds, and the deep runs in the grotto
+func skip_water(x: float, z: float) -> bool:
+	if x >= GROTTO.GROTTO_X - 0.5:
+		return grotto.char_at(x, z) == "~"
+	return x < CAVE_X - 0.5 and tile_at(x, z) == WATER and x > 1.0 and z > 1.0 and z < N - 2.0 and (x < N - 2.0 or (z > 17.5 and z < 23.5))
+
 func player_can(x: float, z: float) -> bool:
 	if not walkable(x, z):
-		if skipping and x < CAVE_X - 0.5 and tile_at(x, z) == WATER and x > 1.0 and z > 1.0 and z < N - 2.0 and (x < N - 2.0 or (z > 17.5 and z < 23.5)):
-			return true
-		return false
+		return skipping and skip_water(x, z)
 	if x >= CAVE_X - 0.5:
 		for d in [Vector2(0.35, 0), Vector2(-0.35, 0), Vector2(0, 0.35), Vector2(0, -0.35)]:
-			if not walkable(x + d.x, z + d.y):
+			if not walkable(x + d.x, z + d.y) and not (skipping and skip_water(x + d.x, z + d.y)):
 				return false
 	return true
 
@@ -252,6 +258,8 @@ func _ready() -> void:
 	garden.build(self)
 	lake.build(self)
 	hill.build(self)
+	grotto.build(self)
+	grotto_steps()
 	build_player()
 	for i in 9:
 		spawn_enemy(Vector2(-1, -1), i >= 6) # the last three are brick archers
@@ -303,6 +311,7 @@ const SCENES := {
 	"kid": {"play": true, "village": true, "kid": true, "hour": 20.5},
 	"grove": {"play": true, "village": true, "forest": true, "grove": true, "hour": 15.0},
 	"flies": {"play": true, "at": Vector2(8, 23), "hour": 22.5, "flies": true},
+	"crab": {"play": true, "village": true, "crab": true, "hour": 14.0},
 	"scrap": {"play": true, "at": Vector2(42.5, 5.5), "hour": 17.0},
 }
 
@@ -375,6 +384,20 @@ func apply_test_args(args: PackedStringArray) -> void:
 			spawn_turtle()
 			player.x = lake.marks.T.x + 2.5
 			player.z = lake.marks.T.y + 1.0
+			snap_mate()
+		if sc.get("crab", false): # the brick crab in the grotto under the island, Mulgyeol along
+			night_q = 4
+			lake_q = 4
+			enter_lake()
+			lake.thaw()
+			join_mate()
+			has_skip = true
+			enter_grotto()
+			close_story()
+			grotto_q = 2
+			spawn_crab()
+			player.x = grotto.marks.C.x + 3.0
+			player.z = grotto.marks.C.y + 0.5
 			snap_mate()
 		if sc.get("hill", false): # the wind hills, one mill turning, Mulgyeol and Noeul along
 			night_q = 4
@@ -1575,6 +1598,8 @@ func damage_enemy(e: Dictionary, amt: float, from: Vector2, kb := 4.0, force_cri
 			get_tree().create_timer(1.0).timeout.connect(noeul_turned if e.get("second", false) else noeul_beaten)
 		elif e.get("turtle", false):
 			get_tree().create_timer(1.0).timeout.connect(turtle_beaten)
+		elif e.get("crab", false):
+			get_tree().create_timer(1.0).timeout.connect(crab_beaten)
 		elif e.get("hawk", false):
 			get_tree().create_timer(1.0).timeout.connect(hawk_beaten)
 		elif e.get("mole", false):
@@ -1849,6 +1874,8 @@ func interact() -> void:
 		return
 	if near_shop():
 		toggle_shop(not shop_open)
+		return
+	if in_grotto() and grotto_key():
 		return
 	if in_forest and forest.solved and not forest.chest_open and Vector2(player.x, player.z).distance_to(forest.marks.c) < 1.6:
 		open_grove_chest()
@@ -2551,7 +2578,8 @@ func save_game() -> void:
 		"gold": player.gold, "pots": player.pots, "x": player.x, "z": player.z,
 		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "in_village": in_village, "met": met.keys(), "pips": crown_pips, "errand": errand, "kid_q": kid_q, "doran_q": doran_q, "mul_q": mul_q, "night_q": night_q, "in_forest": in_forest, "in_garden": in_garden, "in_hill": in_hill, "hill_q": hill_q, "mills": hill.mills.map(func(mm): return mm.turning), "in_lake": in_lake, "lake_q": lake_q, "garden_q": garden_q, "forest_q": forest_q, "walls": forest.walls.map(func(w): return w.open), "stones": forest.stones.map(func(st): return st.phase), "grove": forest.solved, "grove_chest": forest.chest_open, "has_unbrick": has_unbrick, "vlit": village.dark.map(func(d): return d.lit), "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
 		"chests": chests.map(func(c): return c.open), "scraps": marsh.found, "moon_chest": marsh.chest_open,
-		"fly_q": fly_q, "flies": marsh.flies.map(func(f): return f.caught)}
+		"fly_q": fly_q, "flies": marsh.flies.map(func(f): return f.caught),
+		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify(d))
@@ -2640,10 +2668,23 @@ func load_game() -> void:
 		player.z = vz
 		if kid_q > 0:
 			place_kid()
+	grotto_q = int(d.get("grotto_q", 0))
+	if grotto_q == 2:
+		grotto_q = 1 # the crab fight starts over when she walks back into the last room
+	has_pearl = bool(d.get("has_pearl", false))
+	grotto_side = bool(d.get("grotto_side", false))
+	if grotto_side:
+		grotto.opened_look(grotto.side_chest)
+	if grotto_q >= 3:
+		grotto.chest.visible = true
+	if grotto_q >= 4:
+		grotto.opened_look(grotto.chest)
 	if bool(d.get("in_lake", false)):
 		var lx: float = player.x
 		var lz: float = player.z
 		enter_lake()
+		if lx >= GROTTO.GROTTO_X - 0.5:
+			enter_grotto()
 		player.x = lx
 		player.z = lz
 		snap_mate()
@@ -2943,6 +2984,12 @@ var mate: Node3D           # Mulgyeol as a companion
 var mate_cd := 0.0
 const GARDEN := preload("res://garden.gd")
 const MARSH := preload("res://marsh.gd")
+const GROTTO := preload("res://grotto.gd")
+var grotto = GROTTO.new()   # 물빛 동굴 under Mulgyeol's island (Sora is still in_lake down there)
+var grotto_q := 0           # 0 never entered, 1 inside, 2 fighting the crab, 3 crab beaten, 4 pearl taken
+var grotto_side := false    # the side-room chest is open
+var grotto_spawned := false
+var has_pearl := false      # 물빛 진주: stamina refills 1.5 times as fast
 var marsh = MARSH.new()     # the map scraps and the moonkeeper chest
 var garden = GARDEN.new()
 var in_garden := false
@@ -3020,6 +3067,8 @@ func crown_key() -> void:
 			return
 	if in_garden and garden_q == 4:
 		final_wind()
+		return
+	if in_grotto() and grotto_key():
 		return
 	if in_lake and lake_key():
 		return
@@ -3651,6 +3700,168 @@ func update_turtle(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
 			body.rotation.y = lerp_angle(body.rotation.y, atan2(to.x, to.y), dt * 3.0)
 	node.position = Vector3(e.x, 0, e.z)
 	e.shadow.position = Vector3(e.x, 0.02, e.z)
+
+# ---- 물빛 동굴 under the island (after the turtle): water-skip runs, archers, the brick crab and the water pearl
+func in_grotto() -> bool:
+	return in_lake and player.x >= GROTTO.GROTTO_X - 0.5
+
+# dark steps going down on the island's south shore, at the lake's G
+func grotto_steps() -> void:
+	var g := Node3D.new()
+	var dark: Material = mat_color(Color("#1a1e24"))
+	var stone: Material = mat_color(Color("#6a7078"))
+	var hole: MeshInstance3D = box(Vector3(1.0, 0.05, 1.0), dark)
+	hole.position = Vector3(0, 0.02, 0)
+	g.add_child(hole)
+	for k in 3:
+		var st: MeshInstance3D = box(Vector3(0.9, 0.12, 0.22), stone)
+		st.position = Vector3(0, -0.04 - k * 0.1, -0.3 + k * 0.25)
+		g.add_child(st)
+	var at: Vector2 = lake.marks.G
+	g.position = Vector3(at.x, 0, at.y)
+	add_child(g)
+
+func enter_grotto() -> void:
+	player.x = grotto.marks.S.x + 1.2
+	player.z = grotto.marks.S.y
+	ground_y = 0.0
+	ui.mini.map_tex = grotto.map_tex(GROTTO.GROTTO_X + GROTTO.W)
+	ui.zone_name.text = "물빛 동굴"
+	ui.zone_sub.text = "섬 밑 물길"
+	snap_mate()
+	if not grotto_spawned:
+		grotto_spawned = true
+		for f in grotto.foes:
+			spawn_enemy(f[0], f[1])
+	if grotto_q == 0:
+		grotto_q = 1
+		show_story("", STORY.GROTTO_IN)
+	save_game()
+
+func leave_grotto() -> void:
+	player.x = lake.marks.G.x
+	player.z = lake.marks.G.y - 1.2
+	ground_y = 0.0
+	ui.mini.map_tex = lake.map_tex(LAKE.LAKE_X + LAKE.W)
+	ui.zone_name.text = "남쪽 호수"
+	ui.zone_sub.text = "물결의 섬"
+	ui.boss.visible = false
+	snap_mate()
+	save_game()
+
+# E or Space beside a grotto chest
+func grotto_key() -> bool:
+	var me := Vector2(player.x, player.z)
+	if not grotto_side and me.distance_to(grotto.marks.p) < 1.6:
+		grotto_side = true
+		grotto.opened_look(grotto.side_chest)
+		player.pots += 2
+		player.gold += 60
+		burst(Vector3(grotto.marks.p.x, 0.8, grotto.marks.p.y), Color("#bfe6ff"), 30, 3.0)
+		sfx(784, 0.12, "triangle", 0.25)
+		toast("회복약 2개와 금화 60닢을 찾았다")
+		save_game()
+		return true
+	if grotto_q == 3 and me.distance_to(grotto.marks.c) < 1.6:
+		grotto_q = 4
+		has_pearl = true
+		grotto.opened_look(grotto.chest)
+		burst(Vector3(grotto.marks.c.x, 0.8, grotto.marks.c.y), Color("#9fd8ff"), 40, 3.0)
+		sfx(784, 0.12, "triangle", 0.25)
+		show_story("", STORY.PEARL)
+		save_game()
+		return true
+	return false
+
+func spawn_crab() -> void:
+	if enemies.any(func(e): return e.get("crab", false) and not e.dead):
+		return
+	var at: Vector2 = grotto.marks.C
+	var root := Node3D.new()
+	var body := Node3D.new()
+	body.name = "body"
+	root.add_child(body)
+	var shell: Material = mat_color(Color("#c8502a"))
+	var dark: Material = mat_color(Color("#8a3018"))
+	for part in [[Vector3(1.8, 0.6, 1.2), Vector3(0, 0.55, 0), shell], [Vector3(1.4, 0.25, 1.0), Vector3(0, 0.95, 0), dark],
+			[Vector3(0.6, 0.5, 0.5), Vector3(-1.2, 0.6, 0.8), shell], [Vector3(0.6, 0.5, 0.5), Vector3(1.2, 0.6, 0.8), shell],
+			[Vector3(0.25, 0.3, 0.6), Vector3(-1.2, 0.6, 1.2), dark], [Vector3(0.25, 0.3, 0.6), Vector3(1.2, 0.6, 1.2), dark]]:
+		var b := box(part[0], part[2])
+		b.position = part[1]
+		body.add_child(b)
+	for k in 6: # three legs a side
+		var leg := box(Vector3(0.5, 0.14, 0.14), dark)
+		leg.position = Vector3(-1.05 if k < 3 else 1.05, 0.2, -0.4 + (k % 3) * 0.4)
+		body.add_child(leg)
+	for side in [-0.35, 0.35]: # eyes on stalks
+		var stalk := box(Vector3(0.1, 0.35, 0.1), dark)
+		stalk.position = Vector3(side, 1.15, 0.45)
+		body.add_child(stalk)
+		var eye := box(Vector3(0.18, 0.18, 0.18), glow_mat(Color("#ffd040"), 2.0))
+		eye.position = Vector3(side, 1.38, 0.45)
+		body.add_child(eye)
+	add_child(root)
+	enemies.append({"x": at.x, "z": at.y, "hp": 760.0, "max_hp": 760, "node": root, "shadow": blob(1.5), "t": 0.0,
+		"atk_cd": 1.5, "hurt": 0.0, "kx": 0.0, "kz": 0.0, "wx": at.x, "wz": at.y, "dead": false, "respawn": 0.0,
+		"crab": true, "cave": true, "wind": 0.0, "stun": 0.0, "next": ""})
+
+# the brick crab scuttles sideways to line up with Sora. Close in, a 0.6 s pinch (2.3 tiles);
+# farther out, a 0.5 s wind-up then a fan of spat bricks (3, five below half health)
+func update_crab(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
+	var node: Node3D = e.node
+	var body: Node3D = node.get_node("body")
+	ui.boss.visible = d < 12.0
+	ui.boss_name.text = "벽돌 게"
+	ui.boss_bar.size.x = 420.0 * maxf(0.0, e.hp) / e.max_hp
+	e.t += dt
+	e.hurt -= dt
+	e.stun -= dt
+	var angry: bool = e.hp < e.max_hp / 2.0
+	body.scale = Vector3.ONE * (1.06 if e.hurt > 0.0 or e.wind > 0.0 else 1.0)
+	if e.stun > 0.0:
+		pass
+	elif e.wind > 0.0:
+		e.wind -= dt
+		if e.wind <= 0.0:
+			if e.next == "pinch":
+				burst(Vector3(e.x + to.x / maxf(d, 0.01) * 1.2, 0.6, e.z + to.y / maxf(d, 0.01) * 1.2), Color("#ffd28a"), 12, 2.5)
+				sfx(900, 0.06, "square", 0.2, -400)
+				if d < 2.3:
+					player_hit(18 + player.lv, Vector2(e.x, e.z), e)
+			else:
+				var n := 5 if angry else 3
+				for k in n:
+					var a := (k - (n - 1) / 2.0) * 0.28
+					throw_brick(Vector2(e.x, e.z), (to / maxf(d, 0.01)).rotated(a), e)
+			e.atk_cd = 1.0 if angry else 1.5
+	else:
+		e.atk_cd -= dt
+		if e.atk_cd <= 0.0 and d < 9.0:
+			e.next = "pinch" if d < 2.2 else "spit"
+			e.wind = 0.6 if e.next == "pinch" else 0.5
+			pop_num(Vector3(e.x, 2.0, e.z), "!", Color("#ff5a4a") if e.next == "pinch" else Color("#ffd84a"))
+		else:
+			# sideways first: match Sora's x, then creep in on z
+			var v := Vector2(clampf(to.x, -1.0, 1.0) * 2.4, clampf(to.y - signf(to.y) * 1.6, -1.0, 1.0) * 0.9)
+			if d < 1.8:
+				v = Vector2.ZERO # close enough to pinch; do not climb onto her
+			var nx: float = e.x + v.x * dt
+			var nz: float = e.z + v.y * dt
+			if walkable(nx, e.z): e.x = nx
+			if walkable(e.x, nz): e.z = nz
+			body.position.y = absf(sin(e.t * 10.0)) * 0.06 if v.length() > 0.3 else 0.0
+	body.rotation.y = lerp_angle(body.rotation.y, atan2(to.x, to.y), dt * 4.0)
+	node.position = Vector3(e.x, 0, e.z)
+	e.shadow.position = Vector3(e.x, 0.02, e.z)
+
+func crab_beaten() -> void:
+	grotto_q = 3
+	ui.boss.visible = false
+	grotto.chest.visible = true
+	player.gold += 180
+	gain_xp(220)
+	show_story("", STORY.CRAB_DOWN)
+	save_game()
 
 func turtle_beaten() -> void:
 	lake_q = 4
@@ -4595,20 +4806,20 @@ func _process(dt: float) -> void:
 		if key_down(KEY_D) or key_down(KEY_RIGHT): mv += right
 		if key_down(KEY_A) or key_down(KEY_LEFT): mv -= right
 	var running: bool = key_down(KEY_SHIFT) and player.sp > 0 and mv.length() > 0
-	var on_water: bool = tile_at(player.x, player.z) == WATER and player.x < CAVE_X - 0.5
+	var on_water: bool = tile_at(player.x, player.z) == WATER and (player.x < CAVE_X - 0.5 or skip_water(player.x, player.z))
 	skip_grace = 0.6 if has_skip and running else skip_grace - dt
 	skipping = has_skip and (running or (on_water and skip_grace > 0.0))
 	if has_skip and not running and mv.length() > 0 and not on_water and toast_t <= 0.0:
 		var ahead := Vector2(player.x, player.z) + mv.normalized() * 0.7
-		if ahead.x < CAVE_X - 0.5 and tile_at(ahead.x, ahead.y) == WATER:
+		if skip_water(ahead.x, ahead.y):
 			toast("Shift를 누른 채 달리면 물 위를 건넌다")
 	if skipping and on_water:
 		player.sp = maxf(1.0, player.sp - 6.0 * dt) # costs a little extra, but never runs dry mid-river
 		if int(t * 8.0) != int((t - dt) * 8.0):
 			burst(Vector3(player.x, -0.2, player.z), Color("#9fe0ff"), 4, 1.2)
-	elif not running and tile_at(player.x, player.z) == WATER and player.x < CAVE_X - 0.5 and not skipping:
+	elif not running and on_water and not skipping:
 		unstick() # stopped on open water: back to the nearest shore
-	player.sp = maxf(0, player.sp - 22 * dt) if running else minf(100, player.sp + 18 * dt)
+	player.sp = maxf(0, player.sp - 22 * dt) if running else minf(100, player.sp + (27.0 if has_pearl else 18.0) * dt)
 	if skipping and on_water:
 		player.sp = maxf(player.sp, 1.0)
 	var speed := 6.2 if running else 3.6
@@ -4735,6 +4946,15 @@ func _process(dt: float) -> void:
 			toast("남쪽 호수는 굳어 있다. 아직 갈 수 없다")
 	if in_lake and Vector2(player.x, player.z).distance_to(lake.marks.S) < 0.9 and fade_rect.color.a == 0.0:
 		fade_then(leave_lake)
+	if in_lake and lake_q >= 4 and Vector2(player.x, player.z).distance_to(lake.marks.G) < 0.8 and fade_rect.color.a == 0.0:
+		fade_then(enter_grotto)
+	if in_grotto() and Vector2(player.x, player.z).distance_to(grotto.marks.S) < 0.7 and fade_rect.color.a == 0.0:
+		fade_then(leave_grotto)
+	if in_grotto() and grotto_q == 1 and player.z > 13.6 and not story_open:
+		grotto_q = 2
+		show_story("", STORY.CRAB_IN)
+		after_story = spawn_crab
+		save_game()
 	update_mate(dt)
 	update_mate2(dt)
 	update_pips(dt)
@@ -4859,6 +5079,9 @@ func update_enemies(dt: float, gy: float) -> void:
 			continue
 		if e.get("turtle", false):
 			update_turtle(e, dt, d, to)
+			continue
+		if e.get("crab", false):
+			update_crab(e, dt, d, to)
 			continue
 		if e.get("hawk", false):
 			update_hawk(e, dt, d, to)
@@ -5136,6 +5359,13 @@ func faint() -> void:
 	if in_lake:
 		in_lake = false
 		in_village = true
+		if grotto_q == 2:
+			grotto_q = 1
+			for e in enemies:
+				if e.get("crab", false) and not e.dead:
+					e.dead = true
+					e.node.queue_free()
+					e.shadow.queue_free()
 		if lake_q == 3:
 			for e in enemies:
 				if e.get("turtle", false) and not e.dead:

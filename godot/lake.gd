@@ -27,12 +27,12 @@ const ROWS := """###############S##############
 #XXXXXXXiiiiiiiiiiiiiiiXXXXXX#
 #XXXXXXXiiiihiiiiiiiiiiXXXXXX#
 #XXXXXXXXiiiiiiiiiiiiiXXXXXXX#
-#XXXXXXXXXXiiiiiiiiiXXXXXXXXX#
+#XXXXXXXXXXiiiiGiiiiXXXXXXXXX#
 #XXXXXXXXXXXXXiiiXXXXXXXXXXXX#
 ##############################"""
 
 var grid: Array = []
-var marks := {}          # S entry, P pier, Q island pier, T turtle, h hut, D sluice -> world Vector2
+var marks := {}          # S entry, P pier, Q island pier, T turtle, h hut, D sluice, G steps down to the grotto -> world Vector2
 var thawed := false      # the sluice is unwound and the lake is water again
 var spikes: MultiMeshInstance3D
 var water: MeshInstance3D
@@ -62,7 +62,7 @@ func build(m: Node) -> void:
 		for x in W:
 			var c: String = grid[z][x]
 			var w := Vector2(LAKE_X + x, z)
-			if c in "SPQThD":
+			if c in "SPQThDG":
 				marks[c] = w
 			if c == "L":
 				lamp_spots.append(w)
@@ -76,7 +76,7 @@ func build(m: Node) -> void:
 			match c:
 				"=", "P", "Q": col = Color("#8a6a44") # boardwalk and piers
 				"#": col = Color("#4a3a2a")
-				"i", "T", "h", "L": col = Color("#7aa850")
+				"i", "T", "h", "L", "G": col = Color("#7aa850")
 			if c == "#":
 				hgt = 0.9
 			col = col.lightened(m.rnd(0, 0.08))
