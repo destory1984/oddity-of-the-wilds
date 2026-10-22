@@ -1,0 +1,13 @@
+The attached image is the official character turnaround of Sora (front, three-quarter, side, back).
+Use your image generation tool to create ONE new PNG image and save it as sora-v2-walk.png in the current directory.
+
+Draw Sora as a polished pixel-art sprite for a cozy top-down 3/4-view action RPG, faithful to the turnaround: lavender-silver short hair, gold crown with a blue gem, blue ribbon with gold diamonds on her left side, gold diamond earrings, white dress with blue panels and gold trim, detached long white sleeves with blue-and-gold cuffs (arms and hands clearly visible), blue tassels ending in gold diamonds, white thigh-high stockings, blue boots. Chibi proportions as in the turnaround.
+- Layout: a strict grid of 4 columns x 4 rows, every cell the same size, character centered, feet on the same baseline near the bottom of each cell.
+  - Row 1: walking down (front view), 4-frame walk cycle.
+  - Row 2: walking left (side view facing left), 4-frame walk cycle.
+  - Row 3: walking right (side view facing right), 4-frame walk cycle.
+  - Row 4: walking up (back view), 4-frame walk cycle.
+- Walking on the ground: legs alternating, arms swinging opposite to the legs. Not flying.
+- Crisp hard pixel edges, 1-pixel dark outline, limited palette, no text, no labels, no grid lines.
+- Background: solid flat pure magenta #FF00FF everywhere outside the character. No ground shadow.
+When done, reply with only the file path.

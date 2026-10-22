@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Oddity of the Wilds</title>
+<link rel="icon" type="image/png" href="art/sora/icon-64.png">
+<link rel="apple-touch-icon" href="art/sora/icon-180.png">
 <link href="fonts/pretendard/pretendardvariable-dynamic-subset.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Cormorant+Garamond:ital,wght@0,600;1,600&family=Noto+Serif+KR:wght@500;700&display=swap" rel="stylesheet">
 <style>
@@ -549,7 +551,7 @@ const player = {
 };
 const heroSprite = makeSprite(heroFrames.down[0], 1.0, 1.5); scene.add(heroSprite);
 // Sora walk sheet (art/sora/sora-walk-cut.png): 4 frames x rows front, left, right, away
-new THREE.TextureLoader().load('art/sora/sora-walk-cut.png', (t) => {
+new THREE.TextureLoader().load('art/sora/sora-v2-walk-cut.png', (t) => {
   t.colorSpace = THREE.SRGBColorSpace; t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.generateMipmaps = false;
   const cut = (row, col) => {
     const c = t.clone(); c.repeat.set(.25, .25);
@@ -561,7 +563,7 @@ new THREE.TextureLoader().load('art/sora/sora-walk-cut.png', (t) => {
   heroSprite.scale.set(1.1, 1.65, 1); heroSprite.center.set(.5, .01);
 });
 // diagonals (art/sora/sora-walk-diag-cut.png): rows down-left, down-right, up-left, up-right
-new THREE.TextureLoader().load('art/sora/sora-walk-diag-cut.png', (t) => {
+new THREE.TextureLoader().load('art/sora/sora-v2-diag-cut.png', (t) => {
   t.colorSpace = THREE.SRGBColorSpace; t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.generateMipmaps = false;
   const cut = (row, col) => {
     const c = t.clone(); c.repeat.set(.25, .25);
