@@ -1406,9 +1406,10 @@ func ring_mesh(r0: float, r1: float, a0: float, arc: float) -> ArrayMesh:
 			st.add_vertex(p[k])
 	return st.commit()
 
-func slash_fx(pos: Vector3, ang: float, big: bool) -> void:
+func slash_fx(pos: Vector3, ang: float, big: bool, span := 1.8) -> void:
 	var m := MeshInstance3D.new()
-	m.mesh = ring_mesh(1.6 if big else 0.55, 2.4 if big else 1.25, 0.0, TAU if big else 1.8)
+	ang += (1.8 - span) / 2.0 # keep the arc centred where the 1.8-rad arc was
+	m.mesh = ring_mesh(1.6 if big else 0.55, 2.4 if big else 1.25, 0.0, TAU if big else span)
 	var mat := glow_mat(Color("#bfe7ff") if big else Color.WHITE, 2.5)
 	m.material_override = mat
 	m.position = pos + Vector3(0, 0.5, 0)
@@ -1620,6 +1621,10 @@ const LV_MOVES := {
 	8: "새 기술: 빛 칼날 (연속기 마지막 타가 빛 칼날을 날린다)",
 }
 
+# the sword's arc widens as Sora grows: about 70 degrees at Lv1, 150 from Lv8; hits follow the arc
+func slash_span() -> float:
+	return clampf(1.2 + 0.2 * (player.lv - 1), 1.2, 2.6)
+
 func combo_len() -> int:
 	return 3 + (1 if player.lv >= 2 else 0) + (1 if player.lv >= 6 else 0)
 
@@ -1650,7 +1655,8 @@ func attack() -> void:
 		slash_fx(here, 0.0, true)
 	else:
 		var ang := -atan2(f.y, f.x) - 0.9 * (-1.0 if player.combo == 1 else 1.0) + 0.9
-		slash_fx(Vector3(player.x + f.x * 0.5, here.y, player.z + f.y * 0.5), ang, false)
+		slash_fx(Vector3(player.x + f.x * 0.5, here.y, player.z + f.y * 0.5), ang, false, slash_span())
+	var cone := cos(slash_span() / 2.0 + 0.45)
 	var reach := 2.6 if slam else (2.0 if spin else 1.7)
 	var mult: float = 2.4 if slam else (1.6 if spin else ([1.0, 1.15, 1.4][mini(player.combo, 2)] if not last else 1.8))
 	var hit_any := false
@@ -1658,7 +1664,7 @@ func attack() -> void:
 		if e.dead:
 			continue
 		var d := Vector2(e.x - player.x, e.z - player.z)
-		if d.length() < reach and (spin or slam or d.normalized().dot(f) > -0.1):
+		if d.length() < reach and (spin or slam or d.normalized().dot(f) > cone):
 			var countering := counter_t > 0.0
 			damage_enemy(e, player.atk * (2.5 if countering else mult), Vector2(player.x, player.z), 7.0 if last else 3.0,
 				countering, 0.14 if countering else (0.09 if last else 0.05))
