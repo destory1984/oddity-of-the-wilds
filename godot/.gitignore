@@ -1,0 +1,8 @@
+.godot/
+shot*.png
+*.log
+export/
+shot*.png.import
+.claude/
+fonts/title/space-oddity-*
+art/title/ref.png*
