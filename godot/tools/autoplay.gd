@@ -464,6 +464,18 @@ func run() -> void:
 			"stepping on the cave mouth: in cave=%s step=%d at %.1f,%.1f" % [main.in_cave, main.story_step, main.player.x, main.player.z])
 	if want.call("cave_layout"):
 		var ok: bool = main.cave_marks.size() == 9 and not main.walkable(main.cave_marks.D.x, main.cave_marks.D.y) and main.walkable(main.cave_marks.K.x, main.cave_marks.K.y)
+		# the locked door must be the only way to the mole's hall (a playtest found a way round it)
+		var seen: Dictionary = {}
+		var todo: Array = [Vector2i(int(main.cave_marks.S.x), int(main.cave_marks.S.y))]
+		while not todo.is_empty():
+			var at: Vector2i = todo.pop_back()
+			if seen.has(at) or main.cave_char(at.x, at.y) in ["#", "D", "w"]:
+				continue
+			seen[at] = true
+			for dv: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				todo.append(at + dv)
+		var mole_at := Vector2i(int(main.cave_marks.B.x), int(main.cave_marks.B.y))
+		ok = ok and seen.has(Vector2i(int(main.cave_marks.K.x), int(main.cave_marks.K.y))) and not seen.has(mole_at)
 		check("cave_layout", ok, "marks %s, locked door blocks, key spot open" % [main.cave_marks.keys()])
 	if want.call("archer_telegraph"):
 		var ar = main.enemies.filter(func(e): return e.get("archer", false) and not e.dead)

@@ -87,7 +87,7 @@ const CAVE_ROWS := """################################
 #........###........##.........#
 #........###........##.........#
 #........###..wwww..##.........#
-#.......................D......#
+#....................D.........#
 #........###..wwww..##.........#
 #........###........##....B....#
 #........###........##.........#
@@ -549,6 +549,7 @@ func apply_test_args(args: PackedStringArray) -> void:
 				enter_stairs()
 				close_story()
 				stairs.open_wall()
+				set_quest(stairs_quest())
 				player.x = STAIRS.STAIRS_X + 9.0
 				player.z = 20.5
 			snap_mates()
@@ -2998,9 +2999,16 @@ func enter_stairs() -> void:
 		set_quest(stairs_quest())
 	save_game()
 
+var stairs_q_shown := ""
+
 func stairs_quest() -> String:
 	if not stairs.wall_open:
 		return "계단을 막은 벽돌 벽을 왕관으로 풀자 (E)"
+	# past the wall the line follows the landing she stands on (a playtest found it pointing back at the open wall)
+	if in_stairs() and player.z > 15.0:
+		return "깊은 물길은 Shift를 누른 채 물수제비 걸음으로 건너자"
+	if in_stairs() and player.z > 6.0:
+		return "무너진 틈은 빛나는 바람구멍을 밟아 넘자"
 	return tr("꼭대기 계단참의 등불 셋을 왕관으로 켜자 (E) %d/3") % stairs.lamps_lit()
 
 func open_stairs() -> void:
@@ -4699,6 +4707,21 @@ func reset_game() -> void:
 		DirAccess.remove_absolute(SAVE_PATH)
 	get_tree().reload_current_scene()
 
+# a floor tile in a gap at most two tiles across between walls: the ways from room to room
+func cave_doorway(w: Vector2) -> bool:
+	var across := 1
+	var along := 1
+	for d in [1, -1]:
+		for k in range(1, 3):
+			if cave_char(w.x + d * k, w.y) == "#":
+				break
+			across += 1
+		for k in range(1, 3):
+			if cave_char(w.x, w.y + d * k) == "#":
+				break
+			along += 1
+	return across <= 2 or along <= 2
+
 func build_cave() -> void:
 	cave_grid = []
 	for line in CAVE_ROWS.split("\n"):
@@ -4731,7 +4754,8 @@ func build_cave() -> void:
 	floors = floors.filter(func(f): return cave_char(f.x, f.y) != "w")
 	var blocks: Array = [] # [Transform3D, Color]
 	for w in floors:
-		blocks.append([Transform3D(Basis().scaled(Vector3(1, 0.4, 1)), Vector3(w.x, -0.2, w.y)), Color(1.15, 1.15, 1.2)])
+		var lit := Color(1.7, 1.75, 1.95) if cave_doorway(w) else Color(1.15, 1.15, 1.2)
+		blocks.append([Transform3D(Basis().scaled(Vector3(1, 0.4, 1)), Vector3(w.x, -0.2, w.y)), lit])
 	for w in walls:
 		var camera_side := cave_char(w.x, w.y - 1) != "#" or cave_char(w.x, w.y - 2) != "#" # floor within two tiles north: this wall is in front
 		var h := 0.35 if camera_side else rnd(2.4, 3.0)
@@ -7220,6 +7244,10 @@ func cave_map_tex() -> ImageTexture:
 				col = Color("#c8962a")
 			if c == "E":
 				col = Color("#ffd060")
+			if c == "S":
+				col = Color("#bfe6ff")
+			if c == "K" and not has_key:
+				col = Color("#ff9f5a")
 			img.set_pixel(CAVE_X + x, z, col)
 	return ImageTexture.create_from_image(img)
 var fade_rect: ColorRect
@@ -7425,6 +7453,7 @@ func cave_interact() -> bool:
 		burst(key_chest.position + Vector3(0, 0.6, 0), Color("#ffd84a"), 24, 2.5)
 		sfx(784, 0.12, "triangle", 0.25)
 		toast("녹슨 열쇠를 얻었다")
+		ui.mini.map_tex = cave_map_tex()
 		return true
 	if not cave_door_open and me.distance_to(cave_marks.D) < 1.6:
 		if has_key:
@@ -7972,6 +8001,11 @@ func _process(dt: float) -> void:
 	hero_shadow.position = Vector3(player.x, gy + 0.02, player.z)
 
 	update_enemies(dt * (SLOWMO if slowmo > 0 else 1.0), gy)
+	if in_stairs() and not stairs.door_open and fade_rect.color.a == 0.0:
+		var sq: String = stairs_quest()
+		if sq != stairs_q_shown:
+			stairs_q_shown = sq
+			set_quest(sq)
 	if not in_cave and story_step >= 5 and cave_pos.x > 0 and Vector2(player.x, player.z).distance_to(cave_pos) < 1.2 and fade_rect.color.a == 0.0:
 		fade_then(enter_cave)
 	if not in_cave and not in_village and story_step >= 7 and player.x > 46.5 and player.x < CAVE_X - 0.5 and player.z > 17.5 and player.z < 23.5 and fade_rect.color.a == 0.0:

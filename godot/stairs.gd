@@ -112,6 +112,13 @@ func build(m: Node) -> void:
 					if VENTS.has(c):
 						vent_pad(m, w, VENTS[c])
 	m.add_chunks(blocks, STAIRS_X)
+	# the channel's face glows a little, so it reads as water (for the skip) and not as a step down
+	var wet: Material = m.glow_mat(Color("#2f78b8"), 0.6)
+	wet.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
+	wet.blend_mode = BaseMaterial3D.BLEND_MODE_MIX
+	var face: MeshInstance3D = m.box(Vector3(18.0, 0.02, 3.0), wet)
+	face.position = Vector3(STAIRS_X + 11.5, -0.3, 17)
+	m.add_child(face)
 	# a stair of three steps at the foot and the top of each landing's way through
 	var step: Material = m.mat_color(Color("#b8b4c4"))
 	for at in [Vector2(STAIRS_X + 11.5, 28.6), Vector2(STAIRS_X + 11.5, 1.4)]:
