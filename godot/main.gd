@@ -638,10 +638,15 @@ func apply_test_args(args: PackedStringArray) -> void:
 				player.z = [26.5, 20.5, 12.5, 4.5][land]
 				set_quest(stairs_quest())
 			snap_mates()
-		if sc.get("trial", false): # the moon trial's third wave, wolves around the stone ring
+		if sc.get("trial", false): # the moon trial's third wave, wolves around the stone ring on the wind hills
 			night_q = 4
-			player.x = village.marks.R.x + 1.5
-			player.z = village.marks.R.y - 0.5
+			lake_q = 4
+			forest_q = 3
+			hill_q = 3
+			enter_hill()
+			close_story()
+			player.x = hill.marks.R.x + 1.5
+			player.z = hill.marks.R.y - 0.5
 			trial_wave = 3
 			trial_start = t
 			spawn_trial_wave()
@@ -1882,7 +1887,9 @@ func update_wolf(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
 		m.emission_energy_multiplier = 0.9
 	e.shadow.position = Vector3(e.x, y + 0.02, e.z)
 
-# ---- 달빛 시련: a ring of standing stones in the village's south-west corner, open after the lantern night.
+# ---- 달빛 시련: the old moonkeepers' sparring stones east of the wind hills' gorge, open once the brick hawk is
+# down (moved from the village on 2026-10-23: a monster ring had no place among the lanterns). Walking 9 tiles
+# from the stones ends a run; after the first clear its foes give no gold or XP.
 # E at the moon stone starts five waves; the next comes 2.5 s after the last one falls. Fainting or leaving
 # the village ends the run. The first clear gives max HP +20, attack +3 and 300 gold; later clears 80 gold.
 const TRIAL_WAVES := [
@@ -1899,7 +1906,7 @@ var trial_best := 0.0        # best clear in seconds (0: never cleared)
 var trial_stone: Node3D
 
 func build_trial() -> void:
-	var at: Vector2 = village.marks.R
+	var at: Vector2 = hill.marks.R
 	trial_stone = Node3D.new()
 	var stone: Material = mat_color(Color("#8a8a94"))
 	var core: MeshInstance3D = box(Vector3(0.7, 1.3, 0.7), stone)
@@ -1913,7 +1920,7 @@ func build_trial() -> void:
 		var post: MeshInstance3D = box(Vector3(0.3, 0.6, 0.3), stone)
 		post.position = Vector3(cos(a) * 2.2, 0.3, sin(a) * 2.2)
 		trial_stone.add_child(post)
-	var glow := OmniLight3D.new() # a pale moonlight over the ring; this corner of the village has no lantern
+	var glow := OmniLight3D.new() # a pale moonlight over the ring
 	glow.light_color = Color("#bcd6ff")
 	glow.light_energy = 1.8
 	glow.omni_range = 7.0
@@ -1924,9 +1931,9 @@ func build_trial() -> void:
 	rocks.append({"x": at.x, "z": at.y, "r": 0.45})
 
 func trial_key() -> bool:
-	if trial_stone == null or Vector2(player.x, player.z).distance_to(village.marks.R) > 1.6:
+	if trial_stone == null or Vector2(player.x, player.z).distance_to(hill.marks.R) > 1.6:
 		return false
-	if night_q < 4:
+	if hill_q < 3:
 		toast("시련의 돌은 아직 잠들어 있다")
 		return true
 	if trial_wave > 0:
@@ -1941,7 +1948,7 @@ func trial_foes() -> Array:
 	return enemies.filter(func(e): return e.get("trial", false) and not e.dead)
 
 func spawn_trial_wave() -> void:
-	var c: Vector2 = village.marks.R
+	var c: Vector2 = hill.marks.R
 	var list: Array = TRIAL_WAVES[trial_wave - 1]
 	for i in list.size():
 		var at := c + Vector2(1.5, 0)
@@ -1975,8 +1982,8 @@ func spawn_trial_wave() -> void:
 func update_trial(dt: float) -> void:
 	if trial_wave == 0:
 		return
-	if not in_village:
-		end_trial("마을을 벗어나 시련이 끝났다")
+	if not in_hill or Vector2(player.x, player.z).distance_to(hill.marks.R) > 9.0:
+		end_trial("선돌에서 멀어져 시련이 끝났다")
 		return
 	if story_open:
 		return
@@ -2662,6 +2669,7 @@ const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 256분 / 목표 300분 (85%)",
 	"",
 	"2026-10-23 저녁",
+	"· v0.0.10: 달빛 시련을 마을에서 바람 언덕 동쪽 선돌(옛 달지기들이 솜씨를 겨루던 돌)로 옮겼다. 벽돌 매를 물리친 뒤 열리고, 선돌에서 9칸 넘게 멀어지면 끝난다. 처음 깬 뒤에는 시련 괴물이 금화와 경험치를 주지 않는다.",
 	"· v0.0.9: 달빛 눈금이 하룻밤에 다 차도록 빨라졌다. 등불 곁 10 → 6초, 반딧불 병 20 → 12초마다 한 칸. 밤은 105초라 등불 곁에서는 밤의 절반이면 8칸이 찬다.",
 	"· v0.0.8: 칼 휘두르는 효과를 금빛 별가루로 바꿨다(시안 5개 중 3번). 가는 금빛 호가 칼끝을 따라 쓸고, 바깥으로 마름모 불티가 튄다.",
 	"· v0.0.7: 심지가 열셋째 등불을 마을 동쪽 문에 거는 장면에 삽화를 붙였다.",
@@ -3932,6 +3940,8 @@ func damage_enemy(e: Dictionary, amt: float, from: Vector2, kb := 4.0, force_cri
 			for k in 4:
 				burst(Vector3(e.x + rnd(-1, 1), y + rnd(0.5, 2.5), e.z + rnd(-1, 1)), Color("#e8b018"), 30, 5.0)
 			gain_xp(200)
+		elif e.get("trial", false) and trial_best > 0.0:
+			pass # once the trial is cleared it is for the record only: its foes give no gold or XP, so hunting stays worth it
 		else:
 			var g := 3 + rng.randi() % 5
 			player.gold += g
@@ -5727,14 +5737,14 @@ func crown_key() -> void:
 		return
 	if in_lake and lake_key():
 		return
+	if in_hill and trial_key():
+		return
 	if in_hill and race_key():
 		return
 	if in_hill and hill_key():
 		return
 	if in_village:
 		if cupboard_key():
-			return
-		if trial_key():
 			return
 		if hollow_q == 3 and me.distance_to(village.marks.M) < 1.8:
 			simji_lantern()
@@ -8643,8 +8653,8 @@ func journal_lines() -> Array:
 		if magpie_q >= 1:
 			side.call("장터의 반짝이 도둑", [tr(""), tr("밤에 장터를 지켜보자"), tr("부두 끝의 꺼진 달 등불을 켜자 (E)"), tr("끝")][magpie_q])
 		side.call("유리병 편지", tr("끝") if village.bottles_got() == village.bottles.size() else tr("%d/3 · 연못에 떠 있다") % village.bottles_got())
-	if night_q >= 4:
-		side.call("달빛 시련", tr("최고 기록 %d분 %02d초") % [int(trial_best) / 60, int(trial_best) % 60] if trial_best > 0.0 else tr("마을 남서쪽 돌 둘레에서"))
+	if hill_q >= 3 or trial_best > 0.0:
+		side.call("달빛 시련", tr("최고 기록 %d분 %02d초") % [int(trial_best) / 60, int(trial_best) % 60] if trial_best > 0.0 else tr("바람 언덕 동쪽 선돌에서"))
 	out.append("")
 	out.append(tr("도전 과제"))
 	for i in FEATS.size():
