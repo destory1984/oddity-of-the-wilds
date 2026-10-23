@@ -289,11 +289,13 @@ func _ready() -> void:
 	enemies[1].z = 22.0
 	build_chests()
 	marsh.build(self)
+	village_sign()
 	spawn_boss()
 	build_particles()
 	build_hud()
 	for l in [ui.story_text, ui.story_who, ui.journal_text, ui.journal_text2, ui.ways_text]:
 		scale_text(l)
+	build_mate_hud(ui.root)
 	apply_settings()
 	update_daylight(0.0)
 	var targs := OS.get_cmdline_user_args()
@@ -354,6 +356,7 @@ const SCENES := {
 	"ways": {"play": true, "ways": true, "hour": 16.0},
 	"walk_dr": {"play": true, "walk_dr": true, "at": Vector2(12, 14), "hour": 12.0},
 	"settings": {"play": true, "settings": true},
+	"east": {"play": true, "at": Vector2(42.0, 21.5), "hour": 12.0},
 	"scrap": {"play": true, "at": Vector2(42.5, 5.5), "hour": 17.0},
 }
 
@@ -2557,6 +2560,169 @@ func toggle_settings(show: bool) -> void:
 		show_set_tab(0)
 		apply_settings()
 
+# ---- companions talk now and then: when Sora has stood still about 9 s with no monster within 8 tiles,
+# Mulgyeol or Noeul says a short line in a speech balloon (one fitting the place or the night when there is one);
+# sometimes the other answers. 14 - 24 s between lines.
+var chat_t := 0.0
+var chat_cd := 6.0
+
+func say_bubble(who: Node3D, text: String, dur := 3.5) -> void:
+	var b := Node3D.new()
+	var l := Label3D.new()
+	l.text = text
+	l.font = ui_font
+	l.font_size = 40
+	l.pixel_size = 0.006
+	l.modulate = Color("#3a2a1a")
+	l.outline_size = 0
+	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	l.no_depth_test = true
+	l.render_priority = 2
+	b.add_child(l)
+	var q := MeshInstance3D.new() # the balloon: a pale rounded-looking card behind the words
+	var qm := QuadMesh.new()
+	qm.size = Vector2(0.24 * text.length() * 0.6 + 0.5, 0.42)
+	q.mesh = qm
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(1.0, 0.98, 0.92, 0.92)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	mat.no_depth_test = true
+	mat.render_priority = 1
+	q.material_override = mat
+	b.add_child(q)
+	b.position = Vector3(0, 2.35, 0)
+	who.add_child(b)
+	get_tree().create_timer(dur).timeout.connect(func(): if is_instance_valid(b): b.queue_free())
+
+func chat_lines(id: String) -> Array:
+	var lines: Array = STORY.MATE_CHAT[id].duplicate()
+	var place := ""
+	if in_lake: place = "lake"
+	elif in_village: place = "village"
+	elif in_castle(): place = "castle"
+	elif in_cloud(): place = "cloud"
+	elif in_hill: place = "hill"
+	elif in_forest: place = "forest"
+	elif in_marsh(): place = "marsh"
+	var key := id + "_" + place
+	if STORY.MATE_CHAT.has(key):
+		lines.append_array(STORY.MATE_CHAT[key])
+		lines.append_array(STORY.MATE_CHAT[key]) # a place line is twice as likely
+	if is_night() and STORY.MATE_CHAT.has(id + "_night"):
+		lines.append_array(STORY.MATE_CHAT[id + "_night"])
+	return lines
+
+func update_chat(dt: float) -> void:
+	chat_cd -= dt
+	var still: bool = Vector2(player.vx, player.vz).length() < 0.3 and not story_open and not intro and in_house < 0
+	chat_t = chat_t + dt if still else 0.0
+	if chat_t < 9.0 or chat_cd > 0.0:
+		return
+	if enemies.any(func(e): return not e.dead and not e.get("prop", false) and Vector2(e.x - player.x, e.z - player.z).length() < 8.0):
+		return
+	var who: Array = []
+	if mate != null and mate.visible: who.append(["mulgyeol", mate])
+	if mate2 != null and mate2.visible: who.append(["noeul", mate2])
+	if who.is_empty():
+		return
+	chat_cd = rnd(14.0, 24.0)
+	if who.size() == 2 and rng.randf() < 0.3: # the two of them trade a line
+		var pair: Array = STORY.MATE_BANTER[rng.randi() % STORY.MATE_BANTER.size()]
+		var first: Node3D = mate if pair[0] == "mulgyeol" else mate2
+		var second: Node3D = mate2 if pair[0] == "mulgyeol" else mate
+		say_bubble(first, tr(pair[1]))
+		get_tree().create_timer(2.2).timeout.connect(func(): if is_instance_valid(second): say_bubble(second, tr(pair[2])))
+		return
+	var pick: Array = who[rng.randi() % who.size()]
+	var lines := chat_lines(pick[0])
+	say_bubble(pick[1], tr(lines[rng.randi() % lines.size()]))
+
+# the signpost by the east bridge: the only way from the marsh to the village
+# Built after the map, props, plants and monsters so the random draws that place them are the same as before.
+func village_sign() -> void:
+	# a short deck over the east edge water to the village road
+	var plank: Material = mat_color(Color("#a0703e"))
+	for bx in [46, 47]:
+		for bz in [20, 21]:
+			map[idx(bx, bz)] = BRIDGE
+			hgt[idx(bx, bz)] = 0.08
+	for k in 6:
+		var pl: MeshInstance3D = box(Vector3(0.3, 0.1, 2.0), plank)
+		pl.position = Vector3(45.7 + k * 0.36, 0.05, 20.5)
+		add_child(pl)
+	var g := Node3D.new()
+	var wood: Material = mat_color(Color("#6a4a2e"))
+	var pole: MeshInstance3D = box(Vector3(0.14, 1.5, 0.14), wood)
+	pole.position = Vector3(0, 0.75, 0)
+	g.add_child(pole)
+	var board: MeshInstance3D = box(Vector3(1.9, 0.42, 0.08), mat_color(Color("#c8a46a")))
+	board.position = Vector3(0, 1.3, 0.08)
+	g.add_child(board)
+	var t := Label3D.new()
+	t.text = tr("등불 마을 →")
+	t.font = ui_font
+	t.font_size = 36
+	t.pixel_size = 0.006
+	t.modulate = Color("#3a2414")
+	t.outline_size = 0
+	t.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+	t.position = Vector3(0, 1.3, 0.14)
+	g.add_child(t)
+	var glow := box(Vector3(0.2, 0.26, 0.2), glow_mat(Color("#ffc46a"), 1.6))
+	glow.position = Vector3(0, 1.62, 0)
+	g.add_child(glow)
+	g.position = Vector3(43.6, height_at(43.6, 18.6), 18.6)
+	add_child(g)
+	rocks.append({"x": 43.6, "z": 18.6, "r": 0.25})
+
+# 3. companions' status under Sora's bars: portrait, name and a bar that fills as their next blow comes ready
+func build_mate_hud(root: Control) -> void:
+	ui.mate_rows = []
+	for i in 2:
+		var row := Control.new()
+		row.position = Vector2(140, 150 + i * 34)
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		root.add_child(row)
+		var face := TextureRect.new()
+		face.texture = load("res://art/portrait/%s.png" % ["mulgyeol", "jae"][i])
+		face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		face.size = Vector2(28, 28)
+		face.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(face)
+		label(row, ["물결", "노을"][i], Vector2(34, 0), 13, Color("#f6d27a"))
+		var back := ColorRect.new()
+		back.color = Color(0.1, 0.1, 0.15, 0.8)
+		back.position = Vector2(34, 19)
+		back.size = Vector2(110, 6)
+		back.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(back)
+		var fill := ColorRect.new()
+		fill.color = Color("#7ac8ff") if i == 0 else Color("#c8c8d0")
+		fill.position = Vector2(34, 19)
+		fill.size = Vector2(110, 6)
+		fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(fill)
+		var act := label(row, "", Vector2(82, 1), 11, Color("#c9bfa6"))
+		act.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+		row.visible = false
+		ui.mate_rows.append({"row": row, "fill": fill, "act": act})
+
+func update_mate_hud() -> void:
+	var data := [[mate, mate_cd, 1.0], [mate2, mate2_cd, 1.4]]
+	for i in 2:
+		var r: Dictionary = ui.mate_rows[i]
+		var node: Node3D = data[i][0]
+		r.row.visible = node != null and not intro and not in_cave
+		if not r.row.visible:
+			continue
+		var ready: float = clampf(1.0 - float(data[i][1]) / float(data[i][2]), 0.0, 1.0)
+		r.fill.size.x = 110.0 * ready
+		var fighting: bool = enemies.any(func(e): return not e.dead and not e.get("prop", false) and Vector2(e.x - node.position.x, e.z - node.position.z).length() < 5.0)
+		r.act.text = tr("싸우는 중") if fighting else tr("따라가는 중")
+
 func spawn_boss() -> void:
 	var spot := Vector2(16, 4)
 	for tries in 40:
@@ -3924,7 +4090,7 @@ func save_game() -> void:
 			boss_dead = true
 	var d := {"lv": player.lv, "xp": player.xp, "max_hp": player.max_hp, "hp": player.hp, "atk": player.atk,
 		"gold": player.gold, "pots": player.pots, "x": player.x, "z": player.z,
-		"story": story_step, "boss_dead": boss_dead, "in_cave": in_cave, "in_village": in_village, "met": met.keys(), "pips": crown_pips, "errand": errand, "kid_q": kid_q, "doran_q": doran_q, "mul_q": mul_q, "night_q": night_q, "in_forest": in_forest, "in_garden": in_garden, "in_hill": in_hill, "hill_q": hill_q, "mills": hill.mills.map(func(mm): return mm.turning), "in_lake": in_lake, "lake_q": lake_q, "garden_q": garden_q, "forest_q": forest_q, "walls": forest.walls.map(func(w): return w.open), "stones": forest.stones.map(func(st): return st.phase), "grove": forest.solved, "grove_chest": forest.chest_open, "has_unbrick": has_unbrick, "vlit": village.dark.map(func(d): return d.lit), "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
+		"story": story_step, "quest": ui.quest.text, "boss_dead": boss_dead, "in_cave": in_cave, "in_village": in_village, "met": met.keys(), "pips": crown_pips, "errand": errand, "kid_q": kid_q, "doran_q": doran_q, "mul_q": mul_q, "night_q": night_q, "in_forest": in_forest, "in_garden": in_garden, "in_hill": in_hill, "hill_q": hill_q, "mills": hill.mills.map(func(mm): return mm.turning), "in_lake": in_lake, "lake_q": lake_q, "garden_q": garden_q, "forest_q": forest_q, "walls": forest.walls.map(func(w): return w.open), "stones": forest.stones.map(func(st): return st.phase), "grove": forest.solved, "grove_chest": forest.chest_open, "has_unbrick": has_unbrick, "vlit": village.dark.map(func(d): return d.lit), "cave_exit_seen": cave_exit_seen, "has_skip": has_skip, "has_key": has_key, "door_open": cave_door_open, "saw_painting": saw_painting, "hour": hour, "day": day,
 		"chests": chests.map(func(c): return c.open), "scraps": marsh.found, "moon_chest": marsh.chest_open,
 		"fly_q": fly_q, "flies": marsh.flies.map(func(f): return f.caught),
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
@@ -4191,7 +4357,11 @@ func load_game() -> void:
 			key_chest.modulate = Color(0.55, 0.55, 0.55)
 	if is_instance_valid(ui.title_hint):
 		ui.title_hint.text = "아무 키나 눌러 이어하기  ·  F9 처음부터"
-	set_quest(["", "왕관을 만져 보자 (E)", "서쪽 오두막으로 가 보자", "북쪽 벽돌왕이 늪의 물길을 막고 있다", "", "땅 아래로 가는 동굴이 열렸다 (다음 장에서 계속)"][clampi(story_step, 0, 5)])
+	if story_step >= 6: # later chapters: the quest line as it was saved (older saves keep what the zone set)
+		if d.has("quest"):
+			set_quest(String(d.quest))
+	else:
+		set_quest(["", "왕관을 만져 보자 (E)", "서쪽 오두막으로 가 보자", "북쪽 벽돌왕이 늪의 물길을 막고 있다", "", "땅 아래로 가는 동굴이 열렸다"][clampi(story_step, 0, 5)])
 
 # keep level, gold and story, but put Sora back at the starting crossing (F8)
 func return_to_start() -> void:
@@ -7446,6 +7616,8 @@ func _process(dt: float) -> void:
 	update_trial(dt)
 	update_race(dt)
 	update_fishing(dt)
+	update_chat(dt)
+	update_mate_hud()
 	if cloud.reveal_t > 0.0:
 		cloud.reveal_t -= dt
 		if cloud.reveal_t <= 0.0:

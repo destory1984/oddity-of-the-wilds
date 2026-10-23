@@ -110,7 +110,9 @@ func update_flowers(m: Node, blooming: bool) -> void:
 			f.visible = false
 			m.burst(f.position + Vector3(0, 0.5, 0), Color("#eef4ff"), 14, 1.2)
 			m.sfx(880 + picked_count() * 110, 0.2, "sine", 0.2)
-			if picked_count() == FLOWERS.size():
+			if picked_count() == 1:
+				m.show_story("", STORY.MOONFLOWER_FIRST)
+			elif picked_count() == FLOWERS.size():
 				m.toast("달꽃 세 송이를 모았다. 보리 할머니께 가져가자")
 			else:
 				m.toast(m.tr("달꽃 %d/3") % picked_count())

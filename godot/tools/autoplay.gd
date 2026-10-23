@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "mate_facing", "settings", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "mate_facing", "settings", "mate_chat", "east_bridge", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -115,12 +115,13 @@ func run() -> void:
 		tap(KEY_H)
 	calm_enemies(true)
 	if want.call("bridges"):
+		calm_enemies(true) # only the decks are under test; a goblin parked at a bridge end would block the walk
 		for b in main.bridges:
 			var z: float = b.z + 0.5
 			reset_to(Vector2(b.a - 2.0, z))
 			hold_world(Vector2(1, 0))
 			var t := 0.0
-			var goal: float = b.b + 2.0
+			var goal: float = minf(b.b + 2.0, 47.4) # the east deck ends at the map edge, where the village begins
 			while t < 8.0 and main.player.x < goal:
 				# steer back onto the deck's centre line
 				hold_world(Vector2(1, clampf((z - main.player.z) * 2.0, -1, 1)).normalized())
@@ -128,6 +129,7 @@ func run() -> void:
 				t += 0.1
 			release()
 			check("bridges", main.player.x >= goal, "bridge at z=%d: reached x=%.1f of %.1f" % [b.z, main.player.x, goal])
+		calm_enemies(false)
 	if want.call("shop_buy"):
 		reset_to(Vector2(main.shop_pos.x, main.shop_pos.z))
 		main.story_step = 3
@@ -1722,6 +1724,7 @@ func run() -> void:
 		for p in main.MARSH.FLOWERS:
 			reset_to(p)
 			await wait(0.15)
+			main.close_story() # the first flower explains itself
 		var three: bool = main.marsh.picked_count() == 3
 		reset_to(Vector2(main.shop_pos.x, main.shop_pos.z))
 		tap(KEY_SPACE)
@@ -2076,6 +2079,52 @@ func run() -> void:
 		var closed: bool = not main.settings_open
 		check("settings", opened and paused and tilt_off and bigger and hidden_nums and tab_ok and closed,
 			"Esc opens=%s world waits=%s blur off=%s bigger text=%s numbers off=%s tabs=%s Esc closes=%s" % [opened, paused, tilt_off, bigger, hidden_nums, tab_ok, closed])
+	if want.call("mate_chat"):
+		if main.intro:
+			main.start_game(false)
+		await wait(0.2)
+		main.close_story()
+		main.in_village = false
+		main.in_hill = false
+		main.in_lake = false
+		main.in_forest = false
+		main.in_garden = false
+		main.in_cave = false
+		main.join_mate()
+		main.join_noeul()
+		calm_enemies(true)
+		reset_to(Vector2(20, 30))
+		main.snap_mates()
+		main.chat_t = 9.5
+		main.chat_cd = 0.0
+		await wait(0.2)
+		var talked := false
+		for m in [main.mate, main.mate2]:
+			for c in m.get_children():
+				if c is Node3D and c.get_child_count() > 0 and c.get_child(0) is Label3D:
+					talked = true
+		calm_enemies(false)
+		check("mate_chat", talked and main.chat_cd > 10.0, "a companion says a line in a balloon after standing still=%s" % talked)
+	if want.call("east_bridge"):
+		main.in_village = false
+		main.in_hill = false
+		main.in_lake = false
+		main.in_forest = false
+		main.in_garden = false
+		main.in_cave = false
+		main.has_skip = false # even without the water skip
+		main.story_step = maxi(main.story_step, 7)
+		calm_enemies(true)
+		reset_to(Vector2(43.5, 20.5))
+		hold_world(Vector2(1, 0))
+		await wait(1.6)
+		release()
+		await wait(0.3)
+		var inside: bool = main.in_village
+		main.has_skip = true
+		main.in_village = false
+		calm_enemies(false)
+		check("east_bridge", inside, "walking east over the new bridge reaches the village without the water skip=%s" % inside)
 	calm_enemies(false)
 	var failed := results.count(false)
 	print("TESTS %d passed, %d failed" % [results.size() - failed, failed])
