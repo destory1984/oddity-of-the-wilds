@@ -348,6 +348,7 @@ const SCENES := {
 	"house_designs": {"play": true, "village": true, "house_designs": true, "hour": 14.0},
 	"swing_designs": {"play": true, "village": true, "swing_designs": true, "hour": 14.0},
 	"swing": {"play": true, "village": true, "swing": true, "hour": 14.0},
+	"far": {"play": true, "village": true, "far": true, "hour": 14.0},
 	"pier": {"play": true, "village": true, "vat": Vector2(32, 29), "hour": 14.0},
 	"inn": {"play": true, "village": true, "vat": Vector2(8, 30), "hour": 14.0},
 	"forest": {"play": true, "village": true, "forest": true, "hour": 16.0},
@@ -729,6 +730,8 @@ func apply_test_args(args: PackedStringArray) -> void:
 		toggle_help(true)
 	if sc.get("settings", false):
 		toggle_settings(true)
+	if sc.get("far", false): # zoomed all the way out, to judge the haze
+		cam_dist = 26.0
 	if sc.get("swing", false): # a swing caught mid-sweep, just before the picture at 4 s
 		cam_dist = 11.0
 		player.face = Vector2(1, 0)
@@ -2687,6 +2690,9 @@ func travel(i: int) -> void:
 
 const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 256분 / 목표 300분 (85%)",
+	"",
+	"2026-10-24 새벽",
+	"· v0.0.12: 멀리 보기(Z X, 휠)로 카메라를 물리면 땅이 뿌옇게 덮이던 안개를 약하게 했다. 안개가 카메라 거리만큼 뒤로 물러난다.",
 	"",
 	"2026-10-23 저녁",
 	"· v0.0.11: 멀리서 깨지던 한글 간판을 그림으로 바꿨다(상점 물약병, 마을 표지판 등불과 화살표, 가판대 사과, 초승달, 찻잔, 여관 침대). 가판대와 여관 앞에 서면 무엇을 얼마에 파는지 알려 준다.",
@@ -9124,6 +9130,11 @@ func _process(dt: float) -> void:
 	camera.position = target + Vector3(sin(cam_yaw) * cos(pitch) * cam_dist + rnd(-1, 1) * shake * 0.4 * (1.0 if cfg.shake else 0.0),
 		sin(pitch) * cam_dist + rnd(-1, 1) * shake * 0.4 * (1.0 if cfg.shake else 0.0), cos(cam_yaw) * cos(pitch) * cam_dist)
 	camera.look_at(target)
+	# the haze starts past the ground Sora stands on, however far the camera pulls back: at the default 18 it is as
+	# before (18 -> 46), zoomed out to 26 it starts at 26 instead of hiding most of the ground (the user, 2026-10-23)
+	if env != null:
+		env.fog_depth_begin = cam_dist
+		env.fog_depth_end = cam_dist + 28.0 + maxf(0.0, cam_dist - 18.0) * 2.0
 	sun.global_transform = Transform3D(Basis(), target + Vector3(-12, 10 + sun_el * 14, -8)).looking_at(target)
 	motes.position = target
 	rain.position = target + Vector3(0, 8, 0)
