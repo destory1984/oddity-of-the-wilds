@@ -2818,6 +2818,7 @@ const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 285분 / 목표 300분 (95%)",
 	"",
 	"2026-10-24 아침",
+	"· v0.0.27: 왼쪽 아래 단추 넷(조작법, 소리, 일지, 설정)을 오른쪽 기술 단추와 같은 금빛 마름모로 바꿨다. GPT가 그린 시안 다섯 가운데 4번(겹금테에 금빛 선 그림)이다. 단추는 56 → 64 px이고 8 px 간격은 그대로다.",
 	"· v0.0.26: 동굴 밖에서 저장하고 다시 켜면 동굴에 내려갈 때마다 노을을 처음 만나는 벽화 장면이 다시 뜨던 잘못을 고쳤다. 열쇠와 연 문이 잊히던 것도 함께 고쳤다.",
 	"· v0.0.25: 미니맵의 계단 표시를 네모에서 작은 계단 그림(세 단)으로 바꿨다. 올라가는 곳은 금빛, 내려가는 곳은 보라이고, 카메라를 돌려도 똑바로 선다.",
 	"· v0.0.24: 설정 창의 네 쪽 이름을 Settings, Help, Changes, About으로 바꿨다. 어느 언어에서도 영어로 보인다.",
@@ -3052,7 +3053,7 @@ func layout_help() -> void:
 		(ui.help_rows[i][1] as Label).position = Vector2(14 + kw + 24, 60 + i * step)
 	var w: float = maxf(340.0, 14 + kw + 24 + dw + 22)
 	var h: float = 60 + ui.help_rows.size() * step + 18
-	place(ui.help, Control.PRESET_BOTTOM_LEFT, Vector2(8, -72 - h), Vector2(w, h)) # 8 px over the keys
+	place(ui.help, Control.PRESET_BOTTOM_LEFT, Vector2(8, -80 - h), Vector2(w, h)) # 8 px over the keys
 
 # the settings pages stack their rows by the height the text wraps to, so a longer line or a bigger text size
 # pushes the button and the next row down instead of running into them (waits a frame for the wrap)
@@ -3561,24 +3562,25 @@ func update_mate_hud() -> void:
 		else:
 			r.act.text = tr("싸우는 중") if fighting else tr("따라가는 중")
 
-# ---- the bottom-left buttons: Space Oddity's 44 px glass squares with its line icons; the key is in the tooltip
+# ---- the bottom-left buttons: gold diamond keys in the skills' family (draft 4 of five, double gold rim with a thin
+# line symbol, the user's pick 2026-10-24), 64 px, 8 px apart and 8 px from the edges; the key is in the tooltip
+func key_tex(kind: String) -> Texture2D:
+	return load("res://art/ui/key_%s.png" % kind)
+
 func icon_button(root: Control, kind: String, key: String, tip: String, x: float, fn: Callable) -> Button:
 	var b := Button.new()
-	b.icon = odd_icon(kind)
+	b.icon = key_tex(kind)
 	b.expand_icon = true
 	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	b.tooltip_text = tr(tip) + " (" + key + ")"
 	b.focus_mode = Control.FOCUS_NONE
 	b.theme = get_menu_theme()
-	for st in ["normal", "hover", "pressed"]:
-		var sb: StyleBoxFlat = glass_hover() if st != "normal" else glass_normal()
-		sb.content_margin_left = 14
-		sb.content_margin_right = 14
-		sb.content_margin_top = 14
-		sb.content_margin_bottom = 14
-		sb.set_corner_radius_all(12)
-		b.add_theme_stylebox_override(st, sb)
-	place(b, Control.PRESET_BOTTOM_LEFT, Vector2(x, -64), Vector2(56, 56)) # 8 px from the bottom, as Space Oddity
+	for st in ["normal", "hover", "pressed", "focus"]:
+		b.add_theme_stylebox_override(st, StyleBoxEmpty.new())
+	b.add_theme_color_override("icon_normal_color", Color(0.9, 0.9, 0.9))
+	b.add_theme_color_override("icon_hover_color", Color.WHITE)
+	b.add_theme_color_override("icon_pressed_color", Color(0.75, 0.75, 0.75))
+	place(b, Control.PRESET_BOTTOM_LEFT, Vector2(x, -72), Vector2(64, 64))
 	b.pressed.connect(fn)
 	root.add_child(b)
 	return b
@@ -4851,7 +4853,7 @@ func build_hud() -> void:
 	ui.gold = label(gold, "◆ 0", Vector2(10, 4), 14, Color("#ffd84a"))
 
 	# controls help, starts hidden; H or the button toggles it
-	var help := menu_panel(root, Vector2(8, -559), Vector2(340, 487), Control.PRESET_BOTTOM_LEFT) # ends 8 px above the buttons
+	var help := menu_panel(root, Vector2(8, -567), Vector2(340, 487), Control.PRESET_BOTTOM_LEFT) # ends 8 px above the buttons
 	help.mouse_filter = Control.MOUSE_FILTER_STOP
 	label(help, "조작법", Vector2(62, 20), 13, Color("#a99d84"))
 	var rows := [["WASD / 방향키", "이동"], ["Shift", "달리기"], ["J / 왼쪽 클릭", "공격 (연속기)"], ["K / 오른쪽 클릭", "구르기 (때맞추면 섬광)"], ["L / 가운데 클릭", "막기 (때맞추면 반격, Lv4부터 1초 모아 J)"],
@@ -4867,7 +4869,7 @@ func build_hud() -> void:
 	help.visible = false
 	ui.help = help
 	# the journal (Q): what to do now, the side stories found so far and the keepsakes Sora carries
-	var journal := menu_panel(root, Vector2(8, -639), Vector2(800, 567), Control.PRESET_BOTTOM_LEFT)
+	var journal := menu_panel(root, Vector2(8, -647), Vector2(800, 567), Control.PRESET_BOTTOM_LEFT)
 	journal.mouse_filter = Control.MOUSE_FILTER_STOP
 	label(journal, "일지", Vector2(62, 20), 14, Color("#a99d84"))
 	menu_rule(journal, Vector2(14, 60), 772)
@@ -4876,18 +4878,18 @@ func build_hud() -> void:
 	back_key(journal, func(): toggle_journal(false))
 	journal.visible = false
 	ui.journal = journal
-	var ways := menu_panel(root, Vector2(8, -292), Vector2(330, 220), Control.PRESET_BOTTOM_LEFT)
+	var ways := menu_panel(root, Vector2(8, -300), Vector2(330, 220), Control.PRESET_BOTTOM_LEFT)
 	var wt := label(ways, "", Vector2(16, 12), 15, Color("#e9dfc4"))
 	wt.size = Vector2(300, 200)
 	wt.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 	ui.ways_text = wt
 	ways.visible = false
 	ui.ways = ways
-	ui.hint = icon_button(root, "help", "H", "조작법", 8, func(): toggle_help(true)) # 56 px keys 8 px apart and 8 px from the edge
-	ui.sound_btn = icon_button(root, "sound", "M", "효과음", 72, toggle_sound)
+	ui.hint = icon_button(root, "help", "H", "조작법", 8, func(): toggle_help(true)) # 64 px keys 8 px apart and 8 px from the edge
+	ui.sound_btn = icon_button(root, "sound", "M", "효과음", 80, toggle_sound)
 	refresh_sound_btn()
-	ui.journal_btn = icon_button(root, "journal", "Q", "일지", 136, func(): toggle_journal(not ui.journal.visible))
-	ui.settings_btn = icon_button(root, "gear", "Esc", "설정", 200, func(): toggle_settings(not settings_open))
+	ui.journal_btn = icon_button(root, "journal", "Q", "일지", 152, func(): toggle_journal(not ui.journal.visible))
+	ui.settings_btn = icon_button(root, "gear", "Esc", "설정", 224, func(): toggle_settings(not settings_open))
 	build_settings(root)
 
 	ui.toast = label(root, "", Vector2(0, 0), 20)
@@ -9609,7 +9611,7 @@ func hush() -> void:
 	say_bubble(node, tr("쉬잇~"), 3.0)
 
 func refresh_sound_btn() -> void:
-	ui.sound_btn.icon = odd_icon("mute" if muted else "sound")
+	ui.sound_btn.icon = key_tex("mute" if muted else "sound")
 	ui.sound_btn.modulate = Color(1, 1, 1, 0.6) if muted else Color.WHITE # .soundKeys button.off { opacity:.6 }
 	if ui.has("set_sound"):
 		ui.set_sound.icon = odd_icon("mute" if muted else "sound")
