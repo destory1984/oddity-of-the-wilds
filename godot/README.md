@@ -17,7 +17,7 @@ Godot_v4.7.2-stable_win64.exe --path .
 
 | 인자 | 하는 일 |
 |---|---|
-| `--scene=이름` | 정해 둔 장면으로 바로 간다 (start, village, forest, hill, turtle, mold, crab, cloud, knight, shrine, wolves, trial, cage, race, moonflower, house, festival, cloudpath 등 43개) |
+| `--scene=이름` | 정해 둔 장면으로 바로 간다 (start, village, forest, hill, turtle, mold, crab, cloud, knight, shrine, wolves, trial, cage, race, moonflower, house, festival, cloudpath, ways 등 44개) |
 | `--shot=파일.png` | 장면을 띄우고 몇 초 뒤 화면을 저장하고 끝난다 |
 | `--hour=22` | 시각을 정한다 |
 | `--pseudo` | 번역 표를 거친 글을 [대괄호]로 감싼다 |
@@ -44,7 +44,7 @@ Godot_v4.7.2-stable_win64.exe --path .
 | `i18n/text.csv` | 번역 표. 화면 글 약 640줄. 지금은 한국어 칸만 채웠다 |
 | `art/` | 소라 걷기와 쉬는 몸짓, 주민과 노을의 픽셀 그림, 초상화, 이야기 삽화 12장, 제목 그림 |
 | `tools/dev.py` | 검사, 화면 찍기, 자동 시험, 웹 내보내기, 배포를 한 번에 하는 도구 |
-| `tools/autoplay.gd` | 자동 시험 86개. 처음 깨어나기부터 끝 장면까지 따라간다 |
+| `tools/autoplay.gd` | 자동 시험 87개. 처음 깨어나기부터 끝 장면까지 따라간다 |
 
 ## 개발 도구
 
@@ -61,7 +61,7 @@ python tools/dev.py shot village
 ```
 
 - `check`: 스크립트 오류와 번역 표가 코드와 맞는지 본다.
-- `test`: 자동 시험 86개를 돌린다. 약 6분 걸린다.
+- `test`: 자동 시험 87개를 돌린다. 약 6분 걸린다.
 - `shot`: 장면 하나를 찍어 `shots/` 에 저장한다.
 - 한국어 글을 넣거나 고치면 `python tools/i18n.py` 로 번역 표를 다시 만든다.
 
