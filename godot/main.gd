@@ -1651,11 +1651,12 @@ func spawn_trial_wave() -> void:
 	var c: Vector2 = village.marks.R
 	var list: Array = TRIAL_WAVES[trial_wave - 1]
 	for i in list.size():
-		var at := c
-		for tries in 20:
-			var a := TAU * (i + rnd(0, 0.5)) / list.size()
-			at = c + Vector2(cos(a), sin(a)) * rnd(4.0, 5.5)
-			if walkable(at.x, at.y):
+		var at := c + Vector2(1.5, 0)
+		for tries in 30:
+			var a := rnd(0, TAU)
+			var cand := c + Vector2(cos(a), sin(a)) * rnd(4.0, 5.5)
+			if walkable(cand.x, cand.y):
+				at = cand
 				break
 		var kind: String = list[i]
 		if kind == "w":
@@ -1670,7 +1671,7 @@ func spawn_trial_wave() -> void:
 		if kind == "W":
 			e.hp = 300.0 + player.lv * 30
 			e.max_hp = int(e.hp)
-			e.node.scale = Vector3.ONE * 2.2
+			e.size_k = 1.7 # update_enemies sets the scale every frame, so the warden's size goes through this
 			var mats: Array = e.node.get_meta("mats")
 			mats[2].albedo_color = Color("#6a6a78")
 			mats[5].albedo_color = Color("#dfe8ff")
@@ -2258,11 +2259,11 @@ var way_nodes: Array = []
 func way_spot(i: int) -> Vector2:
 	match i:
 		0: return Vector2(shop_pos.x + 2.5, shop_pos.z + 1.5)
-		1: return village.marks.M + Vector2(2.0, -2.0)
-		2: return lake.marks.P + Vector2(2.0, -1.5)
+		1: return village.marks.M + Vector2(3.0, -2.5)
+		2: return lake.marks.P + Vector2(4.0, -1.5)
 		3: return forest.marks.S + Vector2(2.5, -1.5)
 		4: return hill.marks.S + Vector2(2.0, -1.5)
-		5: return castle.marks.S + Vector2(2.5, -1.5)
+		5: return castle.marks.S + Vector2(2.5, 1.5)
 	return Vector2.ZERO
 
 func way_known(i: int) -> bool:
@@ -2323,6 +2324,10 @@ func travel(i: int) -> void:
 	sfx(988, 0.4, "sine", 0.2, -300)
 	fade_then(func():
 		gust_dir = Vector2.ZERO
+		if lake_q == 3: # left the turtle fight: it starts over from the pier
+			lake_q = 2
+			if lake_npc != null:
+				lake_npc.visible = true
 		in_cave = false
 		in_village = false
 		in_forest = false
@@ -3736,6 +3741,7 @@ func load_game() -> void:
 	if forest_q >= 3:
 		join_noeul()
 	lake_q = int(d.get("lake_q", 0))
+	var turtle_cut := lake_q == 3
 	if lake_q == 3:
 		lake_q = 2 # the turtle fight starts over from the pier
 	if lake_q >= 2:
@@ -3807,6 +3813,9 @@ func load_game() -> void:
 			enter_grotto()
 		player.x = lx
 		player.z = lz
+		if turtle_cut: # saved on the island mid-fight: back to the pier, where Mulgyeol rows again
+			player.x = lake.marks.P.x
+			player.z = lake.marks.P.y - 1.0
 		snap_mate()
 	cloud_q = int(d.get("cloud_q", 0))
 	if cloud_q == 2:
@@ -3853,6 +3862,10 @@ func load_game() -> void:
 	has_tea = bool(d.get("has_tea", false))
 	for k in ["has_pearl", "has_feather", "has_acorn", "has_ring", "has_shoes", "has_armour", "has_tea", "has_shard"]:
 		set(k, bool(d.get(k, get(k))))
+	if bool(d.get("has_armour", false)) and not castle.vault_open: # a new round keeps the armour: the treasury stays empty
+		castle.open_vault_look()
+	if bool(d.get("has_ring", false)):
+		crystal_done = true
 	var fk: Array = d.get("fish", [])
 	for i in mini(fk.size(), fish_kinds.size()):
 		fish_kinds[i] = bool(fk[i])
@@ -3949,9 +3962,17 @@ func load_game() -> void:
 # keep level, gold and story, but put Sora back at the starting crossing (F8)
 func return_to_start() -> void:
 	cam_yaw = CAM_YAW
-	if in_cave and ui.has("outside_map"):
+	if not in_marsh() and ui.has("outside_map"):
 		ui.mini.map_tex = ui.outside_map
 	in_cave = false
+	in_village = false
+	in_forest = false
+	in_lake = false
+	in_hill = false
+	in_garden = false
+	in_house = -1
+	gust_dir = Vector2.ZERO
+	ui.boss.visible = false
 	player.x = START.x
 	player.z = START.y
 	ground_y = height_at(START.x, START.y)
@@ -4517,7 +4538,7 @@ func start_night() -> void:
 # Noeul keeps a few steps ahead of Sora along the path; at the last point he turns and she falls
 func update_night(dt: float) -> void:
 	var night_now := hour >= 19.0 or hour < 5.0
-	if in_village and night_q == 0 and mul_q == 3 and night_now and not story_open and fade_rect.color.a == 0.0:
+	if in_village and in_house < 0 and night_q == 0 and mul_q == 3 and night_now and not story_open and fade_rect.color.a == 0.0:
 		start_night()
 	if night_q != 1 or noeul_node == null or story_open:
 		return
@@ -5957,6 +5978,11 @@ func enter_garden() -> void:
 	save_game()
 
 func leave_garden() -> void:
+	if not castle.door_open: # a save from before the castle: open the way back west
+		for pg in castle.pages:
+			pg.read = true
+		castle.open_door()
+		castle.open_gate()
 	in_garden = false
 	in_hill = true
 	player.x = castle.marks.E.x - 1.2
@@ -6048,7 +6074,7 @@ func update_mold(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
 		e.atk_cd -= dt
 		if e.atk_cd <= 0.0:
 			e.next = int(e.next) + 1
-			if int(e.next) % 3 == 0 and enemies.filter(func(g): return not g.dead and g.x > GARDEN.GARDEN_X and not g.get("mold", false)).size() < 4:
+			if int(e.next) % 3 == 0 and enemies.filter(func(g): return not g.dead and in_garden_x(g.x) and not g.get("mold", false)).size() < 4:
 				for k in 2: # wakes two goblins at the arena's edge
 					var a := rnd(0, TAU)
 					spawn_enemy(garden.marks.C + Vector2(cos(a), sin(a)) * 7.0)
@@ -6100,13 +6126,16 @@ func update_mold_wave(dt: float) -> void:
 		ring.queue_free()
 		mold_wave = {}
 
+func in_garden_x(x: float) -> bool:
+	return x >= GARDEN.GARDEN_X - 0.5 and x < GARDEN.GARDEN_X + GARDEN.W
+
 func mold_locks(e: Dictionary) -> void:
 	e.locked = true
 	garden_q = 3
 	crown_pips = 0
 	pip_flash = 0.5
 	for g in enemies:
-		if not g.dead and g.x > GARDEN.GARDEN_X and not g.get("mold", false):
+		if not g.dead and in_garden_x(g.x) and not g.get("mold", false):
 			g.dead = true
 			g.node.visible = false
 			g.shadow.visible = false
@@ -7328,7 +7357,7 @@ func update_enemies(dt: float, gy: float) -> void:
 		if ev.length() > 0.1:
 			node.rotation.y = atan2(ev.x, ev.y)
 		var wind_now: bool = e.get("wind", 0.0) > 0.0
-		node.scale = Vector3.ONE * (1.3 * (1.15 if wind_now else 1.0))
+		node.scale = Vector3.ONE * (1.3 * e.get("size_k", 1.0) * (1.15 if wind_now else 1.0))
 		for m in node.get_meta("mats"):
 			m.emission_enabled = e.hurt > 0 or wind_now
 			m.emission = Color("#ff3a2a") if wind_now and e.hurt <= 0 else Color.WHITE

@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -1253,6 +1253,13 @@ func run() -> void:
 		main.hour = 22.0
 		main.story_step = maxi(main.story_step, 10)
 		var cx: float = main.CASTLE.CASTLE_X
+		main.castle.gate_open = false # an earlier test may have walked out of the garden, which opens the way west
+		for n in main.castle.gate_nodes:
+			n.visible = true
+		main.castle.door_open = false
+		main.castle.door.visible = true
+		for pg in main.castle.pages:
+			pg.read = false
 		reset_to(main.hill.marks.X + Vector2(-0.3, 0))
 		await wait(1.0)
 		var entered: bool = main.in_castle() and main.castle_q == 1
@@ -1965,6 +1972,27 @@ func run() -> void:
 		var home: bool = not main.in_lake and main.in_marsh() and Vector2(main.player.x, main.player.z).distance_to(main.way_spot(0)) < 2.0
 		calm_enemies(false)
 		check("waystones", ok_spots and opened and at_lake and home, "stones reachable=%s list opens=%s marsh -> lake=%s lake -> marsh=%s" % [ok_spots, opened, at_lake, home])
+	if want.call("stuck_fixes"):
+		# an old save: garden reached, castle never seen; leaving the garden must open the way west
+		main.castle.door_open = false
+		main.castle.door.visible = true
+		main.in_village = false
+		main.in_hill = false
+		main.in_garden = true
+		main.leave_garden()
+		var west: bool = main.castle.door_open and main.player_can(main.CASTLE.CASTLE_X + 31, 13)
+		# F8 inside the castle: every zone flag goes, so the marsh works again
+		main.return_to_start()
+		var marsh_ok: bool = main.in_marsh() and not main.in_hill and main.in_house == -1
+		# a save made on the island mid-turtle-fight loads at the pier
+		var f := FileAccess.open(main.SAVE_PATH, FileAccess.WRITE)
+		var isl: Vector2 = main.lake.marks.T + Vector2(2, 0)
+		f.store_string(JSON.stringify({"story": 10, "night_q": 4, "lake_q": 3, "in_lake": true, "x": isl.x, "z": isl.y}))
+		f.close()
+		main.load_game()
+		var pier: bool = main.lake_q == 2 and Vector2(main.player.x, main.player.z).distance_to(main.lake.marks.P) < 2.0
+		main.return_to_start()
+		check("stuck_fixes", west and marsh_ok and pier, "old save leaves the garden westward=%s F8 clears zones=%s turtle-fight save loads at the pier=%s" % [west, marsh_ok, pier])
 	calm_enemies(false)
 	var failed := results.count(false)
 	print("TESTS %d passed, %d failed" % [results.size() - failed, failed])
