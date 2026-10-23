@@ -116,6 +116,10 @@ func build(m: Node) -> void:
 	var wet: Material = m.glow_mat(Color("#2f78b8"), 0.6)
 	wet.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
 	wet.blend_mode = BaseMaterial3D.BLEND_MODE_MIX
+	# the broken drop has a dark floor far below, so in daylight it reads as a fall and not as more floor
+	var deep: MeshInstance3D = m.box(Vector3(20.0, 0.1, 16.0), m.mat_color(Color("#16121e")))
+	deep.position = Vector3(STAIRS_X + 11.5, -2.6, 3.0) # wide to the north: the camera looks down through the gap at a slant
+	m.add_child(deep)
 	var face: MeshInstance3D = m.box(Vector3(18.0, 0.02, 3.0), wet)
 	face.position = Vector3(STAIRS_X + 11.5, -0.3, 17)
 	m.add_child(face)

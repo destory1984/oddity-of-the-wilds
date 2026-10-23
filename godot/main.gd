@@ -365,6 +365,9 @@ const SCENES := {
 	"fall": {"play": true, "fall": 2.5, "at": Vector2(20, 22)},
 	"chat": {"play": true, "chat": true, "at": Vector2(20, 22), "hour": 13.0},
 	"stairs": {"play": true, "village": true, "castle": true, "stairs": true, "hour": 16.0},
+	"stairs_foot": {"play": true, "village": true, "castle": true, "stairs": true, "stairs_at": 0, "hour": 16.0},
+	"stairs_drop": {"play": true, "village": true, "castle": true, "stairs": true, "stairs_at": 2, "hour": 16.0},
+	"stairs_top": {"play": true, "village": true, "castle": true, "stairs": true, "stairs_at": 3, "hour": 16.0},
 	"scrap": {"play": true, "at": Vector2(42.5, 5.5), "hour": 17.0},
 }
 
@@ -548,10 +551,13 @@ func apply_test_args(args: PackedStringArray) -> void:
 				castle_q = 3
 				enter_stairs()
 				close_story()
-				stairs.open_wall()
-				set_quest(stairs_quest())
+				# stairs_at picks the landing to stand on: 0 the foot (wall shut), 1 the channel, 2 the drop, 3 the top
+				var land: int = int(sc.get("stairs_at", 1))
+				if land >= 1:
+					stairs.open_wall()
 				player.x = STAIRS.STAIRS_X + 9.0
-				player.z = 20.5
+				player.z = [26.5, 20.5, 12.5, 4.5][land]
+				set_quest(stairs_quest())
 			snap_mates()
 		if sc.get("trial", false): # the moon trial's third wave, wolves around the stone ring
 			night_q = 4
