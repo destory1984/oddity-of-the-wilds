@@ -377,6 +377,8 @@ const SCENES := {
 	"ways": {"play": true, "ways": true, "hour": 16.0},
 	"walk_dr": {"play": true, "walk_dr": true, "at": Vector2(12, 14), "hour": 12.0},
 	"settings": {"play": true, "settings": true},
+	"controls_big": {"play": true, "controls": true, "text": 3},
+	"settings_big": {"play": true, "settings": true, "text": 3},
 	"hush": {"play": true, "village": true, "hush": true, "hour": 14.0},
 	"east": {"play": true, "at": Vector2(42.0, 21.5), "hour": 12.0},
 	"fall": {"play": true, "fall": 2.5, "at": Vector2(20, 22)},
@@ -687,6 +689,11 @@ func apply_test_args(args: PackedStringArray) -> void:
 	if sc.get("walk_dr", false): # walking toward the bottom right of the screen (5 o'clock)
 		fake_keys[KEY_S] = true
 		fake_keys[KEY_D] = true
+	if sc.has("text"): # a text size step (0 - 3)
+		cfg.text = int(sc.text)
+		apply_settings()
+	if sc.get("controls", false):
+		toggle_help(true)
 	if sc.get("settings", false):
 		toggle_settings(true)
 	if sc.get("hush", false): # the sound switched off: a finger to her lips, held for the picture
@@ -2623,6 +2630,7 @@ const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 256분 / 목표 300분 (85%)",
 	"",
 	"2026-10-23 저녁",
+	"· v0.0.4: 설정 창 글자를 13 → 16px, 단추 글자를 13 → 15px로 키웠다. 긴 설명은 줄을 바꾸고, 글자를 키워 넘치면 굴려 본다. 조작법 창(H)이 글자 크기에 맞춰 넓어진다.",
 	"· v0.0.3: 소리를 끄면 소라가 손가락을 입에 대고 \"쉬잇~\" 한다. 우주 한량의 그림을 가져왔다.",
 	"· v0.0.2: 5장 숲 남쪽 잠든 골짜기(약 12분). 노을이 동료가 된 뒤 빈터 남쪽 회색 문으로 내려간다. 개울을 물수제비로 건너고, 기억 등불 셋으로 노을의 옛 기억을 찾고, 빈 망토(체력 1000)와 싸우고, 그림 문 셋 가운데 해 지는 그림 문에서 한결의 편지와 열셋째 등불을 찾는다. 심지에게 건네면 최대 체력 +15, 금화 150, 노을의 공격 간격 1.4 → 1.1초. 새 괴물 벽돌 고슴도치: 몸을 말면 모든 공격을 막고, 가시를 터뜨린 뒤 1.4초 어지러워 피해를 1.3배 받는다.",
 	"· v0.0.1: 설정 창 제목 아래에 버전과 날짜를 작게 띄운다. 기능을 하나 더할 때마다 끝 숫자가 1씩 오른다. 넷째 칸 이름을 만든 이 → About으로 바꿨다.",
@@ -2801,6 +2809,10 @@ func apply_settings() -> void:
 		var c: Control = tb[0]
 		c.add_theme_font_size_override("normal_font_size" if c is RichTextLabel else "font_size", int(round(tb[1] * k)))
 	refresh_sound_btn()
+	if ui.has("help_rows"):
+		layout_help()
+	if ui.has("set_stacks"):
+		layout_settings()
 	if ui.has("set_rows"):
 		for key in ui.set_rows:
 			var b: Button = ui.set_rows[key]
@@ -2812,6 +2824,54 @@ func apply_settings() -> void:
 		ui.set_minus.disabled = int(cfg.text) <= 0
 		ui.set_plus.disabled = int(cfg.text) >= TEXT_SIZES.size() - 1
 
+# the controls sheet grows with the text size: the key column is as wide as its longest key, the sheet as wide
+# as its longest line (the user, 2026-10-23: at a bigger size the lines ran out past the sheet's edge)
+func layout_help() -> void:
+	var k: float = TEXT_SIZES[int(cfg.text)]
+	var kw := 0.0
+	var dw := 0.0
+	for r in ui.help_rows:
+		kw = maxf(kw, (r[0] as Label).get_minimum_size().x)
+		dw = maxf(dw, (r[1] as Label).get_minimum_size().x)
+	var step := 27.0 * k
+	for i in ui.help_rows.size():
+		(ui.help_rows[i][0] as Label).position = Vector2(14, 60 + i * step + 1)
+		(ui.help_rows[i][1] as Label).position = Vector2(14 + kw + 24, 60 + i * step)
+	var w: float = maxf(340.0, 14 + kw + 24 + dw + 22)
+	var h: float = 60 + ui.help_rows.size() * step + 18
+	place(ui.help, Control.PRESET_BOTTOM_LEFT, Vector2(14, -83 - h), Vector2(w, h))
+
+# the settings pages stack their rows by the height the text wraps to, so a longer line or a bigger text size
+# pushes the button and the next row down instead of running into them (waits a frame for the wrap)
+func layout_settings() -> void:
+	await get_tree().process_frame
+	for k in ui.set_stacks.size():
+		var stack: Array = ui.set_stacks[k]
+		if stack.is_empty():
+			continue
+		var x := 122.0 # the text column starts past the widest title
+		for row in stack:
+			x = maxf(x, (row[0] as Label).get_minimum_size().x + 16.0)
+		for row in stack:
+			var box := (row[1] as Label).get_parent() as Control
+			box.position.x = x
+			box.size.x = 626.0 - x
+			if row[2] != null:
+				(row[2] as Control).position.x = x
+		await get_tree().process_frame # the text wraps again at its new width
+		var y := 0.0
+		for row in stack:
+			var title: Label = row[0]
+			var text: Label = row[1]
+			title.position.y = y
+			(text.get_parent() as Control).position.y = y
+			var h: float = maxf(title.size.y, text.size.y)
+			if row[2] != null:
+				(row[2] as Control).position.y = y + h + 6.0
+				h += 6.0 + 34.0
+			y += h + (18.0 if row[2] != null else 14.0)
+		ui.set_pages[k].custom_minimum_size.y = maxf(400.0, y)
+
 func scale_text(l: Control) -> void:
 	text_bases.append([l, l.get_theme_font_size("normal_font_size" if l is RichTextLabel else "font_size")])
 
@@ -2819,7 +2879,7 @@ func set_button(parent: Control, text: String, pos: Vector2, size: Vector2, fn: 
 	var b := Button.new()
 	b.text = text
 	b.add_theme_font_override("font", ui_font)
-	b.add_theme_font_size_override("font_size", 13)
+	b.add_theme_font_size_override("font_size", 15)
 	b.position = pos
 	b.size = size
 	b.focus_mode = Control.FOCUS_NONE
@@ -2869,7 +2929,7 @@ func build_settings(root: Control) -> void:
 	var h1 := label(col, "설정", Vector2(48, 2), 24, ODD_INK)
 	h1.size = Vector2(300, 40)
 	# the version and the day it shipped, small under the title as in Space Oddity (dev.py ship raises it by one per feature)
-	var ver := label(col, version_text(), Vector2(48, 36), 11, Color(ODD_MUTED, 0.6))
+	var ver := label(col, version_text(), Vector2(48, 36), 12, Color(ODD_MUTED, 0.6))
 	ver.size = Vector2(300, 16)
 	ui.set_sound = Button.new()
 	ui.set_sound.icon = odd_icon("sound")
@@ -2889,14 +2949,19 @@ func build_settings(root: Control) -> void:
 	for i in tabs.size():
 		var tb := set_button(col, tabs[i], Vector2(i * (tw + 8), 54), Vector2(tw, 38), func(): show_set_tab(i))
 		ui.set_tabs.append(tb)
+		var holder := ScrollContainer.new() # a page taller than the sheet (big text) scrolls
+		holder.position = Vector2(0, 106)
+		holder.size = Vector2(640, 400)
+		holder.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		col.add_child(holder)
 		var page := Control.new()
-		page.position = Vector2(0, 106)
-		page.size = Vector2(640, 400)
+		page.custom_minimum_size = Vector2(626, 400)
 		page.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		col.add_child(page)
+		holder.add_child(page)
 		ui.set_pages.append(page)
 	# 설정: rows of label (90 px) and description with a small button under it
 	ui.set_rows = {}
+	ui.set_stacks = [[], [], [], []] # per page: [title, wrapped text, button or null], laid out top to bottom by height
 	var rows := [["shake", "화면 흔들림", "벨 때와 보스가 내려찍을 때 화면이 흔들린다. 어지러우면 끄세요."],
 		["tilt", "미니어처 흐림", "화면 위아래를 흐리게 하고 색을 입혀 작은 정원처럼 보이게 한다. 흐린 게 불편하면 끄세요."],
 		["nums", "피해 숫자", "때리고 맞을 때 숫자를 띄운다. 공격 직전의 \"!\" 표시는 늘 보인다."],
@@ -2904,42 +2969,44 @@ func build_settings(root: Control) -> void:
 	for i in rows.size():
 		var r: Array = rows[i]
 		var y := i * 92
-		var t := label(ui.set_pages[0], r[1], Vector2(0, y), 13, Color("#eef3ff"))
+		var t := label(ui.set_pages[0], r[1], Vector2(0, y), 16, Color("#eef3ff"))
 		t.add_theme_font_override("font", ui_font)
-		t.size = Vector2(90, 20)
-		var dsc := label(ui.set_pages[0], r[2], Vector2(106, y), 13, ODD_MUTED)
-		dsc.size = Vector2(534, 36)
-		dsc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		t.size = Vector2(112, 20)
+		var dsc := wrap_label(ui.set_pages[0], r[2], Vector2(122, y), 518, 16, ODD_MUTED)
 		scale_text(dsc)
+		scale_text(t)
 		var key: String = r[0]
-		ui.set_rows[key] = set_button(ui.set_pages[0], "켜짐", Vector2(106, y + 42), Vector2(74, 34), func():
+		ui.set_rows[key] = set_button(ui.set_pages[0], "켜짐", Vector2(122, y + 42), Vector2(74, 34), func():
 			if key == "sound":
 				toggle_sound()
 			else:
 				cfg[key] = not bool(cfg[key])
 			save_settings()
 			apply_settings())
-	var lt := label(ui.set_pages[0], "언어", Vector2(0, 4 * 92), 13, Color("#eef3ff"))
-	lt.size = Vector2(90, 20)
-	var lang := label(ui.set_pages[0], "한국어. 영어, 일본어, 중국어는 번역 표만 준비되어 있다.", Vector2(106, 4 * 92), 13, ODD_MUTED)
-	lang.size = Vector2(534, 20)
+		ui.set_stacks[0].append([t, dsc, ui.set_rows[key]])
+	var lt := label(ui.set_pages[0], "언어", Vector2(0, 4 * 92), 16, Color("#eef3ff"))
+	lt.size = Vector2(112, 20)
+	var lang := wrap_label(ui.set_pages[0], "한국어. 영어, 일본어, 중국어는 번역 표만 준비되어 있다.", Vector2(122, 4 * 92), 518, 16, ODD_MUTED)
+	scale_text(lt)
+	scale_text(lang)
+	ui.set_stacks[0].append([lt, lang, null])
 	# 도움말
 	var help_rows := [["이동", "WASD, 방향키. Shift로 달린다 (물수제비 걸음을 얻으면 물 위도)"], ["싸움", "J 또는 왼쪽 클릭 베기, K 또는 오른쪽 클릭 구르기, L 막기"],
 		["기술", "U I O 또는 1 2 3, 회복약은 4"], ["왕관", "E: 말 걸기, 등불, 벽돌 풀기, 길돌, 낚시"], ["열기", "Space: 상자, 집. Q 일지, H 조작법, M 소리, T 3시간 보내기"],
 		["화면", "Z X 또는 휠로 확대·축소. F8 처음 자리로, F9 처음부터. Esc 이 창"], ["요령", "맞기 직전에 구르면 섬광 피하기, 막으면 섬광 막기. 괴물은 때리기 전에 빨갛게 부풀고 \"!\"가 뜬다"]]
 	for i in help_rows.size():
-		var ht := label(ui.set_pages[1], help_rows[i][0], Vector2(0, i * 48), 13, Color("#eef3ff"))
-		ht.size = Vector2(90, 20)
-		var hd := label(ui.set_pages[1], help_rows[i][1], Vector2(106, i * 48), 13, ODD_MUTED)
-		hd.size = Vector2(534, 40)
-		hd.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		var ht := label(ui.set_pages[1], help_rows[i][0], Vector2(0, i * 48), 16, Color("#eef3ff"))
+		ht.size = Vector2(112, 20)
+		var hd := wrap_label(ui.set_pages[1], help_rows[i][1], Vector2(122, i * 48), 518, 16, ODD_MUTED)
 		scale_text(hd)
+		scale_text(ht)
+		ui.set_stacks[1].append([ht, hd, null])
 	# 바뀐 것
 	var scroll := ScrollContainer.new() # the list grows with every ship: it scrolls
 	scroll.size = Vector2(640, 396)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	ui.set_pages[2].add_child(scroll)
-	var news := label(scroll, "\n".join(CHANGES), Vector2(0, 0), 13, ODD_MUTED)
+	var news := label(scroll, "\n".join(CHANGES), Vector2(0, 0), 16, ODD_MUTED)
 	news.custom_minimum_size = Vector2(620, 0)
 	news.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	scale_text(news)
@@ -2947,15 +3014,13 @@ func build_settings(root: Control) -> void:
 	var about_rows := [["만든 사람", "destory1984 (기획, 그림 주문), Claude (코드)"], ["그림", "GPT 이미지 생성. 소라의 쉬는 몸짓과 이 창의 모양은 같은 작가의 우주 한량에서 가져왔다"],
 		["글꼴", "Pretendard (SIL 오픈 폰트 라이선스 1.1)"], ["라이선스", "코드는 MIT. 소라 캐릭터와 제목 그림은 destory1984의 것이다"]]
 	for i in about_rows.size():
-		var at := label(ui.set_pages[3], about_rows[i][0], Vector2(0, i * 48), 13, Color("#eef3ff"))
-		at.size = Vector2(90, 20)
-		var ad := label(ui.set_pages[3], about_rows[i][1], Vector2(106, i * 48), 13, ODD_MUTED)
-		ad.size = Vector2(534, 40)
-		ad.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		var at := label(ui.set_pages[3], about_rows[i][0], Vector2(0, i * 48), 16, Color("#eef3ff"))
+		at.size = Vector2(112, 20)
+		var ad := wrap_label(ui.set_pages[3], about_rows[i][1], Vector2(122, i * 48), 518, 16, ODD_MUTED)
 		scale_text(ad)
-	var ct := label(ui.set_pages[3], "만든 코드", Vector2(0, 4 * 48), 13, Color("#eef3ff"))
-	ct.size = Vector2(90, 20)
-	set_button(ui.set_pages[3], "깃허브에서 보기", Vector2(106, 4 * 48 - 6), Vector2(150, 36), func(): OS.shell_open("https://github.com/destory1984/the-crown-oddity"))
+	var ct := label(ui.set_pages[3], "만든 코드", Vector2(0, 4 * 48), 16, Color("#eef3ff"))
+	ct.size = Vector2(112, 20)
+	set_button(ui.set_pages[3], "깃허브에서 보기", Vector2(122, 4 * 48 - 6), Vector2(150, 36), func(): OS.shell_open("https://github.com/destory1984/the-crown-oddity"))
 	var foot := set_button(col, "놀이로 돌아가기", Vector2(0, 512), Vector2(640, 44), func(): toggle_settings(false))
 	foot.add_theme_font_size_override("font_size", 15)
 	foot.add_theme_color_override("font_color", Color("#eef3ff"))
@@ -2967,6 +3032,7 @@ func show_set_tab(i: int) -> void:
 	set_tab = i
 	for k in ui.set_pages.size():
 		ui.set_pages[k].visible = k == i
+		(ui.set_pages[k].get_parent() as Control).visible = k == i
 		var tb: Button = ui.set_tabs[k]
 		tb.add_theme_color_override("font_color", MENU_GOLD if k == i else ODD_INK) # aria-selected: gold rim, gold text
 		tb.add_theme_stylebox_override("normal", glass_chosen() if k == i else glass_normal())
@@ -4138,6 +4204,18 @@ func place(c: Control, anchor: int, pos: Vector2, size: Vector2) -> void:
 	c.offset_right = pos.x + size.x
 	c.offset_bottom = pos.y + size.y
 
+# a label that always wraps at the given width: it sits in a box of that width, and the box sets its width
+# (a bare Label in the settings sheet grew into one long line past the sheet's edge at 16 px)
+func wrap_label(parent: Control, text: String, pos: Vector2, width: float, size: int, color: Color) -> Label:
+	var box := VBoxContainer.new()
+	box.position = pos
+	box.size = Vector2(width, 0)
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(box)
+	var l := label(box, text, Vector2.ZERO, size, color)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	return l
+
 func label(parent: Control, text: String, pos: Vector2, size := 16, color := Color("#efe6cf"), font: Font = null) -> Label:
 	var l := Label.new()
 	l.text = text
@@ -4415,9 +4493,13 @@ func build_hud() -> void:
 	label(help, "조작법", Vector2(62, 20), 13, Color("#a99d84"))
 	var rows := [["WASD / 방향키", "이동"], ["Shift", "달리기"], ["J / 왼쪽 클릭", "공격 (연속기)"], ["K / 오른쪽 클릭", "구르기 (때맞추면 섬광)"], ["L / 가운데 클릭", "막기 (때맞추면 반격, Lv4부터 1초 모아 J)"],
 		["U I O / 1 2 3", "스킬 (기세 30·15·60)"], ["4", "회복약"], ["Space", "상자 열기, 들어가기"], ["E", "왕관 만지기, 말 걸기 (보리 할머니 포함)"], ["Z X / 휠", "확대·축소"], ["T R P", "3시간 뒤로 / 비 / 사진"], ["F8", "처음 자리로 (진행은 그대로)"], ["F9", "처음부터 (저장 지우기)"], ["Q", "일지 (할 일과 곁이야기)"], ["H", "조작법 숨기기"]]
+	ui.help_rows = []
 	for i in rows.size():
-		label(help, rows[i][0], Vector2(14, 60 + i * 27), 13, Color("#e9dfc4"))
-		label(help, rows[i][1], Vector2(150, 60 + i * 27), 15)
+		var hk := label(help, rows[i][0], Vector2(14, 60 + i * 27), 13, Color("#e9dfc4"))
+		var hv := label(help, rows[i][1], Vector2(150, 60 + i * 27), 15)
+		scale_text(hk)
+		scale_text(hv)
+		ui.help_rows.append([hk, hv])
 	back_key(help, func(): toggle_help(false))
 	help.visible = false
 	ui.help = help
