@@ -24,6 +24,11 @@ const FLIES_NEEDED := 5
 var flies: Array = []      # [{"home": Vector2, "node": Node3D, "caught": bool}]
 var flies_on := false      # Sora is on the firefly errand
 
+# moonflowers open only on nights when the moon is more than half full (5 of every 8 nights)
+const FLOWERS := [Vector2(35, 22), Vector2(12, 43), Vector2(40, 36)]
+var flowers: Array = []    # Node3D per flower
+var picked := [false, false, false]
+
 func count() -> int:
 	return found.filter(func(f): return f).size()
 
@@ -62,6 +67,54 @@ func build(m: Node) -> void:
 		f.visible = false
 		m.add_child(f)
 		flies.append({"home": p, "node": f, "caught": false})
+	build_flowers(m)
+
+func build_flowers(m: Node) -> void:
+	var petal := StandardMaterial3D.new()
+	petal.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	petal.albedo_color = Color("#eef4ff")
+	var heart: Material = m.glow_mat(Color("#ffe89a"), 1.0)
+	var stem: Material = m.mat_color(Color("#4a7a3a"))
+	for p in FLOWERS:
+		m.clear_vegetation(p, 0.8)
+		var g := Node3D.new()
+		var st: MeshInstance3D = m.box(Vector3(0.06, 0.5, 0.06), stem)
+		st.position = Vector3(0, 0.25, 0)
+		g.add_child(st)
+		for k in 5:
+			var a := k * TAU / 5.0
+			var pt: MeshInstance3D = m.box(Vector3(0.18, 0.04, 0.1), petal)
+			pt.position = Vector3(cos(a) * 0.12, 0.52, sin(a) * 0.12)
+			pt.rotation.y = -a
+			g.add_child(pt)
+		var c: MeshInstance3D = m.box(Vector3(0.08, 0.06, 0.08), heart)
+		c.position = Vector3(0, 0.55, 0)
+		g.add_child(c)
+		g.position = Vector3(p.x, m.height_at(p.x, p.y), p.y)
+		g.visible = false
+		m.add_child(g)
+		flowers.append(g)
+
+func picked_count() -> int:
+	return picked.count(true)
+
+func update_flowers(m: Node, blooming: bool) -> void:
+	for i in flowers.size():
+		var f: Node3D = flowers[i]
+		f.visible = blooming and not picked[i]
+		if not f.visible:
+			continue
+		f.rotation.y += 0.004
+		if Vector2(m.player.x, m.player.z).distance_to(FLOWERS[i]) < 0.9:
+			picked[i] = true
+			f.visible = false
+			m.burst(f.position + Vector3(0, 0.5, 0), Color("#eef4ff"), 14, 1.2)
+			m.sfx(880 + picked_count() * 110, 0.2, "sine", 0.2)
+			if picked_count() == FLOWERS.size():
+				m.toast("달꽃 세 송이를 모았다. 보리 할머니께 가져가자")
+			else:
+				m.toast(m.tr("달꽃 %d/3") % picked_count())
+			m.save_game()
 
 func caught() -> int:
 	return flies.filter(func(f): return f.caught).size()

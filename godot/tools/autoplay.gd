@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -1674,6 +1674,44 @@ func run() -> void:
 			b0.shadow.queue_free()
 		calm_enemies(false)
 		check("bat", ok_spots and swooped and flies, "spots open=%s swoops=%s flies above ground=%s" % [ok_spots, swooped, flies])
+	if want.call("moonflowers"):
+		main.story_step = maxi(main.story_step, 6)
+		if main.intro:
+			main.start_game(false)
+		await wait(0.2)
+		main.close_story()
+		main.in_village = false
+		main.in_hill = false
+		main.in_lake = false
+		main.in_forest = false
+		main.in_cave = false
+		main.in_garden = false
+		main.marsh.picked = [false, false, false]
+		main.has_tea = false
+		calm_enemies(true)
+		var spots := true
+		for p in main.MARSH.FLOWERS:
+			spots = spots and main.player_can(p.x, p.y)
+		main.hour = 22.0
+		main.day = 0 # new moon: closed
+		await wait(0.2)
+		var shut: bool = not main.marsh.flowers[0].visible
+		main.day = 4 # full moon
+		await wait(0.2)
+		var open_: bool = main.marsh.flowers[0].visible
+		for p in main.MARSH.FLOWERS:
+			reset_to(p)
+			await wait(0.15)
+		var three: bool = main.marsh.picked_count() == 3
+		reset_to(Vector2(main.shop_pos.x, main.shop_pos.z))
+		tap(KEY_SPACE)
+		await wait(0.2)
+		main.close_story()
+		if main.shop_open:
+			main.toggle_shop(false)
+		main.hour = 12.0
+		calm_enemies(false)
+		check("moonflowers", spots and shut and open_ and three and main.has_tea, "spots=%s closed at new moon=%s open at full moon=%s picked 3=%s tea=%s" % [spots, shut, open_, three, main.has_tea])
 	calm_enemies(false)
 	var failed := results.count(false)
 	print("TESTS %d passed, %d failed" % [results.size() - failed, failed])

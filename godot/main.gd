@@ -336,6 +336,7 @@ const SCENES := {
 	"trial": {"play": true, "village": true, "trial": true, "hour": 21.0},
 	"cage": {"play": true, "village": true, "forest": true, "cage": true, "hour": 14.0},
 	"race": {"play": true, "village": true, "hill": true, "race": true, "hour": 10.0},
+	"moonflower": {"play": true, "at": Vector2(37.0, 24.5), "hour": 22.5, "day": 4},
 	"scrap": {"play": true, "at": Vector2(42.5, 5.5), "hour": 17.0},
 }
 
@@ -1149,6 +1150,7 @@ func bori_news() -> Array:
 	if castle.pages_read() >= 3: out.append("한결의 일기를 읽었다고…… 그 녀석, 끝까지 혼자 짊어졌구나.")
 	if trial_best > 0.0: out.append("심지가 그러던데, 달빛 시련을 마쳤다며? 대단하구나.")
 	if has_armour: out.append("달지기 갑옷이 잘 어울리는구나. 이제야 마음이 놓인다.")
+	if not has_tea and marsh.picked_count() == 0 and story_step >= 5: out.append("달이 반 넘게 찬 밤이면 늪에 달꽃이 핀단다. 세 송이만 가져오면 차를 끓여 주마.")
 	return out
 
 func toggle_shop(open: bool) -> void:
@@ -2528,6 +2530,11 @@ func interact() -> void:
 	if near_shop() and doran_q == 2 and not shop_open:
 		deliver_letter()
 		return
+	if near_shop() and marsh.picked_count() == 3 and not has_tea and not shop_open:
+		has_tea = true
+		show_story("", STORY.MOON_TEA)
+		save_game()
+		return
 	if near_shop():
 		toggle_shop(not shop_open)
 		return
@@ -3265,7 +3272,7 @@ func save_game() -> void:
 		"fly_q": fly_q, "flies": marsh.flies.map(func(f): return f.caught),
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
-		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "fish": fish_kinds, "has_shoes": has_shoes,
+		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes,
 		"castle_q": castle_q, "bars": castle.bars, "levers": castle.levers.map(func(lv): return lv.up), "vault": castle.vault_open, "has_armour": has_armour, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -3392,6 +3399,10 @@ func load_game() -> void:
 	has_acorn = bool(d.get("has_acorn", false))
 	trial_best = float(d.get("trial_best", 0.0))
 	race_best = float(d.get("race_best", 0.0))
+	var fl: Array = d.get("flowers", [])
+	for i in mini(fl.size(), marsh.picked.size()):
+		marsh.picked[i] = bool(fl[i])
+	has_tea = bool(d.get("has_tea", false))
 	var fk: Array = d.get("fish", [])
 	for i in mini(fk.size(), fish_kinds.size()):
 		fish_kinds[i] = bool(fk[i])
@@ -3720,7 +3731,8 @@ const CASTLE := preload("res://castle.gd")
 var castle = CASTLE.new()   # 가라앉은 달지기 성 between the hill and the garden (Sora is still in_hill in there)
 var castle_q := 0           # 0 never entered, 1 inside, 2 fighting the knight, 3 knight beaten (east gate open)
 var castle_spawned := false
-var has_armour := false     # 달지기 갑옷 from the castle treasury: damage taken x0.85
+var has_armour := false
+var has_tea := false        # 달꽃 차 from Bori: resting fills a pip in 6 s by a lantern (12 s with the jar)     # 달지기 갑옷 from the castle treasury: damage taken x0.85
 var cloud = CLOUD.new()     # 구름 둔덕 above the hill (Sora is still in_hill up there)
 var cloud_q := 0            # 0 never entered, 1 inside, 2 fighting the scarecrow, 3 scarecrow beaten
 var cloud_chest := false
@@ -5793,7 +5805,7 @@ func update_pips(dt: float) -> void:
 	var jar := fly_q >= 3
 	if (near_lamp or jar) and calm and Vector2(player.vx, player.vz).length() < 0.3:
 		rest_t += dt
-		if rest_t >= (10.0 if near_lamp else 20.0):
+		if rest_t >= (10.0 if near_lamp else 20.0) * (0.6 if has_tea else 1.0):
 			rest_t = 0.0
 			crown_pips += 1
 			burst(Vector3(player.x, ground_y + 1.6, player.z), Color("#9fd4ff"), 10, 1.2)
@@ -6192,6 +6204,8 @@ func journal_lines() -> Array:
 		side.call("울림 수정", tr("끝") if has_ring else (tr("상자를 열자") if crystal_done else tr("낮은 소리부터 차례로")))
 	if story_step >= 6:
 		side.call("동굴의 세 돌단", tr("아직 찾지 못했다") if not shrine_seen else (tr("깨운 기술: %s") % tr(["회오리", "불씨탄", "빛파동"][skill_up]) if skill_up >= 0 else tr("하나를 고르자")))
+	if marsh.picked_count() > 0 or has_tea:
+		side.call("늪의 달꽃", tr("끝") if has_tea else (tr("보리 할머니께 가져가자") if marsh.picked_count() == 3 else tr("%d/3 · 달이 반 넘게 찬 밤에만 핀다") % marsh.picked_count()))
 	if errand >= 1:
 		var done := int(errand >= 3) + int(kid_q >= 3) + int(doran_q >= 3) + int(mul_q >= 3) + int(fly_q >= 3)
 		side.call("마을 심부름", tr("%d/5 마침") % done)
@@ -6226,6 +6240,7 @@ func journal_lines() -> Array:
 	if has_ring: keep.append(tr("수정 반지"))
 	if has_shoes: keep.append(tr("바람 신발"))
 	if has_armour: keep.append(tr("달지기 갑옷"))
+	if has_tea: keep.append(tr("달꽃 차"))
 	out.append("  " + (", ".join(keep) if not keep.is_empty() else tr("왕관 하나")))
 	return out
 
@@ -6547,6 +6562,7 @@ func _process(dt: float) -> void:
 	if in_marsh() and not intro:
 		marsh.update(self)
 	marsh.update_flies(self, in_marsh() and (hour >= 19.0 or hour < 5.0))
+	marsh.update_flowers(self, in_marsh() and not intro and (hour >= 19.0 or hour < 5.0) and moon_phase().x >= 0.6)
 	if jar_node != null:
 		jar_node.visible = night > 0.5
 		jar_node.position = Vector3(player.x + 0.35, ground_y + 0.55 + sin(t * 2.0) * 0.04, player.z + 0.1)
