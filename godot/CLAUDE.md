@@ -7,10 +7,31 @@
 - 기획은 `DESIGN.md`. 무엇을 만들지, 밸런스를 정할 때는 기획자 에이전트(`designer`)를 먼저 부른다.
 - 웹 사이트 저장소는 `../rpg_demo` (GitHub `destory1984/oddity-of-the-wilds`). 맨 위에 웹 실행 파일, `godot/` 에 이 프로젝트 원본 사본이 들어간다.
 
+## 지역 좌표 (x로 구분한다)
+
+| x | 지역 | 플래그 |
+|---|---|---|
+| 0 → 47 | 갈대늪 | 다른 플래그가 모두 꺼져 있을 때 (`in_marsh()`) |
+| 100 → | 지하 동굴 | `in_cave` |
+| 140 → | 등불 마을 | `in_village` |
+| 180 → | 굳은 숲 | `in_forest` |
+| 230 → | 정원 한가운데 | `in_garden` |
+| 270 → | 남쪽 호수 | `in_lake` |
+| 310 → | 바람 언덕 | `in_hill` |
+| 350 → | 물빛 동굴 | `in_lake` 그대로, `in_grotto()` |
+| 390 → | 구름 둔덕 | `in_hill` 그대로, `in_cloud()` |
+| 430 → | 가라앉은 달지기 성 | `in_hill` 그대로, `in_castle()` |
+| 480 → | 마을 집 안 | `in_village` 그대로, `in_house >= 0` |
+
+- `tile_at()` 은 큰 x부터 본다. 새 지역을 더하면 맨 위에 넣는다.
+- 곁이야기는 화면 위 할 일 줄(`set_quest`)을 덮어쓰지 않는다. 진행은 toast, 대사, 일지(Q)로 알린다.
+- 늪 땅은 메시 하나라서 늪에 새로 놓는 물건에는 OmniLight3D를 달지 않는다(웹 렌더러는 메시 하나에 빛 8개).
+- 부서지는 소품(다람쥐 우리)은 `enemies` 에 `"prop": true` 로 넣어 동료가 치지 않게 한다. 시작할 때 `enemies` 앞자리에 무엇을 넣으면 `_ready` 의 `enemies[0]` 위치 조정이 그것을 옮기니, 지역 괴물은 그 지역에 들어갈 때 만든다.
+
 ## 작업 순서
 
 1. 고친다.
-2. `python tools/dev.py check` : 스크립트 문법과 타입 오류를 잡는다. GDScript는 `:=` 로 타입을 추론할 수 없는 값(사전에서 꺼낸 값 등)에서 자주 막힌다. 그런 곳은 `var x: float =` 처럼 타입을 적는다.
+2. `python tools/dev.py check` : 스크립트 문법과 타입 오류를 잡는다. `tools/autoplay.gd` 는 시험을 돌릴 때만 읽히므로 check가 그 파일의 오류를 못 잡는다. 시험이 멈추면(TIMED OUT) 먼저 그 파일의 형 추론 오류(`:=`)를 의심한다. GDScript는 `:=` 로 타입을 추론할 수 없는 값(사전에서 꺼낸 값 등)에서 자주 막힌다. 그런 곳은 `var x: float =` 처럼 타입을 적는다.
 3. `python tools/dev.py shot 장면이름` : `shots/장면이름.png` 를 읽어 눈으로 확인한다. 장면은 `python tools/dev.py scenes` (title, start, night, dusk, noon, cottage, shop, boss, bridge, faint). 새 상황을 확인해야 하면 `main.gd` 의 `SCENES` 에 장면을 더한다. `--hour=23 --day=4` 로 시각과 날짜를 덮어쓸 수 있다.
 4. `python tools/dev.py test` : 자동 플레이 시험(`tools/autoplay.gd`). 진짜 게임에 클릭과 키를 넣어 결과를 본다. 시작 화면, 다리 4곳 건너기, 상점에서 사기, 발소리, 보스 곁 12초 버티기, 쓰러짐 뒤 되돌림. 사용자가 찾아 준 버그는 고친 뒤 여기에 시험으로 더한다.
 5. 소리를 바꿨으면 `python tools/dev.py sound` : 효과음마다 길이, 크기(peak, rms), 쉿 소리 정도(zcr)를 숫자로 보고 `shots/sounds/*.wav` 를 남긴다. zcr이 0.15를 넘으면 쉿 소리가 난다.

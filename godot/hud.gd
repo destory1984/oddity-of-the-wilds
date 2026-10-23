@@ -75,8 +75,9 @@ func _draw() -> void:
 			diamond(pc, 6, Color.WHITE)
 		else:
 			draw_polyline(PackedVector2Array([pc + Vector2(0, -6), pc + Vector2(6, 0), pc + Vector2(0, 6), pc + Vector2(-6, 0), pc + Vector2(0, -6)]), Color("#6a6050"), 1.0)
-	if main.rest_t > 0.0 and main.crown_pips < 8: # the next pip glows in while resting
-		diamond(Vector2(x0 + 8 + main.crown_pips * 16, 124), 6 * main.rest_t / 10.0, Color("#9fd4ff"))
+	var grow: float = 6.0 * minf(1.0, main.rest_t / main.rest_need)
+	if grow >= 0.5 and main.crown_pips < 8: # the next pip glows in while resting (too small a diamond cannot be drawn)
+		diamond(Vector2(x0 + 8 + main.crown_pips * 16, 124), grow, Color("#9fd4ff"))
 	# ---- sun / moon dial hanging under the portrait
 	var dc := Vector2(70, 222)
 	for i in 14:

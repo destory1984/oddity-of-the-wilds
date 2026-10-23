@@ -6182,6 +6182,8 @@ func light_village_lamp(d: Dictionary) -> void:
 	save_game()
 
 # rest beside a lit lantern at night with no monster near: one pip every 10 s
+var rest_need := 10.0        # seconds of rest for the next pip (lantern 10, jar 20, both x0.6 with the tea)
+
 func update_pips(dt: float) -> void:
 	pip_flash -= dt
 	var night_now := hour >= 19.0 or hour < 5.0
@@ -6198,9 +6200,10 @@ func update_pips(dt: float) -> void:
 		if not e.dead and Vector2(e.x - me.x, e.z - me.z).length() < 6.0:
 			calm = false
 	var jar := fly_q >= 3
+	rest_need = (10.0 if near_lamp else 20.0) * (0.6 if has_tea else 1.0)
 	if (near_lamp or jar) and calm and Vector2(player.vx, player.vz).length() < 0.3:
 		rest_t += dt
-		if rest_t >= (10.0 if near_lamp else 20.0) * (0.6 if has_tea else 1.0):
+		if rest_t >= rest_need:
 			rest_t = 0.0
 			crown_pips += 1
 			burst(Vector3(player.x, ground_y + 1.6, player.z), Color("#9fd4ff"), 10, 1.2)
