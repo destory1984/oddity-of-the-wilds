@@ -114,6 +114,8 @@ func cave_char(x: float, z: float) -> String:
 	return c
 
 func tile_at(x: float, z: float) -> int:
+	if x >= HOUSE_X - 0.5:
+		return WATER if house_char(x, z) == "#" else GRASS
 	if x >= CASTLE.CASTLE_X - 0.5:
 		return WATER if castle.blocked(x, z) else GRASS
 	if x >= CLOUD.CLOUD_X - 0.5:
@@ -273,6 +275,7 @@ func _ready() -> void:
 	cloud.build_updraft(self, hill.marks.U)
 	castle.build(self)
 	build_trial()
+	build_house_room()
 	build_race()
 	build_player()
 	for i in 9:
@@ -1953,6 +1956,114 @@ func update_bat(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
 		m.emission_energy_multiplier = 0.9
 	e.shadow.position = Vector3(e.x, 0.02, e.z)
 
+# ---- inside the village houses: Space at a door goes in. One small room (x >= HOUSE_X) is dressed for whichever
+# house it is; each of the five houses has a cupboard to look in once. The last house keeps an old picture of the moonkeepers with Hangyeol.
+const HOUSE_X := 480
+const HOUSE_ROWS := ["#########", "#.......#", "#.......#", "#.......#", "#.......#", "#.......#", "####S####"]
+const HOUSE_LOOT := [["gold", 30], ["pots", 1], ["gold", 60], ["pots", 2], ["picture", 0]] # one per house, in build order
+const HOUSE_WALLS := [Color("#e4dccc"), Color("#d8c8a8"), Color("#c8d8c8"), Color("#e0c8c0"), Color("#c8c8dc")]
+var in_house := -1
+var house_seen := [false, false, false, false, false]
+var house_wall_mat: StandardMaterial3D
+var cupboard: Node3D
+
+func house_char(x: float, z: float) -> String:
+	var tx := int(round(x)) - HOUSE_X
+	var tz := int(round(z))
+	if tx < 0 or tz < 0 or tz >= HOUSE_ROWS.size() or tx >= HOUSE_ROWS[0].length():
+		return "#"
+	return HOUSE_ROWS[tz][tx]
+
+func build_house_room() -> void:
+	var floor_mat: Material = mat_color(Color("#a07a52"))
+	house_wall_mat = mat_color(HOUSE_WALLS[0])
+	for z in HOUSE_ROWS.size():
+		for x in HOUSE_ROWS[0].length():
+			var c: String = HOUSE_ROWS[z][x]
+			var b: MeshInstance3D
+			if c == "#":
+				b = box(Vector3(1, 1.2 if z == 0 else 0.3, 1), house_wall_mat) # the back wall stands, the rest stay low
+				b.position = Vector3(HOUSE_X + x, (0.6 if z == 0 else 0.15) - 0.0, z)
+			else:
+				b = box(Vector3(1, 0.4, 1), floor_mat)
+				b.position = Vector3(HOUSE_X + x, -0.2, z)
+			add_child(b)
+	var wood: Material = mat_color(Color("#6a4a2e"))
+	var cloth: Material = mat_color(Color("#c85a5a"))
+	for part in [[Vector3(1.6, 0.4, 0.9), Vector3(HOUSE_X + 1.8, 0.2, 1.6), cloth], [Vector3(0.6, 0.2, 0.9), Vector3(HOUSE_X + 1.3, 0.5, 1.6), mat_color(Color("#f0e8d8"))],
+			[Vector3(1.2, 0.6, 0.8), Vector3(HOUSE_X + 5.0, 0.3, 3.5), wood], [Vector3(0.9, 0.06, 0.9), Vector3(HOUSE_X + 5.0, 0.62, 3.5), mat_color(Color("#e8dcc0"))]]:
+		var b := box(part[0], part[2])
+		b.position = part[1]
+		add_child(b)
+	rocks.append({"x": HOUSE_X + 1.8, "z": 1.6, "r": 0.8})
+	rocks.append({"x": HOUSE_X + 5.0, "z": 3.5, "r": 0.6})
+	cupboard = Node3D.new()
+	var cb := box(Vector3(1.0, 1.4, 0.5), wood)
+	cb.position = Vector3(0, 0.7, 0)
+	cupboard.add_child(cb)
+	var knob := box(Vector3(0.1, 0.1, 0.06), mat_color(Color("#e8b018")))
+	knob.position = Vector3(0.2, 0.8, 0.27)
+	cupboard.add_child(knob)
+	cupboard.position = Vector3(HOUSE_X + 6.5, 0, 1.3)
+	add_child(cupboard)
+	rocks.append({"x": HOUSE_X + 6.5, "z": 1.3, "r": 0.5})
+	var hearth := OmniLight3D.new()
+	hearth.light_color = Color("#ffc890")
+	hearth.light_energy = 2.0
+	hearth.omni_range = 8.0
+	hearth.position = Vector3(HOUSE_X + 4.0, 2.5, 3.0)
+	add_child(hearth)
+
+func house_door_near() -> int:
+	for i in village.doors.size():
+		if Vector2(player.x, player.z).distance_to(village.doors[i]) < 0.9:
+			return i
+	return -1
+
+func enter_house(i: int) -> void:
+	in_house = i
+	house_wall_mat.albedo_color = HOUSE_WALLS[i % HOUSE_WALLS.size()]
+	player.x = HOUSE_X + 4.0
+	player.z = 5.0
+	ground_y = 0.0
+	ui.zone_sub.text = tr("마을 집 %d") % (i + 1)
+	snap_mates()
+	save_game()
+
+func leave_house() -> void:
+	var d: Vector2 = village.doors[in_house]
+	in_house = -1
+	player.x = d.x
+	player.z = d.y + 0.4
+	ground_y = 0.0
+	ui.zone_sub.text = "마을 거리"
+	snap_mates()
+	save_game()
+
+func cupboard_key() -> bool:
+	if in_house < 0 or Vector2(player.x, player.z).distance_to(Vector2(cupboard.position.x, cupboard.position.z)) > 1.5:
+		return false
+	if house_seen[in_house]:
+		toast("찬장은 비어 있다")
+		return true
+	house_seen[in_house] = true
+	var loot: Array = HOUSE_LOOT[in_house % HOUSE_LOOT.size()]
+	match loot[0]:
+		"gold":
+			player.gold += loot[1]
+			toast(tr("찬장에서 금화 %d닢을 찾았다") % loot[1])
+		"pots":
+			player.pots += loot[1]
+			toast(tr("찬장에서 회복약 %d개를 찾았다") % loot[1])
+		"mp":
+			player.mp = minf(player.max_mp, player.mp + loot[1])
+			toast("찬장의 기세 사탕을 먹었다")
+		"picture":
+			show_story("", STORY.HOUSE_PICTURE)
+	sfx(784, 0.12, "triangle", 0.25)
+	save_game()
+	return true
+
 func spawn_boss() -> void:
 	var spot := Vector2(16, 4)
 	for tries in 40:
@@ -2526,6 +2637,12 @@ func in_marsh() -> bool:
 
 func interact() -> void:
 	if in_cave and cave_interact():
+		return
+	if in_village and in_house >= 0 and cupboard_key():
+		return
+	if in_village and in_house < 0 and house_door_near() >= 0 and fade_rect.color.a == 0.0:
+		var hi := house_door_near()
+		fade_then(func(): enter_house(hi))
 		return
 	if near_shop() and doran_q == 2 and not shop_open:
 		deliver_letter()
@@ -3272,7 +3389,7 @@ func save_game() -> void:
 		"fly_q": fly_q, "flies": marsh.flies.map(func(f): return f.caught),
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
-		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes,
+		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes,
 		"castle_q": castle_q, "bars": castle.bars, "levers": castle.levers.map(func(lv): return lv.up), "vault": castle.vault_open, "has_armour": has_armour, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -3354,6 +3471,9 @@ func load_game() -> void:
 	if bool(d.get("in_village", false)):
 		var vx: float = player.x
 		var vz: float = player.z
+		if vx >= HOUSE_X - 0.5: # saved inside a house: wake on the square instead
+			vx = village.marks.M.x - 2.0
+			vz = village.marks.M.y + 1.0
 		var e0 := errand
 		errand = maxi(errand, 1) # do not replay the arrival scene
 		enter_village()
@@ -3399,6 +3519,9 @@ func load_game() -> void:
 	has_acorn = bool(d.get("has_acorn", false))
 	trial_best = float(d.get("trial_best", 0.0))
 	race_best = float(d.get("race_best", 0.0))
+	var hs: Array = d.get("houses", [])
+	for i in mini(hs.size(), house_seen.size()):
+		house_seen[i] = bool(hs[i])
 	var fl: Array = d.get("flowers", [])
 	for i in mini(fl.size(), marsh.picked.size()):
 		marsh.picked[i] = bool(fl[i])
@@ -3845,6 +3968,8 @@ func crown_key() -> void:
 	if in_hill and hill_key():
 		return
 	if in_village:
+		if cupboard_key():
+			return
 		if trial_key():
 			return
 		if me.distance_to(village.marks.M) < 1.8:
@@ -6207,6 +6332,7 @@ func journal_lines() -> Array:
 	if marsh.picked_count() > 0 or has_tea:
 		side.call("늪의 달꽃", tr("끝") if has_tea else (tr("보리 할머니께 가져가자") if marsh.picked_count() == 3 else tr("%d/3 · 달이 반 넘게 찬 밤에만 핀다") % marsh.picked_count()))
 	if errand >= 1:
+		side.call("마을 집 찬장", tr("%d/5 열어 봄") % house_seen.count(true))
 		var done := int(errand >= 3) + int(kid_q >= 3) + int(doran_q >= 3) + int(mul_q >= 3) + int(fly_q >= 3)
 		side.call("마을 심부름", tr("%d/5 마침") % done)
 	if fly_q >= 1:
@@ -6571,6 +6697,8 @@ func _process(dt: float) -> void:
 	update_trial(dt)
 	update_race(dt)
 	update_fishing(dt)
+	if in_house >= 0 and Vector2(player.x, player.z).distance_to(Vector2(HOUSE_X + 4, 6)) < 0.7 and fade_rect.color.a == 0.0:
+		fade_then(leave_house)
 	if in_cave:
 		check_painting()
 	if in_cave and not has_skip and Vector2(player.x, player.z).distance_to(cave_marks.E) < 1.6 and toast_t <= 0.0:

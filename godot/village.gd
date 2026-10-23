@@ -41,6 +41,7 @@ const FOLK := [
 	{"id": "mulgyeol", "at": Vector2i(28, 21)},
 ]
 var folk_pos := {}
+var doors: Array = []    # world Vector2 in front of each house door, in build order
 var folk_node := {}
 
 func _init() -> void:
@@ -121,6 +122,7 @@ func build(m: Node) -> void:
 					for dx in 3:
 						seen[Vector2i(x + dx, z + dz)] = true
 				house(m, Vector3(VILLAGE_X + x + 1, 0, z + 0.5))
+				doors.append(Vector2(VILLAGE_X + x + 0.4, z + 1.9)) # just in front of the door
 	var post_mat: Material = m.mat_color(Color("#3b2a1e"))
 	var glass: Material = m.glow_mat(Color("#ffc46a"), 4.0)
 	glass.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
