@@ -345,6 +345,7 @@ const SCENES := {
 	"festival": {"play": true, "village": true, "festival": true, "hour": 22.0, "day": 4},
 	"cloudpath": {"play": true, "village": true, "cloud": true, "path": true, "hour": 11.0},
 	"ways": {"play": true, "ways": true, "hour": 16.0},
+	"walk_dr": {"play": true, "walk_dr": true, "at": Vector2(12, 14), "hour": 12.0},
 	"scrap": {"play": true, "at": Vector2(42.5, 5.5), "hour": 17.0},
 }
 
@@ -583,6 +584,9 @@ func apply_test_args(args: PackedStringArray) -> void:
 		player.x = w0.x + 0.8
 		player.z = w0.y + 1.4
 		toggle_ways(true)
+	if sc.get("walk_dr", false): # walking toward the bottom right of the screen (5 o'clock)
+		fake_keys[KEY_S] = true
+		fake_keys[KEY_D] = true
 	if sc.get("opening", false):
 		begin_opening()
 	if sc.has("faint"):
@@ -1353,7 +1357,9 @@ func sync_ghost() -> void:
 	hero_ghost.flip_h = hero.flip_h
 
 func set_hero_frame(dir: String, frame: int) -> void:
-	var e: Array = hero_tex[dir]
+	# the drawn down-right row turns the head right but the body left, so down-right is the down-left row mirrored
+	hero.flip_h = dir == "downright"
+	var e: Array = hero_tex["downleft" if dir == "downright" else dir]
 	var tex: Texture2D = e[0]
 	var cw := tex.get_width() / 4.0
 	var ch := tex.get_height() / 4.0
@@ -1387,6 +1393,7 @@ func set_hero_idle(name: String, frame: int) -> void:
 	if not idle_tex.has(name):
 		idle_tex[name] = load("res://art/sora/idle/%s.png" % name)
 	hero.texture = idle_tex[name]
+	hero.flip_h = false
 	hero.region_rect = Rect2(frame * 192, 0, 192, 256)
 	hero.pixel_size = walk_px # same cell size and scale as the walk sheets
 	hero.offset = walk_off
@@ -3224,10 +3231,10 @@ func build_hud() -> void:
 	sn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ui.shop_say = label(say, "", Vector2(40, 32), 19)
 	ui.shop_say.size = Vector2(860, 40)
-	label(say, "1 → 4 사기  ·  Space / Esc 닫기", Vector2(680, 70), 12, Color("#a99d84"))
+	label(say, "1 → 4 사기  ·  E / Space / Esc 닫기", Vector2(680, 70), 12, Color("#a99d84"))
 	shop.visible = false
 	ui.shop = shop
-	ui.shop_hint = label(root, "Space  상점 들어가기", Vector2.ZERO, 16, Color("#fff1c8"))
+	ui.shop_hint = label(root, "E  보리 할머니의 상점", Vector2.ZERO, 16, Color("#fff1c8"))
 	place(ui.shop_hint, Control.PRESET_CENTER_BOTTOM, Vector2(-150, -260), Vector2(300, 24))
 	ui.shop_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ui.shop_hint.add_theme_constant_override("outline_size", 6)
@@ -3350,7 +3357,7 @@ func build_hud() -> void:
 	help.mouse_filter = Control.MOUSE_FILTER_STOP
 	label(help, "조작법", Vector2(14, 8), 12, Color("#a99d84"))
 	var rows := [["WASD / 방향키", "이동"], ["Shift", "달리기"], ["J / 왼쪽 클릭", "공격 (연속기)"], ["K / 오른쪽 클릭", "구르기 (때맞추면 섬광)"], ["L / 가운데 클릭", "막기 (때맞추면 반격, Lv4부터 1초 모아 J)"],
-		["U I O / 1 2 3", "스킬 (기세 30·15·60)"], ["4", "회복약"], ["Space", "상자 열기, 들어가기"], ["E", "왕관 만지기"], ["Z X / 휠", "확대·축소"], ["T R P", "3시간 뒤로 / 비 / 사진"], ["F8", "처음 자리로 (진행은 그대로)"], ["F9", "처음부터 (저장 지우기)"], ["Q", "일지 (할 일과 곁이야기)"], ["H", "조작법 숨기기"]]
+		["U I O / 1 2 3", "스킬 (기세 30·15·60)"], ["4", "회복약"], ["Space", "상자 열기, 들어가기"], ["E", "왕관 만지기, 말 걸기 (보리 할머니 포함)"], ["Z X / 휠", "확대·축소"], ["T R P", "3시간 뒤로 / 비 / 사진"], ["F8", "처음 자리로 (진행은 그대로)"], ["F9", "처음부터 (저장 지우기)"], ["Q", "일지 (할 일과 곁이야기)"], ["H", "조작법 숨기기"]]
 	for i in rows.size():
 		label(help, rows[i][0], Vector2(14, 34 + i * 27), 13, Color("#e9dfc4"))
 		label(help, rows[i][1], Vector2(150, 34 + i * 27), 15)
@@ -4304,6 +4311,9 @@ func crown_key() -> void:
 	var me := Vector2(player.x, player.z)
 	if way_key():
 		return
+	if in_marsh() and near_shop(): # Bori answers to E like every other villager (Space still works)
+		interact()
+		return
 	if in_cave and shrine_key():
 		return
 	if in_forest:
@@ -4433,7 +4443,7 @@ func doran_errand() -> void:
 		burst(Vector3(player.x, 1.4, player.z), Color("#9fd4ff"), 18, 1.5)
 		sfx(587, 0.4, "sine", 0.3, 300)
 		show_story("", STORY.DORAN_READ)
-		set_quest("편지를 서쪽 늪 오두막의 보리 할머니께 전하자 (Space)")
+		set_quest("편지를 서쪽 늪 오두막의 보리 할머니께 전하자 (E)")
 	else:
 		return
 	save_game()
@@ -6905,7 +6915,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event is InputEventKey and event.pressed and not event.echo:
 			match event.keycode:
 				KEY_1, KEY_2, KEY_3, KEY_4: buy(event.keycode - KEY_1)
-				KEY_SPACE, KEY_ESCAPE: toggle_shop(false)
+				KEY_SPACE, KEY_ESCAPE, KEY_E: toggle_shop(false)
 		return
 	if event is InputEventMouseButton and event.pressed:
 		match event.button_index:
@@ -7052,7 +7062,7 @@ func _process(dt: float) -> void:
 	slowmo -= dt
 	ui.slowmo_tint.visible = slowmo > 0
 	ui.shop_hint.visible = not intro and not shop_open and near_shop()
-	ui.shop_hint.text = "Space  편지 전하기" if doran_q == 2 else "Space  상점 들어가기"
+	ui.shop_hint.text = "E  편지 전하기" if doran_q == 2 else "E  보리 할머니의 상점"
 	if shop_open and not near_shop():
 		toggle_shop(false)
 	if key_down(KEY_J) and player.atk_cd <= 0 and not intro and not shop_open:

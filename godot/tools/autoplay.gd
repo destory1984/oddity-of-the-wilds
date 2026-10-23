@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -2020,6 +2020,28 @@ func run() -> void:
 		var more: bool = main.player.lv > lv0 or main.player.xp == xp0 + 12
 		main.in_hill = false
 		check("books", reach and main.has_bookmark and more, "shelves reachable=%s bookmark=%s xp x1.2=%s" % [reach, main.has_bookmark, more])
+	if want.call("bori_e"):
+		await wait(0.2)
+		main.close_story() # the books test leaves the bookmark scene queued
+		await wait(0.2)
+		main.close_story()
+		main.in_village = false
+		main.in_hill = false
+		main.in_lake = false
+		main.in_forest = false
+		main.in_garden = false
+		main.in_cave = false
+		main.story_step = maxi(main.story_step, 3)
+		reset_to(Vector2(main.shop_pos.x, main.shop_pos.z))
+		main.doran_q = 3
+		main.mail_q = 2
+		main.has_tea = true # nothing else waiting for Bori: E goes straight to the shop
+		main.crown_key() # what E does in the world
+		await wait(0.2)
+		var opened: bool = main.shop_open
+		tap(KEY_E)
+		await wait(0.2)
+		check("bori_e", opened and not main.shop_open, "E opens Bori's shop=%s and E closes it=%s" % [opened, not main.shop_open])
 	calm_enemies(false)
 	var failed := results.count(false)
 	print("TESTS %d passed, %d failed" % [results.size() - failed, failed])
