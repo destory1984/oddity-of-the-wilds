@@ -1793,6 +1793,84 @@ func end_race(msg: String) -> void:
 	set_quest(race_quest)
 	toast(msg)
 
+# ---- fishing at the south lake's east shore (after the sluice is unwound): E casts; after 2 - 5 s a fish
+# bites ("!" and a plop) and E within 0.7 s lands it. Five kinds; landing all five gets 100 gold and max HP +10.
+const FISH := [["붕어", 40], ["메기", 25], ["무지개송어", 18], ["벽돌 물고기", 12], ["황금 잉어", 5]] # name, weight
+var fish_state := ""        # "", "wait" (line in the water), "bite"
+var fish_t := 0.0
+var fish_kinds := [false, false, false, false, false]
+var bobber: Node3D
+
+func fish_key() -> bool:
+	if lake_q < 2 or Vector2(player.x, player.z).distance_to(lake.marks.f) > 1.5:
+		return false
+	match fish_state:
+		"":
+			fish_state = "wait"
+			fish_t = rnd(2.0, 5.0)
+			if bobber == null:
+				bobber = Node3D.new()
+				var b: MeshInstance3D = box(Vector3(0.14, 0.14, 0.14), mat_color(Color("#e84a4a")))
+				bobber.add_child(b)
+				add_child(bobber)
+			bobber.visible = true
+			bobber.position = Vector3(lake.marks.f.x, -0.25, lake.marks.f.y + 2.0)
+			sfx(300, 0.15, "noise", 0.08, -100)
+			toast("낚싯줄을 던졌다. 찌가 흔들리면 E!")
+		"wait":
+			fish_state = ""
+			bobber.visible = false
+			toast("너무 일찍 당겼다")
+		"bite":
+			land_fish()
+	return true
+
+func land_fish() -> void:
+	fish_state = ""
+	bobber.visible = false
+	var total := 0
+	for f in FISH:
+		total += f[1]
+	var roll := rng.randi() % total
+	var k := 0
+	for i in FISH.size():
+		roll -= FISH[i][1]
+		if roll < 0:
+			k = i
+			break
+	var fresh: bool = not fish_kinds[k]
+	fish_kinds[k] = true
+	var n: int = fish_kinds.count(true)
+	player.gold += 5 + k * 5
+	burst(Vector3(lake.marks.f.x, 0.4, lake.marks.f.y + 1.5), Color("#9fd4ff"), 16, 2.0)
+	sfx(660 + k * 80, 0.15, "triangle", 0.2)
+	toast(tr("%s을(를) 낚았다! (%d/5 종류)") % [tr(FISH[k][0]), n] if fresh else tr("%s을(를) 낚았다") % tr(FISH[k][0]))
+	if fresh and n == FISH.size():
+		player.gold += 100
+		player.max_hp += 10
+		player.hp = float(player.max_hp)
+		show_story("", STORY.FISH_ALL)
+	save_game()
+
+func update_fishing(dt: float) -> void:
+	if fish_state == "":
+		return
+	if not in_lake or in_grotto() or Vector2(player.x, player.z).distance_to(lake.marks.f) > 2.0:
+		fish_state = ""
+		bobber.visible = false
+		return
+	fish_t -= dt
+	bobber.position.y = -0.25 + (sin(t * 30.0) * 0.06 if fish_state == "bite" else sin(t * 2.0) * 0.02)
+	if fish_state == "wait" and fish_t <= 0.0:
+		fish_state = "bite"
+		fish_t = 0.7
+		pop_num(bobber.position + Vector3(0, 0.8, 0), "!", Color("#ffd84a"))
+		sfx(500, 0.1, "noise", 0.12, -300)
+	elif fish_state == "bite" and fish_t <= 0.0:
+		fish_state = ""
+		bobber.visible = false
+		toast("물고기가 미끼만 먹고 달아났다")
+
 func spawn_boss() -> void:
 	var spot := Vector2(16, 4)
 	for tries in 40:
@@ -3107,7 +3185,7 @@ func save_game() -> void:
 		"fly_q": fly_q, "flies": marsh.flies.map(func(f): return f.caught),
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
-		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "has_shoes": has_shoes,
+		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "fish": fish_kinds, "has_shoes": has_shoes,
 		"castle_q": castle_q, "bars": castle.bars, "levers": castle.levers.map(func(lv): return lv.up), "vault": castle.vault_open, "has_armour": has_armour, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -3234,6 +3312,9 @@ func load_game() -> void:
 	has_acorn = bool(d.get("has_acorn", false))
 	trial_best = float(d.get("trial_best", 0.0))
 	race_best = float(d.get("race_best", 0.0))
+	var fk: Array = d.get("fish", [])
+	for i in mini(fk.size(), fish_kinds.size()):
+		fish_kinds[i] = bool(fk[i])
 	has_shoes = bool(d.get("has_shoes", false))
 	shrine_seen = bool(d.get("shrine_seen", false))
 	castle_q = int(d.get("castle_q", 0))
@@ -3662,6 +3743,8 @@ func crown_key() -> void:
 	if in_cloud() and cloud_key():
 		return
 	if in_castle() and castle_key():
+		return
+	if in_lake and not in_grotto() and fish_key():
 		return
 	if in_lake and lake_key():
 		return
@@ -6028,6 +6111,8 @@ func journal_lines() -> Array:
 		side.call("마을 심부름", tr("%d/5 마침") % done)
 	if fly_q >= 1:
 		side.call("꼬마의 반딧불 병", tr("끝") if fly_q >= 3 else (tr("콩알에게 가져가자") if fly_q == 2 else tr("밤의 늪에서 %d/5") % marsh.caught()))
+	if lake_q >= 2:
+		side.call("호숫가 낚시", tr("끝") if fish_kinds.count(true) == 5 else tr("%d/5 종류") % fish_kinds.count(true))
 	if lake_q >= 4:
 		side.call("섬 밑 물빛 동굴", tr("끝") if grotto_q >= 4 else (tr("상자를 열자") if grotto_q == 3 else tr("섬 남쪽 계단으로")))
 	if forest_q >= 1:
@@ -6383,6 +6468,7 @@ func _process(dt: float) -> void:
 	update_shrine(dt)
 	update_trial(dt)
 	update_race(dt)
+	update_fishing(dt)
 	if in_cave:
 		check_painting()
 	if in_cave and not has_skip and Vector2(player.x, player.z).distance_to(cave_marks.E) < 1.6 and toast_t <= 0.0:
