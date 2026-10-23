@@ -829,24 +829,59 @@ func build_terrain() -> void:
 	plank_mat.uv1_scale = Vector3(4, 1, 1)
 	var post_mat := mat_color(Color("#3b2a1e"))
 	for b in bridges:
-		var length: float = b.b - b.a + 3
-		var g := Node3D.new()
-		var deck := box(Vector3(length, 0.12, 1.8), plank_mat)
-		deck.position.y = 0.02
-		g.add_child(deck)
-		for side in [-0.95, 0.95]:
-			for y in [0.62, 0.34]:
-				var rail := box(Vector3(length, 0.08, 0.08), post_mat)
-				rail.position = Vector3(0, y, side)
-				g.add_child(rail)
-			var i := 0.0
-			while i <= length:
-				var p := box(Vector3(0.14, 1.2, 0.14), post_mat)
-				p.position = Vector3(i - length / 2.0, 0.15, side)
-				g.add_child(p)
-				i += 1.5
-		g.position = Vector3((b.a + b.b) / 2.0, 0, b.z + 0.5)
-		add_child(g)
+		lego_deck(b.a, b.b, b.z)
+
+# a bridge of toy bricks: a deck of staggered 2x2-stud bricks in red, yellow, blue and green,
+# and a low brick wall along each side with gaps every third brick
+const LEGO_COLS := [Color("#c8322a"), Color("#e8b018"), Color("#2f5fb8"), Color("#3f8a3a")]
+var lego_mats: Array = []
+var stud_mesh: CylinderMesh
+
+func lego_brick(g: Node3D, size: Vector3, pos: Vector3, ci: int) -> void:
+	if lego_mats.is_empty():
+		for c in LEGO_COLS:
+			var m := StandardMaterial3D.new()
+			m.albedo_color = c
+			m.roughness = 0.3
+			lego_mats.append(m)
+		stud_mesh = CylinderMesh.new()
+		stud_mesh.top_radius = 0.11
+		stud_mesh.bottom_radius = 0.11
+		stud_mesh.height = 0.07
+		stud_mesh.radial_segments = 10
+	var mat: Material = lego_mats[ci % lego_mats.size()]
+	var b := box(size - Vector3(0.03, 0, 0.03), mat) # a hair narrower, so the seams between bricks show
+	b.position = pos
+	g.add_child(b)
+	for i in 2:
+		for k in 2:
+			var st := MeshInstance3D.new()
+			st.mesh = stud_mesh
+			st.material_override = mat
+			st.position = pos + Vector3((i - 0.5) * size.x * 0.5, size.y / 2.0 + 0.035, (k - 0.5) * size.z * 0.5)
+			g.add_child(st)
+
+func lego_deck(a: int, b_: int, z: int) -> void:
+	var length := b_ - a + 3
+	var g := Node3D.new()
+	var n := 0
+	for row in 2: # two rows of bricks across the deck, the second shifted half a brick
+		var x := -length / 2.0 + (0.5 if row == 1 else 0.0)
+		while x < length / 2.0 - 0.01:
+			var w := minf(1.0, length / 2.0 - x)
+			lego_brick(g, Vector3(w, 0.2, 0.86), Vector3(x + w / 2.0, 0.02, -0.44 + row * 0.88), n)
+			x += w
+			n += 1
+	for side in [-0.95, 0.95]: # the side walls
+		var k := 0
+		var x2 := -length / 2.0
+		while x2 < length / 2.0 - 0.01:
+			if k % 3 != 2:
+				lego_brick(g, Vector3(0.9, 0.36, 0.22), Vector3(x2 + 0.45, 0.3, side), k + 1)
+			x2 += 1.0
+			k += 1
+	g.position = Vector3((a + b_) / 2.0, 0, z + 0.5)
+	add_child(g)
 
 func box(size: Vector3, m: Material) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
@@ -2688,15 +2723,11 @@ func update_chat(dt: float) -> void:
 # Built after the map, props, plants and monsters so the random draws that place them are the same as before.
 func village_sign() -> void:
 	# a short deck over the east edge water to the village road
-	var plank: Material = mat_color(Color("#a0703e"))
 	for bx in [46, 47]:
 		for bz in [20, 21]:
 			map[idx(bx, bz)] = BRIDGE
 			hgt[idx(bx, bz)] = 0.08
-	for k in 6:
-		var pl: MeshInstance3D = box(Vector3(0.3, 0.1, 2.0), plank)
-		pl.position = Vector3(45.7 + k * 0.36, 0.05, 20.5)
-		add_child(pl)
+	lego_deck(46, 46, 20)
 	var g := Node3D.new()
 	var wood: Material = mat_color(Color("#6a4a2e"))
 	var pole: MeshInstance3D = box(Vector3(0.14, 1.5, 0.14), wood)
@@ -2763,10 +2794,15 @@ func update_mate_hud() -> void:
 		r.row.visible = node != null and not intro and not in_cave
 		if not r.row.visible:
 			continue
-		var ready: float = clampf(1.0 - float(data[i][1]) / float(data[i][2]), 0.0, 1.0)
-		r.fill.size.x = 110.0 * ready
+		var id: String = ["mulgyeol", "noeul"][i]
+		var frac: float = clampf(mate_health(id) / mate_max(), 0.0, 1.0)
+		r.fill.size.x = 110.0 * frac
+		r.fill.color = Color("#e05a4a") if frac < 0.3 else Color("#6ad07a")
 		var fighting: bool = enemies.any(func(e): return not e.dead and not e.get("prop", false) and Vector2(e.x - node.position.x, e.z - node.position.z).length() < 5.0)
-		r.act.text = tr("싸우는 중") if fighting else tr("따라가는 중")
+		if mate_down[id] > 0.0:
+			r.act.text = tr("쉬는 중 %d초") % int(ceil(mate_down[id]))
+		else:
+			r.act.text = tr("싸우는 중") if fighting else tr("따라가는 중")
 
 # ---- round icon buttons for the bottom-left row (the font has no icon glyphs, so the icons are drawn here)
 const ICON_GOLD := Color("#f2d27a")
@@ -6245,6 +6281,68 @@ func mate_step(at: Vector3, d: Vector3) -> Vector3:
 	if walkable(p.x, p.z + d.z) or not walkable(p.x, p.z): p.z += d.z
 	return p
 
+# ---- companions' health: goblins and thrown bricks can hit Mulgyeol and Noeul too. At 0 a companion sits out
+# for 10 s (lying down, no attacks), then gets up with half health; out of a fight they heal 4 HP a second.
+var mate_hp := {"mulgyeol": -1.0, "noeul": -1.0}  # -1: not set yet (full)
+var mate_down := {"mulgyeol": 0.0, "noeul": 0.0}
+const MATE_REST := 10.0
+
+func mate_max() -> float:
+	return 60.0 + player.lv * 6.0
+
+func mate_node(id: String) -> Node3D:
+	return mate if id == "mulgyeol" else mate2
+
+func mate_health(id: String) -> float:
+	if mate_hp[id] < 0.0:
+		mate_hp[id] = mate_max()
+	return mate_hp[id]
+
+func hurt_mate(id: String, dmg: int) -> void:
+	var node := mate_node(id)
+	if node == null or mate_down[id] > 0.0:
+		return
+	mate_hp[id] = mate_health(id) - dmg
+	pop_num(node.position + Vector3(0, 1.9, 0), str(dmg), Color("#ffb07a"))
+	sfx(260, 0.08, "triangle", 0.1, -100)
+	if mate_hp[id] <= 0.0:
+		mate_hp[id] = 0.0
+		mate_down[id] = MATE_REST
+		var spr: Sprite3D = node.get_child(0)
+		spr.billboard = BaseMaterial3D.BILLBOARD_DISABLED # tilt by hand, as for Sora
+		spr.rotation = Vector3(0, cam_yaw, PI / 2.0)
+		spr.modulate = Color(0.6, 0.6, 0.65)
+		spr.position.y = 0.3
+		toast(tr("%s이(가) 쓰러져 잠시 쉰다") % tr("물결" if id == "mulgyeol" else "노을"))
+
+# companions near a strike or a thrown brick take the hit as well
+func mate_near(at: Vector2, r: float) -> String:
+	for id in ["mulgyeol", "noeul"]:
+		var node := mate_node(id)
+		if node != null and node.visible and mate_down[id] <= 0.0 and Vector2(node.position.x, node.position.z).distance_to(at) < r:
+			return id
+	return ""
+
+# returns true while the companion is down (its update should stop there)
+func mate_tick(id: String, dt: float) -> bool:
+	var node := mate_node(id)
+	var spr: Sprite3D = node.get_child(0)
+	if mate_down[id] > 0.0:
+		mate_down[id] -= dt
+		if mate_down[id] <= 0.0 or not node.visible:
+			mate_down[id] = 0.0
+			mate_hp[id] = mate_max() * 0.5
+			spr.rotation = Vector3.ZERO
+			spr.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+			spr.modulate = Color.WHITE
+			spr.position.y = 0.0
+			burst(node.position + Vector3(0, 0.8, 0), Color("#9fe0ff"), 10, 1.2)
+		return mate_down[id] > 0.0
+	var calm := not enemies.any(func(e): return not e.dead and not e.get("prop", false) and Vector2(e.x - node.position.x, e.z - node.position.z).length() < 8.0)
+	if calm:
+		mate_hp[id] = minf(mate_max(), mate_health(id) + 4.0 * dt)
+	return false
+
 func update_mate2(dt: float) -> void:
 	if mate2 == null:
 		return
@@ -6253,6 +6351,8 @@ func update_mate2(dt: float) -> void:
 	if mate2.position.distance_to(me) > 8.0:
 		mate2.position = me + Vector3(1.3, 0, -0.6)
 	var spr: Sprite3D = mate2.get_child(0)
+	if mate_tick("noeul", dt):
+		return
 	mate2_cd -= dt
 	var goal := me + Vector3(1.3, 0, -0.6)
 	if not walkable(goal.x, goal.z):
@@ -6285,6 +6385,8 @@ func update_mate(dt: float) -> void:
 	if mate.position.distance_to(me) > 8.0:
 		snap_mate()
 	var spr: Sprite3D = mate.get_child(0)
+	if mate_tick("mulgyeol", dt):
+		return
 	mate_cd -= dt
 	var target = null
 	var best := 5.0
@@ -7924,9 +8026,14 @@ func update_enemies(dt: float, gy: float) -> void:
 			e.wind -= dt
 			if e.wind <= 0.0:
 				e.atk_cd = 1.6
+				var hitd := int(round(rnd(5, 9) + player.lv))
 				if d < 1.3:
-					player_hit(int(round(rnd(5, 9) + player.lv)), Vector2(e.x, e.z), e)
-		elif not e.get("archer", false) and not intro and d < 1.1 and e.atk_cd <= 0 and e.hurt <= 0 and e.get("stun", 0.0) <= 0.0:
+					player_hit(hitd, Vector2(e.x, e.z), e)
+				else:
+					var mid := mate_near(Vector2(e.x, e.z), 1.3)
+					if mid != "":
+						hurt_mate(mid, hitd)
+		elif not e.get("archer", false) and not intro and (d < 1.1 or mate_near(Vector2(e.x, e.z), 1.1) != "") and e.atk_cd <= 0 and e.hurt <= 0 and e.get("stun", 0.0) <= 0.0:
 			e.wind = 0.45
 			pop_num(Vector3(e.x, height_at(e.x, e.z) + 1.3, e.z), "!", Color("#ff5a4a"))
 		var ey := height_at(e.x, e.z)
@@ -8189,6 +8296,10 @@ func update_fall(dt: float) -> void:
 
 # Sora faints: say so plainly, keep gold and level, heal the boss, and wake her at the start
 func faint() -> void:
+	for id in ["mulgyeol", "noeul"]:
+		if mate_down[id] > 0.0:
+			mate_down[id] = 0.001 # gets up on the next tick
+		mate_hp[id] = mate_max()
 	if race_on:
 		end_race("경주 중에 쓰러졌다")
 	if trial_wave > 0:
@@ -8313,6 +8424,11 @@ func update_enemy_shots(dt: float) -> void:
 		var hit := Vector2(n.position.x - player.x, n.position.z - player.z).length() < 0.6
 		if hit:
 			player_hit(12, Vector2(n.position.x, n.position.z) - sh.v.normalized(), sh.owner)
+		else:
+			var mid := mate_near(Vector2(n.position.x, n.position.z), 0.6)
+			if mid != "":
+				hurt_mate(mid, 10)
+				hit = true
 		if hit or sh.life <= 0.0 or not walkable(n.position.x, n.position.z):
 			n.queue_free()
 			enemy_shots.remove_at(i)
