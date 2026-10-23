@@ -2713,6 +2713,7 @@ const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 256분 / 목표 300분 (85%)",
 	"",
 	"2026-10-24 새벽",
+	"· v0.0.14: 우주 한량의 배치 규칙대로 화면의 단추와 판을 모두 가장자리에서 8px에 맞췄다(왼쪽 아래 단추, 왼쪽 위 초상, 미니맵, 기술 칸, 금화 칸). 단추 사이도 8px이다.",
 	"· v0.0.13: 땅 밑에서 올라가는 곳을 지도에 금빛 네모로 표시한다(성 아래 잠긴 층, 물빛 동굴, 지하 동굴). 내려가는 곳은 보라색 그대로. 잠긴 층의 올라가는 계단에 틀과 등을 달았다.",
 	"· v0.0.12: 멀리 보기(Z X, 휠)로 카메라를 물리면 땅이 뿌옇게 덮이던 안개를 약하게 했다. 안개가 카메라 거리만큼 뒤로 물러난다.",
 	"",
@@ -2933,7 +2934,7 @@ func layout_help() -> void:
 		(ui.help_rows[i][1] as Label).position = Vector2(14 + kw + 24, 60 + i * step)
 	var w: float = maxf(340.0, 14 + kw + 24 + dw + 22)
 	var h: float = 60 + ui.help_rows.size() * step + 18
-	place(ui.help, Control.PRESET_BOTTOM_LEFT, Vector2(14, -83 - h), Vector2(w, h))
+	place(ui.help, Control.PRESET_BOTTOM_LEFT, Vector2(8, -72 - h), Vector2(w, h)) # 8 px over the keys
 
 # the settings pages stack their rows by the height the text wraps to, so a longer line or a bigger text size
 # pushes the button and the next row down instead of running into them (waits a frame for the wrap)
@@ -3440,7 +3441,7 @@ func icon_button(root: Control, kind: String, key: String, tip: String, x: float
 		sb.content_margin_bottom = 14
 		sb.set_corner_radius_all(12)
 		b.add_theme_stylebox_override(st, sb)
-	place(b, Control.PRESET_BOTTOM_LEFT, Vector2(x, -70), Vector2(56, 56))
+	place(b, Control.PRESET_BOTTOM_LEFT, Vector2(x, -64), Vector2(56, 56)) # 8 px from the bottom, as Space Oddity
 	b.pressed.connect(fn)
 	root.add_child(b)
 	return b
@@ -4652,7 +4653,7 @@ func build_hud() -> void:
 				circle.set_pixel(x, y, Color.WHITE)
 	mask.texture = ImageTexture.create_from_image(circle)
 	mask.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
-	place(mask, Control.PRESET_TOP_RIGHT, Vector2(-200, 12), Vector2(186, 186))
+	place(mask, Control.PRESET_TOP_RIGHT, Vector2(-194, 8), Vector2(186, 186)) # 8 px from the top and right edges
 	mask.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(mask)
 	var mini := Control.new()
@@ -4703,7 +4704,7 @@ func build_hud() -> void:
 	ui.gold = label(gold, "◆ 0", Vector2(10, 4), 14, Color("#ffd84a"))
 
 	# controls help, starts hidden; H or the button toggles it
-	var help := menu_panel(root, Vector2(14, -570), Vector2(340, 487), Control.PRESET_BOTTOM_LEFT) # ends above the buttons
+	var help := menu_panel(root, Vector2(8, -559), Vector2(340, 487), Control.PRESET_BOTTOM_LEFT) # ends 8 px above the buttons
 	help.mouse_filter = Control.MOUSE_FILTER_STOP
 	label(help, "조작법", Vector2(62, 20), 13, Color("#a99d84"))
 	var rows := [["WASD / 방향키", "이동"], ["Shift", "달리기"], ["J / 왼쪽 클릭", "공격 (연속기)"], ["K / 오른쪽 클릭", "구르기 (때맞추면 섬광)"], ["L / 가운데 클릭", "막기 (때맞추면 반격, Lv4부터 1초 모아 J)"],
@@ -4719,7 +4720,7 @@ func build_hud() -> void:
 	help.visible = false
 	ui.help = help
 	# the journal (Q): what to do now, the side stories found so far and the keepsakes Sora carries
-	var journal := menu_panel(root, Vector2(14, -650), Vector2(800, 567), Control.PRESET_BOTTOM_LEFT)
+	var journal := menu_panel(root, Vector2(8, -639), Vector2(800, 567), Control.PRESET_BOTTOM_LEFT)
 	journal.mouse_filter = Control.MOUSE_FILTER_STOP
 	label(journal, "일지", Vector2(62, 20), 14, Color("#a99d84"))
 	menu_rule(journal, Vector2(14, 60), 772)
@@ -4728,18 +4729,18 @@ func build_hud() -> void:
 	back_key(journal, func(): toggle_journal(false))
 	journal.visible = false
 	ui.journal = journal
-	var ways := menu_panel(root, Vector2(14, -350), Vector2(330, 220), Control.PRESET_BOTTOM_LEFT)
+	var ways := menu_panel(root, Vector2(8, -292), Vector2(330, 220), Control.PRESET_BOTTOM_LEFT)
 	var wt := label(ways, "", Vector2(16, 12), 15, Color("#e9dfc4"))
 	wt.size = Vector2(300, 200)
 	wt.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 	ui.ways_text = wt
 	ways.visible = false
 	ui.ways = ways
-	ui.hint = icon_button(root, "help", "H", "조작법", 14, func(): toggle_help(true))
-	ui.sound_btn = icon_button(root, "sound", "M", "효과음", 78, toggle_sound)
+	ui.hint = icon_button(root, "help", "H", "조작법", 8, func(): toggle_help(true)) # 56 px keys 8 px apart and 8 px from the edge
+	ui.sound_btn = icon_button(root, "sound", "M", "효과음", 72, toggle_sound)
 	refresh_sound_btn()
-	ui.journal_btn = icon_button(root, "journal", "Q", "일지", 142, func(): toggle_journal(not ui.journal.visible))
-	ui.settings_btn = icon_button(root, "gear", "Esc", "설정", 206, func(): toggle_settings(not settings_open))
+	ui.journal_btn = icon_button(root, "journal", "Q", "일지", 136, func(): toggle_journal(not ui.journal.visible))
+	ui.settings_btn = icon_button(root, "gear", "Esc", "설정", 200, func(): toggle_settings(not settings_open))
 	build_settings(root)
 
 	ui.toast = label(root, "", Vector2(0, 0), 20)

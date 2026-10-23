@@ -44,7 +44,7 @@ func _draw() -> void:
 	var p: Dictionary = main.player
 	var vs := get_viewport_rect().size
 	# ---- portrait and level
-	var c := Vector2(70, 72)
+	var c := Vector2(59, 72) # the ring (r 51) 8 px from the left edge
 	draw_circle(c, 50, NAVY)
 	draw_texture_rect(portrait, Rect2(c - Vector2(44, 44), Vector2(88, 88)), false)
 	draw_arc(c, 46, 0, TAU, 64, GOLD, 2.5, true)
@@ -79,7 +79,7 @@ func _draw() -> void:
 	if grow >= 0.5 and main.crown_pips < 8: # the next pip glows in while resting (too small a diamond cannot be drawn)
 		diamond(Vector2(x0 + 8 + main.crown_pips * 16, 124), grow, Color("#9fd4ff"))
 	# ---- sun / moon dial hanging under the portrait
-	var dc := Vector2(70, 222)
+	var dc := Vector2(59, 222)
 	for i in 14:
 		var a0 := PI + PI * i / 14.0
 		var pt := dc + Vector2(cos(a0) * 58, sin(a0) * 32)
@@ -99,8 +99,8 @@ func _draw() -> void:
 		if ph.x < 0.98:
 			draw_circle(sp + Vector2(5.5 * 2.0 * ph.x * ph.y, -0.5), 5.4, Color("#0b1530"))
 	# zone name, small, under the dial
-	text(Vector2(22, 254), main.ui.zone_name.text, 14, TEXT)
-	text(Vector2(22, 272), main.ui.zone_sub.text, 11, DIM)
+	text(Vector2(10, 254), main.ui.zone_name.text, 14, TEXT)
+	text(Vector2(10, 272), main.ui.zone_sub.text, 11, DIM)
 	# ---- quest ornaments
 	if main.ui.quest.visible:
 		var cx := vs.x / 2.0
@@ -117,7 +117,7 @@ func _draw() -> void:
 	var cds: Array = p.cds
 	var cd_max := [main.SKILL_CD[0], main.SKILL_CD[1], main.SKILL_CD[2], 2.0]
 	for i in 4:
-		var sc := Vector2(vs.x - 300 + i * 74, vs.y - 74)
+		var sc := Vector2(vs.x - 264 + i * 74, vs.y - 59) # the last icon and the key tags 8 px from the right and bottom edges
 		draw_texture_rect(icons[i], Rect2(sc - Vector2(34, 34), Vector2(68, 68)), false)
 		var frac: float = cds[i] / cd_max[i]
 		var cant: bool = i < 3 and p.mp < main.skill_cost(i)
@@ -135,7 +135,7 @@ func _draw() -> void:
 		if i == 3:
 			text(sc + Vector2(14, 30), "×%d" % p.pots, 12, TEXT)
 	# ---- gold pill
-	var gp := Rect2(Vector2(vs.x - 150, vs.y - 158), Vector2(126, 28))
+	var gp := Rect2(Vector2(vs.x - 139, vs.y - 129), Vector2(126, 28)) # its end diamond 8 px from the edge, 8 px over the skills
 	draw_rect(gp, NAVY)
 	draw_rect(gp, GOLD_DIM, false, 1.0)
 	diamond(gp.position + Vector2(0, 14), 5, GOLD)
