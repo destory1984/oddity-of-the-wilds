@@ -1179,18 +1179,26 @@ func toggle_shop(open: bool) -> void:
 		refresh_shop()
 		sfx(660, 0.12, "triangle", 0.2)
 
+# the blade and the armour cost 40 more each time one is bought (80, 120, 160, ...)
+var shop_bought := [0, 0, 0, 0]
+
+func shop_price(i: int) -> int:
+	return SHOP[i].price + (40 * shop_bought[i] if i >= 2 else 0)
+
 func refresh_shop() -> void:
 	ui.shop_gold.text = "◆ %d" % player.gold
 	for i in SHOP.size():
-		ui.shop_btns[i].disabled = player.gold < SHOP[i].price
+		ui.shop_btns[i].disabled = player.gold < shop_price(i)
+		ui.shop_btns[i].text = tr("◆ %d  사기") % shop_price(i)
 
 func buy(i: int) -> void:
 	var it: Dictionary = SHOP[i]
-	if player.gold < it.price:
+	if player.gold < shop_price(i):
 		ui.shop_say.text = "금화가 조금 모자라구나. 늪을 한 바퀴 더 돌고 오렴."
 		ui.shop_keeper.texture = load("res://art/portrait/bori_serious.png")
 		return
-	player.gold -= it.price
+	player.gold -= shop_price(i)
+	shop_bought[i] += 1
 	match i:
 		0: player.pots += 1
 		1: player.mp = minf(player.max_mp, player.mp + 50.0)
@@ -3554,7 +3562,7 @@ func save_game() -> void:
 		"fly_q": fly_q, "flies": marsh.flies.map(func(f): return f.caught),
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
-		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "play_secs": play_secs, "ng": ng, "fest_gift": fest_gift, "mail_q": mail_q, "mail_got": mail_got, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes,
+		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "shop_bought": shop_bought, "play_secs": play_secs, "ng": ng, "fest_gift": fest_gift, "mail_q": mail_q, "mail_got": mail_got, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes,
 		"castle_q": castle_q, "bars": castle.bars, "levers": castle.levers.map(func(lv): return lv.up), "vault": castle.vault_open, "has_armour": has_armour, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -3684,6 +3692,9 @@ func load_game() -> void:
 	has_acorn = bool(d.get("has_acorn", false))
 	trial_best = float(d.get("trial_best", 0.0))
 	race_best = float(d.get("race_best", 0.0))
+	var sb: Array = d.get("shop_bought", [])
+	for i in mini(sb.size(), shop_bought.size()):
+		shop_bought[i] = int(sb[i])
 	play_secs = float(d.get("play_secs", 0.0))
 	ng = int(d.get("ng", 0))
 	fest_gift = bool(d.get("fest_gift", false))
