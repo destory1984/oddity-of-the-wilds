@@ -2049,6 +2049,13 @@ func enter_house(i: int) -> void:
 	player.z = 5.0
 	ground_y = 0.0
 	ui.zone_sub.text = tr("마을 집 %d") % (i + 1)
+	var img := Image.create(HOUSE_X + 9, 7, false, Image.FORMAT_RGBA8) # a tiny map of the room for the minimap
+	img.fill(Color(0, 0, 0, 0))
+	for z in HOUSE_ROWS.size():
+		for x in HOUSE_ROWS[0].length():
+			if HOUSE_ROWS[z][x] != "#":
+				img.set_pixel(HOUSE_X + x, z, Color("#6a5034"))
+	ui.mini.map_tex = ImageTexture.create_from_image(img)
 	snap_mates()
 	save_game()
 
@@ -2059,6 +2066,7 @@ func leave_house() -> void:
 	player.z = d.y + 0.4
 	ground_y = 0.0
 	ui.zone_sub.text = "마을 거리"
+	ui.mini.map_tex = village.map_tex(VILLAGE.VILLAGE_X + VILLAGE.W)
 	snap_mates()
 	save_game()
 
