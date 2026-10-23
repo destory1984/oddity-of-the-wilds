@@ -275,6 +275,7 @@ func _ready() -> void:
 	cloud.build_updraft(self, hill.marks.U)
 	castle.build(self)
 	build_trial()
+	build_ways()
 	build_house_room()
 	build_race()
 	build_player()
@@ -343,6 +344,7 @@ const SCENES := {
 	"house": {"play": true, "village": true, "house": true, "hour": 15.0},
 	"festival": {"play": true, "village": true, "festival": true, "hour": 22.0, "day": 4},
 	"cloudpath": {"play": true, "village": true, "cloud": true, "path": true, "hour": 11.0},
+	"ways": {"play": true, "ways": true, "hour": 16.0},
 	"scrap": {"play": true, "at": Vector2(42.5, 5.5), "hour": 17.0},
 }
 
@@ -574,6 +576,13 @@ func apply_test_args(args: PackedStringArray) -> void:
 		marsh.found = [true, false, true]
 		set_quest("마을 심부름을 모두 마쳤다. 밤이 되면 마을에서 쉬자")
 		toggle_journal(true)
+	if sc.get("ways", false): # the waystone list by Bori's cottage
+		story_step = 9
+		lake_q = 1
+		var w0 := way_spot(0)
+		player.x = w0.x + 0.8
+		player.z = w0.y + 1.4
+		toggle_ways(true)
 	if sc.get("opening", false):
 		begin_opening()
 	if sc.has("faint"):
@@ -2240,6 +2249,109 @@ func write_new_round() -> void:
 	f.store_string(JSON.stringify(keep))
 	f.close()
 
+# ---- moon waystones: a standing stone in each hub. E at one opens a list of the stones already reached;
+# a number key (1 - 6) travels there. Esc or E closes the list.
+const WAY_NAMES := ["늪 오두막", "마을 광장", "남쪽 호수 부두", "굳은 숲 입구", "바람 언덕", "달지기 성 문"]
+var way_open := false
+var way_nodes: Array = []
+
+func way_spot(i: int) -> Vector2:
+	match i:
+		0: return Vector2(shop_pos.x + 2.5, shop_pos.z + 1.5)
+		1: return village.marks.M + Vector2(2.0, -2.0)
+		2: return lake.marks.P + Vector2(2.0, -1.5)
+		3: return forest.marks.S + Vector2(2.5, -1.5)
+		4: return hill.marks.S + Vector2(2.0, -1.5)
+		5: return castle.marks.S + Vector2(2.5, -1.5)
+	return Vector2.ZERO
+
+func way_known(i: int) -> bool:
+	match i:
+		0: return story_step >= 3
+		1: return story_step >= 8
+		2: return lake_q >= 1
+		3: return forest_q >= 1
+		4: return hill_q >= 1
+		5: return castle_q >= 1
+	return false
+
+func build_ways() -> void:
+	var stone: Material = mat_color(Color("#8a8a94"))
+	var moon: Material = glow_mat(Color("#bcd6ff"), 0.9)
+	for i in WAY_NAMES.size():
+		var at := way_spot(i)
+		var g := Node3D.new()
+		var b := box(Vector3(0.5, 1.2, 0.4), stone)
+		b.position = Vector3(0, 0.6, 0)
+		g.add_child(b)
+		var m := box(Vector3(0.3, 0.3, 0.06), moon)
+		m.position = Vector3(0, 0.9, 0.22)
+		g.add_child(m)
+		g.position = Vector3(at.x, height_at(at.x, at.y), at.y)
+		add_child(g)
+		way_nodes.append(g)
+		rocks.append({"x": at.x, "z": at.y, "r": 0.35})
+
+func way_near() -> int:
+	for i in WAY_NAMES.size():
+		if Vector2(player.x, player.z).distance_to(way_spot(i)) < 1.4:
+			return i
+	return -1
+
+func way_key() -> bool:
+	if way_open:
+		toggle_ways(false)
+		return true
+	if way_near() < 0:
+		return false
+	toggle_ways(true)
+	return true
+
+func toggle_ways(show: bool) -> void:
+	way_open = show
+	ui.ways.visible = show
+	if show:
+		var lines: Array = [tr("달빛 길돌: 숫자 키로 건너가기 (Esc 닫기)"), ""]
+		for i in WAY_NAMES.size():
+			lines.append("%d   %s" % [i + 1, tr(WAY_NAMES[i]) if way_known(i) else "? ? ?"])
+		ui.ways_text.text = "\n".join(lines)
+
+func travel(i: int) -> void:
+	toggle_ways(false)
+	if not way_known(i) or way_near() == i:
+		return
+	sfx(988, 0.4, "sine", 0.2, -300)
+	fade_then(func():
+		gust_dir = Vector2.ZERO
+		in_cave = false
+		in_village = false
+		in_forest = false
+		in_lake = false
+		in_hill = false
+		in_garden = false
+		in_house = -1
+		match i:
+			0:
+				if ui.has("outside_map"):
+					ui.mini.map_tex = ui.outside_map
+				ui.zone_name.text = "갈대늪"
+				ui.zone_sub.text = "보리 할머니의 오두막"
+			1:
+				var e0 := errand
+				errand = maxi(errand, 1) # no arrival scene again
+				enter_village()
+				errand = e0
+			2: enter_lake()
+			3: enter_forest()
+			4: enter_hill()
+			5: enter_castle()
+		var to := way_spot(i) + Vector2(0, 1.2)
+		player.x = to.x
+		player.z = to.y
+		ground_y = height_at(to.x, to.y)
+		snap_mates()
+		save_game())
+
 func spawn_boss() -> void:
 	var spot := Vector2(16, 4)
 	for tries in 40:
@@ -3267,6 +3379,13 @@ func build_hud() -> void:
 	journal.add_child(jclose)
 	journal.visible = false
 	ui.journal = journal
+	var ways := panel(root, Vector2(14, -333), Vector2(330, 220), Control.PRESET_BOTTOM_LEFT)
+	var wt := label(ways, "", Vector2(16, 12), 15, Color("#e9dfc4"))
+	wt.size = Vector2(300, 200)
+	wt.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	ui.ways_text = wt
+	ways.visible = false
+	ui.ways = ways
 	var hint := Button.new()
 	hint.text = "H  조작법 보기"
 	hint.add_theme_font_override("font", ui_font)
@@ -3436,7 +3555,7 @@ func build_hud() -> void:
 	for c in root.get_children():
 		if c != title:
 			c.visible = false
-	ui.hidden_for_intro = root.get_children().filter(func(c): return c != title and c != ui.help and c != ui.journal and c != ui.boss and c != ui.shop and c != ui.shop_hint and c != ui.slowmo_tint and c != ui.story and c != ui.quest and c != ui.legacy)
+	ui.hidden_for_intro = root.get_children().filter(func(c): return c != title and c != ui.help and c != ui.journal and c != ui.ways and c != ui.boss and c != ui.shop and c != ui.shop_hint and c != ui.slowmo_tint and c != ui.story and c != ui.quest and c != ui.legacy)
 	for k in ["zone", "stats"]:
 		pass
 
@@ -4155,6 +4274,8 @@ func spend_pips(n: int) -> bool:
 # E key: talk to Simji, light a dark village lantern, or (in the marsh opening) touch the crown
 func crown_key() -> void:
 	var me := Vector2(player.x, player.z)
+	if way_key():
+		return
 	if in_cave and shrine_key():
 		return
 	if in_forest:
@@ -6730,6 +6851,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			MOUSE_BUTTON_RIGHT: dodge()
 			MOUSE_BUTTON_WHEEL_UP: cam_dist = clampf(cam_dist - 1.2, 8, 26)
 			MOUSE_BUTTON_WHEEL_DOWN: cam_dist = clampf(cam_dist + 1.2, 8, 26)
+	if way_open and event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode >= KEY_1 and event.keycode <= KEY_6:
+			travel(event.keycode - KEY_1)
+			return
+		if event.keycode == KEY_ESCAPE:
+			toggle_ways(false)
+			return
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
 			KEY_J: attack()

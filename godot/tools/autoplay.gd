@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -1931,6 +1931,40 @@ func run() -> void:
 		main.in_hill = false
 		calm_enemies(false)
 		check("cloud_path", shown and fell and walked and faster, "E shows the path=%s step off falls back=%s path walkable=%s shard cuts cooldowns=%s" % [shown, fell, walked, faster])
+	if want.call("waystones"):
+		main.story_step = maxi(main.story_step, 10)
+		if main.intro:
+			main.start_game(false)
+		await wait(0.2)
+		main.close_story()
+		main.lake_q = maxi(main.lake_q, 1)
+		main.in_village = false
+		main.in_hill = false
+		main.in_lake = false
+		main.in_forest = false
+		main.in_garden = false
+		main.in_cave = false
+		calm_enemies(true)
+		var ok_spots := true
+		for i in main.WAY_NAMES.size():
+			var w: Vector2 = main.way_spot(i) + Vector2(0, 1.2)
+			ok_spots = ok_spots and main.walkable(w.x, w.y)
+		var w0: Vector2 = main.way_spot(0)
+		reset_to(w0 + Vector2(0, 1.0))
+		tap(KEY_E)
+		await wait(0.1)
+		var opened: bool = main.way_open and main.ui.ways.visible
+		tap(KEY_3)
+		await wait(1.2)
+		var at_lake: bool = main.in_lake and Vector2(main.player.x, main.player.z).distance_to(main.way_spot(2)) < 2.0
+		reset_to(main.way_spot(2) + Vector2(0, 1.0))
+		tap(KEY_E)
+		await wait(0.1)
+		tap(KEY_1)
+		await wait(1.2)
+		var home: bool = not main.in_lake and main.in_marsh() and Vector2(main.player.x, main.player.z).distance_to(main.way_spot(0)) < 2.0
+		calm_enemies(false)
+		check("waystones", ok_spots and opened and at_lake and home, "stones reachable=%s list opens=%s marsh -> lake=%s lake -> marsh=%s" % [ok_spots, opened, at_lake, home])
 	calm_enemies(false)
 	var failed := results.count(false)
 	print("TESTS %d passed, %d failed" % [results.size() - failed, failed])
