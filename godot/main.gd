@@ -419,8 +419,8 @@ func apply_test_args(args: PackedStringArray) -> void:
 			close_story()
 			grotto_q = 2
 			spawn_crab()
-			player.x = grotto.marks.C.x + 3.0
-			player.z = grotto.marks.C.y + 0.5
+			player.x = grotto.marks.C.x + 4.0
+			player.z = grotto.marks.C.y + 1.5
 			snap_mate()
 		if sc.get("hill", false): # the wind hills, one mill turning, Mulgyeol and Noeul along
 			night_q = 4
@@ -474,6 +474,7 @@ func apply_test_args(args: PackedStringArray) -> void:
 				spawn_knight()
 				player.x = castle.marks.K.x - 3.5
 				player.z = castle.marks.K.y + 1.0
+			set_quest(castle_quest())
 			snap_mates()
 		if sc.get("kid", false): # Kongal's kid goblin trotting after Sora in the south field
 			errand = 3
@@ -4130,8 +4131,8 @@ func update_crab(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
 		else:
 			# sideways first: match Sora's x, then creep in on z
 			var v := Vector2(clampf(to.x, -1.0, 1.0) * 2.4, clampf(to.y - signf(to.y) * 1.6, -1.0, 1.0) * 0.9)
-			if d < 1.8:
-				v = Vector2.ZERO # close enough to pinch; do not climb onto her
+			if d < 2.1:
+				v = Vector2.ZERO # close enough to pinch (2.3); its wide shell would cover her any closer
 			var nx: float = e.x + v.x * dt
 			var nz: float = e.z + v.y * dt
 			if walkable(nx, e.z): e.x = nx
