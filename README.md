@@ -82,6 +82,9 @@
 |---|---|
 | ![갈대늪](docs/shots/start.jpg) | ![보리 할머니의 상점](docs/shots/shop.jpg) |
 | ![굳은 숲](docs/shots/forest.jpg) | ![남쪽 호수 섬의 벽돌 거북](docs/shots/turtle.jpg) |
+| ![섬 밑 물빛 동굴의 벽돌 게](docs/shots/crab.jpg) | ![구름 둔덕의 벽돌 허수아비](docs/shots/scarecrow.jpg) |
+| ![가라앉은 달지기 성](docs/shots/castle.jpg) | ![옥좌의 방의 벽돌 기사](docs/shots/knight.jpg) |
+| ![숲의 달 순서 돌](docs/shots/grove.jpg) | ![동굴의 세 돌단](docs/shots/shrine.jpg) |
 
 ## 만든 방법
 
