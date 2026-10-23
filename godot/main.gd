@@ -2193,7 +2193,7 @@ func festival_key() -> bool:
 # attack, max HP, gold, potions, keepsakes, the woken skill, feats and records. Monsters then take
 # 1/(1 + 0.5 x round) of the damage and deal (1 + 0.5 x round) times as much.
 const NG_KEEP := ["lv", "xp", "max_hp", "atk", "gold", "pots", "has_pearl", "has_feather", "has_acorn", "has_ring", "has_shoes",
-	"has_armour", "has_tea", "skill_up", "stats", "feats", "trial_best", "race_best", "fish"]
+	"has_armour", "has_tea", "has_shard", "skill_up", "stats", "feats", "trial_best", "race_best", "fish"]
 var ng := 0                 # how many rounds were finished before this one
 var ng_armed := 0.0         # seconds left to confirm with a second E
 
@@ -2716,7 +2716,7 @@ func use_skill(i: int) -> void:
 		toast("기세가 모자라다")
 		return
 	player.mp -= skill_cost(i)
-	player.cds[i] = SKILL_CD[i]
+	player.cds[i] = SKILL_CD[i] * (0.8 if has_shard else 1.0)
 	var here := Vector3(player.x, height_at(player.x, player.z), player.z)
 	var me := Vector2(player.x, player.z)
 	match i:
@@ -3562,7 +3562,7 @@ func save_game() -> void:
 		"fly_q": fly_q, "flies": marsh.flies.map(func(f): return f.caught),
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
-		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "shop_bought": shop_bought, "play_secs": play_secs, "ng": ng, "fest_gift": fest_gift, "mail_q": mail_q, "mail_got": mail_got, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes,
+		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "has_shard": has_shard, "shop_bought": shop_bought, "play_secs": play_secs, "ng": ng, "fest_gift": fest_gift, "mail_q": mail_q, "mail_got": mail_got, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes,
 		"seals": garden.seals.map(func(sl): return sl.open),
 		"castle_q": castle_q, "bars": castle.bars, "levers": castle.levers.map(func(lv): return lv.up), "vault": castle.vault_open, "has_armour": has_armour, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
@@ -3693,6 +3693,9 @@ func load_game() -> void:
 	has_acorn = bool(d.get("has_acorn", false))
 	trial_best = float(d.get("trial_best", 0.0))
 	race_best = float(d.get("race_best", 0.0))
+	has_shard = bool(d.get("has_shard", false))
+	if has_shard:
+		cloud.shard_look()
 	var sb: Array = d.get("shop_bought", [])
 	for i in mini(sb.size(), shop_bought.size()):
 		shop_bought[i] = int(sb[i])
@@ -3716,7 +3719,7 @@ func load_game() -> void:
 	for i in mini(fl.size(), marsh.picked.size()):
 		marsh.picked[i] = bool(fl[i])
 	has_tea = bool(d.get("has_tea", false))
-	for k in ["has_pearl", "has_feather", "has_acorn", "has_ring", "has_shoes", "has_armour", "has_tea"]:
+	for k in ["has_pearl", "has_feather", "has_acorn", "has_ring", "has_shoes", "has_armour", "has_tea", "has_shard"]:
 		set(k, bool(d.get(k, get(k))))
 	var fk: Array = d.get("fish", [])
 	for i in mini(fk.size(), fish_kinds.size()):
@@ -5103,7 +5106,25 @@ func update_gust(dt: float) -> void:
 	if int(gust_t * 10.0) != int((gust_t - dt) * 10.0):
 		burst(Vector3(player.x, 0.5, player.z), Color("#ffffff"), 3, 0.8)
 
+var has_shard := false      # 구름 조각: skill cooldowns x0.8
+
 func cloud_key() -> bool:
+	var cx := float(CLOUD.CLOUD_X)
+	var me := Vector2(player.x, player.z)
+	if not cloud.shard_open and me.distance_to(cloud.marks.q) < 1.6:
+		cloud.shard_look()
+		has_shard = true
+		burst(Vector3(cloud.marks.q.x, 0.8, cloud.marks.q.y), Color("#bfe6ff"), 40, 3.0)
+		sfx(784, 0.12, "triangle", 0.25)
+		show_story("", STORY.CLOUD_SHARD)
+		save_game()
+		return true
+	if me.x < cx + 7.0 and me.y > 10.5: # by the unseen path: hold up the crown and it shows for 3 s
+		cloud.reveal_t = 3.0
+		cloud.reveal(true)
+		burst(Vector3(player.x, 1.6, player.z), Color("#bfe6ff"), 14, 1.5)
+		sfx(988, 0.3, "sine", 0.18)
+		return true
 	if not cloud_chest and Vector2(player.x, player.z).distance_to(cloud.marks.c) < 1.6:
 		cloud_chest = true
 		cloud.opened_look()
@@ -6593,6 +6614,8 @@ func journal_lines() -> Array:
 		side.call("숲의 달 순서 돌", tr("끝") if forest.chest_open else (tr("상자를 열자") if forest.solved else tr("숲 북서쪽 숲터")))
 	if hill_q >= 1:
 		side.call("바람개비 경주", tr("최고 기록 %.1f초") % race_best if race_best > 0.0 else tr("언덕 남서쪽 깃대에서"))
+	if cloud_q >= 1:
+		side.call("보이지 않는 구름길", tr("끝") if has_shard else tr("첫 섬 남쪽에서 E로 길을 비춰 보자"))
 	if hill_q >= 3:
 		side.call("구름 둔덕", tr("끝") if cloud_q >= 3 else tr("언덕 북쪽 바람구멍으로"))
 	if castle_q >= 1:
@@ -6620,6 +6643,7 @@ func journal_lines() -> Array:
 	if has_shoes: keep.append(tr("바람 신발"))
 	if has_armour: keep.append(tr("달지기 갑옷"))
 	if has_tea: keep.append(tr("달꽃 차"))
+	if has_shard: keep.append(tr("구름 조각"))
 	out.append("  " + (", ".join(keep) if not keep.is_empty() else tr("왕관 하나")))
 	return out
 
@@ -6950,6 +6974,16 @@ func _process(dt: float) -> void:
 	update_trial(dt)
 	update_race(dt)
 	update_fishing(dt)
+	if cloud.reveal_t > 0.0:
+		cloud.reveal_t -= dt
+		if cloud.reveal_t <= 0.0:
+			cloud.reveal(false)
+	if in_cloud() and gust_dir == Vector2.ZERO and cloud.char_at(player.x, player.z) == "," and fade_rect.color.a == 0.0:
+		player.x = CLOUD.CLOUD_X + 3.0 # a step off the unseen path: back onto the entry island
+		player.z = 11.0
+		hurt_player(8, 0.0)
+		burst(Vector3(player.x, 0.5, player.z), Color("#ffffff"), 20, 2.5)
+		toast("발을 헛디뎌 구름 아래로 떨어졌다가 바람에 실려 돌아왔다")
 	if not intro:
 		play_secs += dt
 	ng_armed -= dt
