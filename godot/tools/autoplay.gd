@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -628,8 +628,11 @@ func run() -> void:
 		check("village_enter", main.in_village and main.story_step == 8 and talk, "east edge -> village=%s step=%d arrival talk=%s" % [main.in_village, main.story_step, talk])
 	if want.call("village_layout"):
 		var lamps: int = main.village_lamps().size()
-		check("village_layout", lamps == 12 and main.village.dark.size() == 3 and main.walkable(main.village.marks.M.x - 1.5, main.village.marks.M.y),
-			"12 lanterns (%d), 3 dark (%d), square walkable" % [lamps, main.village.dark.size()])
+		var want_lamps := 0
+		for row: String in main.village.grid:
+			want_lamps += row.count("L") + row.count("d")
+		check("village_layout", lamps == want_lamps and main.village.dark.size() == 3 and main.walkable(main.village.marks.M.x - 1.5, main.village.marks.M.y),
+			"%d lanterns (%d), 3 dark (%d), square walkable" % [want_lamps, lamps, main.village.dark.size()])
 	if want.call("simji_talk"):
 		main.in_village = true
 		main.errand = 0
@@ -1775,7 +1778,7 @@ func run() -> void:
 		main.close_story()
 		reset_to(Vector2(main.HOUSE_X + 4, 6))
 		await wait(1.0)
-		var out: bool = main.in_house == -1 and main.player.x < main.HOUSE_X and main.in_village
+		var out: bool = main.in_house == -1 and main.player.x >= main.VILLAGE.VILLAGE_X - 0.5 and main.in_village
 		calm_enemies(false)
 		check("houses", doors_ok and inside and picture and out, "5 doors reachable=%s went in=%s picture in the last house=%s came out=%s" % [doors_ok, inside, picture, out])
 	if want.call("feats"):
@@ -2112,13 +2115,15 @@ func run() -> void:
 		main.chat_t = 9.5
 		main.chat_cd = 0.0
 		await wait(0.2)
-		var talked := false
-		for m in [main.mate, main.mate2]:
-			for c in m.get_children():
-				if c is Node3D and c.get_child_count() > 1 and c.get_child(1) is Label3D:
-					talked = true
+		var talked: bool = main.bubbles_said > 0
+		await wait(11.0) # let a talk the rest started run out
+		var said0: int = main.bubbles_said
+		main.rest_talk(main.STORY.REST_TALK[0]) # Sora, Mulgyeol, Noeul, Mulgyeol: all three talk
+		await wait(8.0)
+		var said: int = main.bubbles_said - said0
+		var three: bool = said == 4
 		calm_enemies(false)
-		check("mate_chat", talked and main.chat_cd > 10.0, "a companion says a line in a balloon after standing still=%s" % talked)
+		check("mate_chat", talked and three and main.chat_cd > 10.0, "a balloon after standing still=%s a four-line talk among all three=%s (%d balloons)" % [talked, three, said])
 	if want.call("east_bridge"):
 		main.in_village = false
 		main.in_hill = false
@@ -2270,6 +2275,92 @@ func run() -> void:
 		calm_enemies(false)
 		check("undercroft", skipped and blown and down_in and flooded and drained and out and door and guards and won and chest and kept and back,
 			"skip=%s vent=%s stair down=%s flooded/drained=%s/%s lamps go out after 8 s=%s four lamps open the door=%s guardians shut it=%s beaten=%s chest +20/+3=%s saved=%s way back up=%s" % [skipped, blown, down_in, flooded, drained, out, door, guards, won, chest, kept, back])
+	if want.call("village_market"):
+		if main.intro:
+			main.start_game(false)
+		await wait(0.2)
+		main.close_story()
+		main.in_hill = false
+		main.in_lake = false
+		main.in_forest = false
+		main.in_garden = false
+		main.in_cave = false
+		main.in_house = -1
+		main.in_village = true
+		main.errand = maxi(main.errand, 1)
+		calm_enemies(true)
+		var vx: float = main.VILLAGE.VILLAGE_X
+		var big: bool = main.VILLAGE.W == 48 and main.VILLAGE.H == 36 and main.walkable(vx + 40, 10) and main.walkable(vx + 16, 30) and not main.walkable(vx + 30, 27)
+		main.player.gold = 200
+		main.magpie_q = 0
+		reset_to(main.village.marks["1"] + Vector2(0, 0.6))
+		main.player.hp = 20.0 # reset_to heals her
+		tap(KEY_E) # the first E at a stall reads the market's note instead
+		await wait(0.1)
+		var note: bool = main.story_open and main.magpie_q == 1
+		main.close_story()
+		await wait(0.1)
+		tap(KEY_E)
+		await wait(0.1)
+		var apple: bool = main.player.hp >= 59.0 and main.player.gold == 195
+		var apple_note := "hp %.0f gold %d at %s" % [main.player.hp, main.player.gold, str(Vector2(main.player.x - vx, main.player.z))]
+		reset_to(main.village.marks.Q + Vector2(0, 1.2))
+		tap(KEY_E)
+		await wait(0.1)
+		var started: bool = main.target_on
+		for i in 6:
+			main.spawn_target()
+			var tg: Dictionary = main.enemies[main.enemies.size() - 1]
+			main.damage_enemy(tg, 10.0, Vector2(tg.x, tg.z + 1.0))
+		main.target_left = 0.05
+		await wait(0.3)
+		main.close_story()
+		var medal: bool = started and not main.target_on and main.has_medal and main.target_best >= 6
+		main.hour = 22.0
+		reset_to(main.village.marks.N + Vector2(0, 0.6))
+		main.player.hp = 30.0
+		tap(KEY_E)
+		await wait(1.4)
+		main.close_story()
+		var slept: bool = absf(main.hour - 7.0) < 0.2 and main.player.hp >= main.player.max_hp and main.player.gold == 185
+		var g0: int = main.player.gold
+		for b in main.village.bottles:
+			main.pick_bottle(b)
+			main.close_story()
+		await wait(0.3)
+		var letters: bool = main.village.bottles_got() == 3 and main.player.gold == g0 + 120
+		reset_to(main.village.marks.f)
+		tap(KEY_E)
+		await wait(0.1)
+		var fishing: bool = main.fish_state == "wait"
+		tap(KEY_E)
+		calm_enemies(false)
+		# the magpie: at night it flies ahead perch by perch, to its nest on the pond; the moon lantern ends it
+		main.hour = 22.0
+		main.magpie_at = 0
+		main.place_magpie()
+		var perches: Array = main.magpie_perches()
+		for k in 3:
+			var pp: Vector3 = perches[k]
+			reset_to([Vector2(pp.x, pp.y + 1.5), Vector2(pp.x, pp.y - 1.5), main.village.marks.f][k])
+			await wait(1.6)
+		var flew: bool = main.magpie_at == 3
+		var np: Vector3 = perches[3]
+		main.player.x = np.x - 0.8 # out on the water, as if she skipped there
+		main.player.z = np.y
+		main.update_magpie(0.01)
+		await wait(0.1)
+		var nest: bool = main.magpie_q == 2
+		main.close_story()
+		reset_to(main.village.marks.f)
+		main.crown_pips = 8
+		var g1: int = main.player.gold
+		tap(KEY_E)
+		await wait(0.2)
+		main.close_story()
+		var lamp: bool = main.magpie_q == 3 and main.player.gold == g1 + 100 and main.crown_pips == 6
+		check("village_market", note and flew and nest and lamp and big and apple and medal and slept and letters and fishing,
+			"note=%s magpie flew to its nest=%s found it=%s moon lantern=%s 48x36=%s apple stall=%s target medal=%s inn night=%s three bottles=%s pier fishing=%s (%s)" % [note, flew, nest, lamp, big, apple, medal, slept, letters, fishing, apple_note])
 	if want.call("moon_stairs"):
 		main.story_step = maxi(main.story_step, 10)
 		if main.intro:

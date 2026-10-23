@@ -114,7 +114,9 @@ func cave_char(x: float, z: float) -> String:
 	return c
 
 func tile_at(x: float, z: float) -> int:
-	if x >= UNDER.UNDER_X - 0.5:
+	if x >= VILLAGE.VILLAGE_X - 0.5:
+		return WATER if village.blocked(x, z) else (SAND if village.char_at(x, z) in "=:P" else GRASS)
+	if x >= UNDER.UNDER_X - 0.5 and x < VILLAGE.VILLAGE_X - 0.5:
 		return WATER if under.blocked(x, z, under_shut()) else GRASS
 	if x >= STAIRS.STAIRS_X - 0.5:
 		return WATER if stairs.blocked(x, z) else GRASS
@@ -134,8 +136,6 @@ func tile_at(x: float, z: float) -> int:
 		return WATER if garden.blocked(x, z) else (SAND if garden.char_at(x, z) == "=" else GRASS)
 	if x >= FOREST.FOREST_X - 0.5:
 		return WATER if forest.blocked(x, z) else (SAND if forest.char_at(x, z) == "=" else GRASS)
-	if x >= VILLAGE.VILLAGE_X - 0.5:
-		return WATER if village.blocked(x, z) else (SAND if village.char_at(x, z) == "=" else GRASS)
 	if x >= CAVE_X - 0.5:
 		var c := cave_char(x, z)
 		return WATER if c == "#" or c == "D" else (SAND if c == "w" else GRASS)
@@ -185,7 +185,9 @@ var skip_grace := 0.0   # a short let-go of Shift or the arrows mid-river does n
 
 # water the water skip can run over: the marsh rivers and ponds, and the deep runs in the grotto
 func skip_water(x: float, z: float) -> bool:
-	if x >= UNDER.UNDER_X - 0.5:
+	if x >= VILLAGE.VILLAGE_X - 0.5:
+		return village.char_at(x, z) in "~B"
+	if x >= UNDER.UNDER_X - 0.5 and x < VILLAGE.VILLAGE_X - 0.5:
 		return under.char_at(x, z) == "~"
 	if x >= STAIRS.STAIRS_X - 0.5:
 		return stairs.char_at(x, z) == "~"
@@ -307,6 +309,7 @@ func _ready() -> void:
 	build_mate_hud(ui.root)
 	under.build(self)
 	build_under_stair()
+	build_magpie()
 	apply_settings()
 	update_daylight(0.0)
 	var targs := OS.get_cmdline_user_args()
@@ -339,6 +342,9 @@ const SCENES := {
 	"scene": {"play": true, "scene": true},
 	"village": {"play": true, "village": true},
 	"village_night": {"play": true, "village": true, "hour": 22.0},
+	"market": {"play": true, "village": true, "vat": Vector2(38, 6), "hour": 14.0},
+	"pier": {"play": true, "village": true, "vat": Vector2(32, 29), "hour": 14.0},
+	"inn": {"play": true, "village": true, "vat": Vector2(8, 30), "hour": 14.0},
 	"forest": {"play": true, "village": true, "forest": true, "hour": 16.0},
 	"forest_night": {"play": true, "village": true, "forest": true, "hour": 22.0},
 	"mold": {"play": true, "village": true, "mold": true, "hour": 21.0},
@@ -417,6 +423,9 @@ func apply_test_args(args: PackedStringArray) -> void:
 		enter_village()
 		player.x = village.marks.M.x - 2.0
 		player.z = village.marks.M.y + 1.0
+		if sc.has("vat"): # a spot in village tiles
+			player.x = VILLAGE.VILLAGE_X + sc.vat.x
+			player.z = sc.vat.y
 		if sc.get("forest", false): # the hardened forest, first wall ahead
 			night_q = 4
 			forest_q = 1
@@ -1955,8 +1964,15 @@ var fish_t := 0.0
 var fish_kinds := [false, false, false, false, false]
 var bobber: Node3D
 
+var fish_at := Vector2.ZERO # the spot she fishes from: the lake's east shore or the end of the village pier
+
 func fish_key() -> bool:
-	if lake_q < 2 or Vector2(player.x, player.z).distance_to(lake.marks.f) > 1.5:
+	var me := Vector2(player.x, player.z)
+	if in_lake and not in_grotto() and lake_q >= 2 and me.distance_to(lake.marks.f) <= 1.5:
+		fish_at = lake.marks.f
+	elif in_village and in_house < 0 and me.distance_to(village.marks.f) <= 1.5:
+		fish_at = village.marks.f
+	elif fish_state == "":
 		return false
 	match fish_state:
 		"":
@@ -1968,7 +1984,8 @@ func fish_key() -> bool:
 				bobber.add_child(b)
 				add_child(bobber)
 			bobber.visible = true
-			bobber.position = Vector3(lake.marks.f.x, -0.25, lake.marks.f.y + 2.0)
+			var cast := Vector2(0, 2.0) if fish_at == lake.marks.f else Vector2(2.0, 0) # the pier looks east over the pond
+			bobber.position = Vector3(fish_at.x + cast.x, -0.25, fish_at.y + cast.y)
 			sfx(300, 0.15, "noise", 0.08, -100)
 			toast("낚싯줄을 던졌다. 찌가 흔들리면 E!")
 		"wait":
@@ -1996,7 +2013,7 @@ func land_fish() -> void:
 	fish_kinds[k] = true
 	var n: int = fish_kinds.count(true)
 	player.gold += 5 + k * 5
-	burst(Vector3(lake.marks.f.x, 0.4, lake.marks.f.y + 1.5), Color("#9fd4ff"), 16, 2.0)
+	burst(Vector3(bobber.position.x, 0.4, bobber.position.z), Color("#9fd4ff"), 16, 2.0)
 	sfx(660 + k * 80, 0.15, "triangle", 0.2)
 	toast(tr("%s을(를) 낚았다! (%d/5 종류)") % [tr(FISH[k][0]), n] if fresh else tr("%s을(를) 낚았다") % tr(FISH[k][0]))
 	if fresh and n == FISH.size():
@@ -2009,7 +2026,7 @@ func land_fish() -> void:
 func update_fishing(dt: float) -> void:
 	if fish_state == "":
 		return
-	if not in_lake or in_grotto() or Vector2(player.x, player.z).distance_to(lake.marks.f) > 2.0:
+	if not (in_lake and not in_grotto() or in_village) or Vector2(player.x, player.z).distance_to(fish_at) > 2.0:
 		fish_state = ""
 		bobber.visible = false
 		return
@@ -2309,7 +2326,7 @@ func update_festival(dt: float) -> void:
 	if fest_t > 0.0:
 		return
 	fest_t = 0.5
-	var at := Vector3(VILLAGE.VILLAGE_X + rnd(3, 29), rnd(0.5, 1.5), rnd(3, 21))
+	var at := Vector3(VILLAGE.VILLAGE_X + rnd(3, 45), rnd(0.5, 1.5), rnd(3, 33))
 	var lamp := box(Vector3(0.24, 0.32, 0.24), glow_mat(Color("#ff9a3a"), 0.7)) # low glow keeps the orange under bloom
 	lamp.position = at
 	add_fx(lamp, 9.0, func(n: Node3D, k: float, d: float):
@@ -2333,7 +2350,7 @@ func festival_key() -> bool:
 # attack, max HP, gold, potions, keepsakes, the woken skill, feats and records. Monsters then take
 # 1/(1 + 0.5 x round) of the damage and deal (1 + 0.5 x round) times as much.
 const NG_KEEP := ["lv", "xp", "max_hp", "atk", "gold", "pots", "has_pearl", "has_feather", "has_acorn", "has_ring", "has_shoes",
-	"has_armour", "has_tea", "has_shard", "has_bookmark", "has_lamp", "skill_up", "stats", "feats", "trial_best", "race_best", "fish"]
+	"has_armour", "has_tea", "has_shard", "has_bookmark", "has_lamp", "has_medal", "skill_up", "stats", "feats", "trial_best", "race_best", "fish"]
 var ng := 0                 # how many rounds were finished before this one
 var ng_armed := 0.0         # seconds left to confirm with a second E
 
@@ -2512,7 +2529,7 @@ const ICON_SVG := {
 	"gear": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#eef3ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5.6"/><circle cx="12" cy="12" r="1.9"/><path d="M12 3.2v3.2M12 17.6v3.2M3.2 12h3.2M17.6 12h3.2M5.8 5.8L8 8M16 16l2.2 2.2M5.8 18.2L8 16M16 8l2.2-2.2"/></svg>',
 	"sound": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#eef3ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3l4.5-3.8v12.6L7 14.5H4z"/><path d="M15 9.2a4 4 0 0 1 0 5.6"/><path d="M17.6 6.6a7.6 7.6 0 0 1 0 10.8"/></svg>',
 	"mute": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#eef3ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3l4.5-3.8v12.6L7 14.5H4z"/><path d="M15.5 9.5l5 5M20.5 9.5l-5 5"/></svg>',
-	"back": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#eef3ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5L8 12l6.5 6.5"/></svg>',
+	"back": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(0.25 -2.25)"><path d="M9 7L4.5 11.5 9 16"/><path d="M5 11.5h9a5 5 0 0 1 0 10h-2"/></g></svg>',
 }
 var menu_theme: Theme
 var icon_cache := {}
@@ -2564,6 +2581,28 @@ func odd_icon(kind: String) -> ImageTexture:
 	var tex := ImageTexture.create_from_image(img)
 	icon_cache[kind] = tex
 	return tex
+
+# the corner key that leaves a sheet or card, as Space Oddity's .backKey: 44 x 44 at 8 px from the top-left corner,
+# a 1 px #9fb4ff66 line, 12 px corners, #0b1630d9 fill, the return arrow drawn at 20 px
+func back_key(parent: Control, fn: Callable) -> Button:
+	var b := Button.new()
+	b.icon = odd_icon("back")
+	b.expand_icon = true
+	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	b.focus_mode = Control.FOCUS_NONE
+	b.tooltip_text = tr("이전 화면으로")
+	for st in ["normal", "hover", "pressed"]:
+		var sb := flat(Color("#0b1630d9") if st == "normal" else Color("#26456199"), Color("#9fb4ff66") if st == "normal" else Color("#93d2ff88"), 1, 12, 0.0)
+		sb.content_margin_left = 12
+		sb.content_margin_right = 12
+		sb.content_margin_top = 12
+		sb.content_margin_bottom = 12
+		b.add_theme_stylebox_override(st, sb)
+	b.position = Vector2(8, 8)
+	b.size = Vector2(44, 44)
+	b.pressed.connect(fn)
+	parent.add_child(b)
+	return b
 
 func menu_panel(root: Control, pos: Vector2, size: Vector2, anchor: int) -> Panel:
 	var p := panel(root, pos, size, anchor)
@@ -2647,14 +2686,7 @@ func build_settings(root: Control) -> void:
 	sp.theme = get_menu_theme()
 	sp.mouse_filter = Control.MOUSE_FILTER_STOP
 	root.add_child(sp)
-	var back := Button.new()
-	back.icon = odd_icon("back")
-	back.expand_icon = true
-	back.focus_mode = Control.FOCUS_NONE
-	back.position = Vector2(8, 8)
-	back.size = Vector2(44, 44)
-	back.pressed.connect(func(): toggle_settings(false))
-	sp.add_child(back)
+	back_key(sp, func(): toggle_settings(false))
 	var col := Control.new() # the 640 px column, centred
 	col.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	col.offset_left = -320
@@ -2746,7 +2778,9 @@ func build_settings(root: Control) -> void:
 	var ct := label(ui.set_pages[3], "만든 코드", Vector2(0, 4 * 48), 13, Color("#eef3ff"))
 	ct.size = Vector2(90, 20)
 	set_button(ui.set_pages[3], "깃허브에서 보기", Vector2(106, 4 * 48 - 6), Vector2(150, 36), func(): OS.shell_open("https://github.com/destory1984/oddity-of-the-wilds"))
-	set_button(col, "놀이로 돌아가기", Vector2(0, 514), Vector2(640, 42), func(): toggle_settings(false))
+	var foot := set_button(col, "놀이로 돌아가기", Vector2(0, 512), Vector2(640, 44), func(): toggle_settings(false))
+	foot.add_theme_font_size_override("font_size", 15)
+	foot.add_theme_color_override("font_color", Color("#eef3ff"))
 	sp.visible = false
 	ui.settings = sp
 	show_set_tab(0)
@@ -2763,6 +2797,7 @@ func toggle_settings(show: bool) -> void:
 	settings_open = show
 	ui.settings.visible = show
 	if show:
+		ui.settings.move_to_front() # above the companions' rows, built after it
 		ui.help.visible = false
 		ui.journal.visible = false
 		show_set_tab(0)
@@ -2804,7 +2839,10 @@ func balloon_tex(w: int) -> ImageTexture:
 	balloon_cache[w] = tex
 	return tex
 
+var bubbles_said := 0 # counted for the tests
+
 func say_bubble(who: Node3D, text: String, dur := 3.5) -> void:
+	bubbles_said += 1
 	var b := Node3D.new()
 	var w := 40 + text.length() * 26
 	w = int(ceil(w / 16.0)) * 16 # a few widths only, so the cache stays small
@@ -2872,6 +2910,14 @@ func update_chat(dt: float) -> void:
 	if who.is_empty():
 		return
 	chat_cd = rnd(14.0, 24.0)
+	# most rests are a little talk with Sora in it (the user asked for all three to chat, not only the two)
+	var here: Array = ["sora"]
+	for pair in who:
+		here.append(pair[0])
+	var talks: Array = STORY.REST_TALK.filter(func(tk): return tk.all(func(ln): return ln[0] in here))
+	if not talks.is_empty() and rng.randf() < 0.65:
+		rest_talk(talks[rng.randi() % talks.size()])
+		return
 	if who.size() == 2 and rng.randf() < 0.3: # the two of them trade a line
 		var pair: Array = STORY.MATE_BANTER[rng.randi() % STORY.MATE_BANTER.size()]
 		var first: Node3D = mate if pair[0] == "mulgyeol" else mate2
@@ -2882,6 +2928,26 @@ func update_chat(dt: float) -> void:
 	var pick: Array = who[rng.randi() % who.size()]
 	var lines := chat_lines(pick[0])
 	say_bubble(pick[1], tr(lines[rng.randi() % lines.size()]))
+
+# a short talk at rest: each line in its speaker's balloon, 2.4 s apart; Sora's balloon stands where she rests
+func rest_talk(talk: Array) -> void:
+	chat_cd = maxf(chat_cd, talk.size() * 2.4 + 10.0)
+	for i in talk.size():
+		var ln: Array = talk[i]
+		get_tree().create_timer(i * 2.4 + 0.01).timeout.connect(func():
+			if story_open:
+				return
+			var node: Node3D = null
+			match ln[0]:
+				"mulgyeol": node = mate
+				"noeul": node = mate2
+				"sora":
+					node = Node3D.new()
+					node.position = Vector3(player.x, ground_y, player.z)
+					add_child(node)
+					get_tree().create_timer(4.5).timeout.connect(node.queue_free)
+			if node != null and is_instance_valid(node):
+				say_bubble(node, tr(ln[1]), 2.2))
 
 # the signpost by the east bridge: the only way from the marsh to the village
 # Built after the map, props, plants and monsters so the random draws that place them are the same as before.
@@ -2979,12 +3045,13 @@ func icon_button(root: Control, kind: String, key: String, tip: String, x: float
 	b.theme = get_menu_theme()
 	for st in ["normal", "hover", "pressed"]:
 		var sb: StyleBoxFlat = glass_hover() if st != "normal" else glass_normal()
-		sb.content_margin_left = 11
-		sb.content_margin_right = 11
-		sb.content_margin_top = 11
-		sb.content_margin_bottom = 11
+		sb.content_margin_left = 14
+		sb.content_margin_right = 14
+		sb.content_margin_top = 14
+		sb.content_margin_bottom = 14
+		sb.set_corner_radius_all(12)
 		b.add_theme_stylebox_override(st, sb)
-	place(b, Control.PRESET_BOTTOM_LEFT, Vector2(x, -58), Vector2(44, 44))
+	place(b, Control.PRESET_BOTTOM_LEFT, Vector2(x, -70), Vector2(56, 56))
 	b.pressed.connect(fn)
 	root.add_child(b)
 	return b
@@ -3326,6 +3393,9 @@ func damage_enemy(e: Dictionary, amt: float, from: Vector2, kb := 4.0, force_cri
 	if e.has("cage"):
 		cage_hit(e)
 		return
+	if e.has("practice"):
+		target_hit(e)
+		return
 	if e.get("knight", false) and e.stun <= 0.0 and e.tired <= 0.0 and e.dash <= 0.0:
 		var from_dir := (from - Vector2(e.x, e.z)).normalized()
 		if from_dir.dot(e.face) > 0.34: # within about 70 degrees either side of where the shield points
@@ -3338,7 +3408,7 @@ func damage_enemy(e: Dictionary, amt: float, from: Vector2, kb := 4.0, force_cri
 		stats.crits += 1
 	if (e.get("boss", false) or e.get("mole", false)) and e.get("stun", 0.0) > 0.0:
 		amt *= 1.5
-	var dmg := int(round(amt / ng_mult() * rnd(0.85, 1.15) * (1.0 if force_crit else (1.8 if crit else 1.0))))
+	var dmg := int(round(amt / ng_mult() * rnd(0.85, 1.15) * (1.0 if force_crit else (crit_mult() if crit else 1.0))))
 	hitstop = maxf(hitstop, 0.09 if crit and stop < 0.09 else stop)
 	if e.get("wind", 0.0) > 0.0 and not e.get("boss", false):
 		e.wind = 0.0 # a hit interrupts a goblin's wind-up
@@ -4092,37 +4162,25 @@ func build_hud() -> void:
 	ui.gold = label(gold, "◆ 0", Vector2(10, 4), 14, Color("#ffd84a"))
 
 	# controls help, starts hidden; H or the button toggles it
-	var help := menu_panel(root, Vector2(14, -530), Vector2(340, 461), Control.PRESET_BOTTOM_LEFT) # ends above the buttons
+	var help := menu_panel(root, Vector2(14, -570), Vector2(340, 487), Control.PRESET_BOTTOM_LEFT) # ends above the buttons
 	help.mouse_filter = Control.MOUSE_FILTER_STOP
-	label(help, "조작법", Vector2(14, 8), 12, Color("#a99d84"))
+	label(help, "조작법", Vector2(62, 20), 13, Color("#a99d84"))
 	var rows := [["WASD / 방향키", "이동"], ["Shift", "달리기"], ["J / 왼쪽 클릭", "공격 (연속기)"], ["K / 오른쪽 클릭", "구르기 (때맞추면 섬광)"], ["L / 가운데 클릭", "막기 (때맞추면 반격, Lv4부터 1초 모아 J)"],
 		["U I O / 1 2 3", "스킬 (기세 30·15·60)"], ["4", "회복약"], ["Space", "상자 열기, 들어가기"], ["E", "왕관 만지기, 말 걸기 (보리 할머니 포함)"], ["Z X / 휠", "확대·축소"], ["T R P", "3시간 뒤로 / 비 / 사진"], ["F8", "처음 자리로 (진행은 그대로)"], ["F9", "처음부터 (저장 지우기)"], ["Q", "일지 (할 일과 곁이야기)"], ["H", "조작법 숨기기"]]
 	for i in rows.size():
-		label(help, rows[i][0], Vector2(14, 34 + i * 27), 13, Color("#e9dfc4"))
-		label(help, rows[i][1], Vector2(150, 34 + i * 27), 15)
-	var close := Button.new()
-	close.text = "X"
-	close.add_theme_font_override("font", ui_font)
-	close.position = Vector2(310, 6)
-	close.size = Vector2(24, 24)
-	close.pressed.connect(func(): toggle_help(false))
-	help.add_child(close)
+		label(help, rows[i][0], Vector2(14, 60 + i * 27), 13, Color("#e9dfc4"))
+		label(help, rows[i][1], Vector2(150, 60 + i * 27), 15)
+	back_key(help, func(): toggle_help(false))
 	help.visible = false
 	ui.help = help
 	# the journal (Q): what to do now, the side stories found so far and the keepsakes Sora carries
-	var journal := menu_panel(root, Vector2(14, -530), Vector2(740, 461), Control.PRESET_BOTTOM_LEFT)
+	var journal := menu_panel(root, Vector2(14, -650), Vector2(800, 567), Control.PRESET_BOTTOM_LEFT)
 	journal.mouse_filter = Control.MOUSE_FILTER_STOP
-	label(journal, "일지", Vector2(14, 8), 12, Color("#a99d84"))
-	menu_rule(journal, Vector2(14, 28), 712)
-	ui.journal_text = journal_column(journal, Vector2(14, 36), Vector2(380, 415))
-	ui.journal_text2 = journal_column(journal, Vector2(410, 36), Vector2(316, 415)) # the right column: feats and keepsakes
-	var jclose := Button.new()
-	jclose.text = "X"
-	jclose.add_theme_font_override("font", ui_font)
-	jclose.position = Vector2(710, 6)
-	jclose.size = Vector2(24, 24)
-	jclose.pressed.connect(func(): toggle_journal(false))
-	journal.add_child(jclose)
+	label(journal, "일지", Vector2(62, 20), 14, Color("#a99d84"))
+	menu_rule(journal, Vector2(14, 60), 772)
+	ui.journal_text = journal_column(journal, Vector2(14, 70), Vector2(420, 487))
+	ui.journal_text2 = journal_column(journal, Vector2(450, 70), Vector2(336, 487)) # the right column: feats and keepsakes
+	back_key(journal, func(): toggle_journal(false))
 	journal.visible = false
 	ui.journal = journal
 	var ways := menu_panel(root, Vector2(14, -350), Vector2(330, 220), Control.PRESET_BOTTOM_LEFT)
@@ -4133,10 +4191,10 @@ func build_hud() -> void:
 	ways.visible = false
 	ui.ways = ways
 	ui.hint = icon_button(root, "help", "H", "조작법", 14, func(): toggle_help(true))
-	ui.sound_btn = icon_button(root, "sound", "M", "효과음", 66, toggle_sound)
+	ui.sound_btn = icon_button(root, "sound", "M", "효과음", 78, toggle_sound)
 	refresh_sound_btn()
-	ui.journal_btn = icon_button(root, "journal", "Q", "일지", 118, func(): toggle_journal(not ui.journal.visible))
-	ui.settings_btn = icon_button(root, "gear", "Esc", "설정", 170, func(): toggle_settings(not settings_open))
+	ui.journal_btn = icon_button(root, "journal", "Q", "일지", 142, func(): toggle_journal(not ui.journal.visible))
+	ui.settings_btn = icon_button(root, "gear", "Esc", "설정", 206, func(): toggle_settings(not settings_open))
 	build_settings(root)
 
 	ui.toast = label(root, "", Vector2(0, 0), 20)
@@ -4422,7 +4480,7 @@ func save_game() -> void:
 		"fly_q": fly_q, "flies": marsh.flies.map(func(f): return f.caught),
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
-		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "books": castle.books.map(func(b): return b.read), "has_bookmark": has_bookmark, "has_shard": has_shard, "shop_bought": shop_bought, "play_secs": play_secs, "ng": ng, "fest_gift": fest_gift, "mail_q": mail_q, "mail_got": mail_got, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes,
+		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "books": castle.books.map(func(b): return b.read), "has_bookmark": has_bookmark, "has_shard": has_shard, "shop_bought": shop_bought, "play_secs": play_secs, "ng": ng, "fest_gift": fest_gift, "mail_q": mail_q, "mail_got": mail_got, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes, "target_best": target_best, "has_medal": has_medal, "bottles": village.bottles.map(func(b): return b.got), "inn_nights": inn_nights, "magpie_q": magpie_q,
 		"seals": garden.seals.map(func(sl): return sl.open),
 		"stairs_wall": stairs.wall_open, "stairs_lamps": stairs.lamps.map(func(l): return l.lit),
 		"castle_q": castle_q, "bars": castle.bars, "levers": castle.levers.map(func(lv): return lv.up), "vault": castle.vault_open, "has_armour": has_armour, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read),
@@ -4509,7 +4567,9 @@ func load_game() -> void:
 	if bool(d.get("in_village", false)):
 		var vx: float = player.x
 		var vz: float = player.z
-		if vx >= HOUSE_X - 0.5: # saved inside a house: wake on the square instead
+		if vx >= VILLAGE.OLD_X - 0.5 and vx < VILLAGE.OLD_X + 40.0:
+			vx += VILLAGE.VILLAGE_X - VILLAGE.OLD_X
+		if vx >= HOUSE_X - 0.5 and vx < HOUSE_X + 10.0: # saved inside a house: wake on the square instead
 			vx = village.marks.M.x - 2.0
 			vz = village.marks.M.y + 1.0
 		var e0 := errand
@@ -4590,6 +4650,17 @@ func load_game() -> void:
 	for i in mini(fl.size(), marsh.picked.size()):
 		marsh.picked[i] = bool(fl[i])
 	has_tea = bool(d.get("has_tea", false))
+	target_best = int(d.get("target_best", 0))
+	has_medal = bool(d.get("has_medal", false))
+	inn_nights = int(d.get("inn_nights", 0))
+	magpie_q = int(d.get("magpie_q", 0))
+	if magpie_q >= 3:
+		light_moon_lamp()
+	var bts: Array = d.get("bottles", [])
+	for i in mini(bts.size(), village.bottles.size()):
+		if bool(bts[i]):
+			village.bottles[i].got = true
+			village.bottles[i].node.visible = false
 	for k in ["has_pearl", "has_feather", "has_acorn", "has_ring", "has_shoes", "has_armour", "has_tea", "has_shard", "has_bookmark"]:
 		set(k, bool(d.get(k, get(k))))
 	if bool(d.get("has_armour", false)) and not castle.vault_open: # a new round keeps the armour: the treasury stays empty
@@ -5104,7 +5175,11 @@ func crown_key() -> void:
 		return
 	if in_castle() and castle_key():
 		return
-	if in_lake and not in_grotto() and fish_key():
+	if in_village and in_house < 0 and magpie_key():
+		return
+	if (in_lake and not in_grotto() or in_village) and fish_key():
+		return
+	if in_village and in_house < 0 and market_key():
 		return
 	if in_lake and not in_grotto() and Vector2(player.x, player.z).distance_to(lake.marks.h) < 2.0 and deliver(2, STORY.MAIL_HUT):
 		return
@@ -7661,6 +7736,8 @@ func toggle_help(show: bool) -> void:
 		ui.journal.visible = false
 	ui.help.visible = show
 	ui.hint.visible = not show
+	if show:
+		ui.help.move_to_front()
 
 # one journal column: rich text so headings can be gold; each line is translated as it is built
 func journal_column(parent: Control, pos: Vector2, size: Vector2) -> RichTextLabel:
@@ -7672,7 +7749,7 @@ func journal_column(parent: Control, pos: Vector2, size: Vector2) -> RichTextLab
 	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	r.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 	r.add_theme_font_override("normal_font", ui_font)
-	r.add_theme_font_size_override("normal_font_size", 13)
+	r.add_theme_font_size_override("normal_font_size", 15)
 	r.add_theme_color_override("default_color", Color("#e9dfc4"))
 	parent.add_child(r)
 	return r
@@ -7685,7 +7762,7 @@ func journal_bbcode(lines: Array) -> String:
 	for l in lines:
 		var line: String = String(l).replace("[", "[lb]")
 		if l in heads:
-			out.append("[color=#f6d27a][font_size=15]%s[/font_size][/color]" % line)
+			out.append("[color=#f6d27a][font_size=17]%s[/font_size][/color]" % line)
 		elif String(l).ends_with(tr("완료")) or String(l).ends_with(tr("끝")):
 			out.append("[color=#9fd8a0]%s[/color]" % line)
 		else:
@@ -7700,6 +7777,8 @@ func toggle_journal(show: bool) -> void:
 		ui.journal_text.text = journal_bbcode(lines.slice(0, cut))
 		ui.journal_text2.text = journal_bbcode(lines.slice(cut))
 	ui.journal.visible = show
+	if show:
+		ui.journal.move_to_front()
 
 # one line per thing: the current quest, each side story once it has been found, and the keepsakes
 func journal_lines() -> Array:
@@ -7752,6 +7831,11 @@ func journal_lines() -> Array:
 		side.call("서재의 달지기 책", tr("끝") if has_bookmark else tr("%d/5 읽음") % castle.books.filter(func(b): return b.read).size())
 		side.call("성의 보물고", tr("끝") if castle.vault_open else (tr("상자를 열자") if castle.vault_solved() else tr("경비실의 지렛대 셋")))
 		side.call("성 아래 잠긴 층", under_journal())
+	if errand >= 1:
+		side.call("장터 과녁", (tr("메달, 최고 %d개") % target_best) if has_medal else (tr("최고 %d개 / 6개면 메달") % target_best if target_best > 0 else tr("장터 울타리 안 과녁 기둥에서 E")))
+		if magpie_q >= 1:
+			side.call("장터의 반짝이 도둑", [tr(""), tr("밤에 장터를 지켜보자"), tr("부두 끝의 꺼진 달 등불을 켜자 (E)"), tr("끝")][magpie_q])
+		side.call("유리병 편지", tr("끝") if village.bottles_got() == village.bottles.size() else tr("%d/3 · 연못에 떠 있다") % village.bottles_got())
 	if night_q >= 4:
 		side.call("달빛 시련", tr("최고 기록 %d분 %02d초") % [int(trial_best) / 60, int(trial_best) % 60] if trial_best > 0.0 else tr("마을 남서쪽 돌 둘레에서"))
 	out.append("")
@@ -7777,6 +7861,7 @@ func journal_lines() -> Array:
 	if has_shard: keep.append(tr("구름 조각"))
 	if has_bookmark: keep.append(tr("달지기 책갈피"))
 	if has_lamp: keep.append(tr("한결의 등잔"))
+	if has_medal: keep.append(tr("과녁 메달"))
 	out.append("  " + (", ".join(keep) if not keep.is_empty() else tr("왕관 하나")))
 	return out
 
@@ -8151,6 +8236,9 @@ func _process(dt: float) -> void:
 	update_trial(dt)
 	update_race(dt)
 	update_fishing(dt)
+	if in_village:
+		update_market(dt)
+		update_magpie(dt)
 	update_chat(dt)
 	update_mate_hud()
 	if cloud.reveal_t > 0.0:
@@ -8893,7 +8981,7 @@ var under_diary_read := false
 var has_lamp := false          # 한결의 등잔, a keepsake
 
 func in_under() -> bool:
-	return in_hill and player.x >= UNDER.UNDER_X - 0.5
+	return in_hill and player.x >= UNDER.UNDER_X - 0.5 and player.x < VILLAGE.VILLAGE_X - 0.5
 
 # the moon door shuts behind her while the guardians stand and she is in Hangyeol's room
 func under_shut() -> bool:
@@ -9107,3 +9195,337 @@ func under_key() -> bool:
 		save_game()
 		return true
 	return false
+
+# ---- the bigger village (48x36): the market's honesty-box stalls and its target yard, the inn, and the pond's
+# drifting bottles. Fishing from the pier's end goes through fish_key like the lake shore.
+const STALLS := {
+	"1": {"price": 5, "what": "사과"},          # heals 40
+	"2": {"price": 40, "what": "달빛 가루"},    # two crown pips
+	"3": {"price": 15, "what": "따뜻한 차"},    # stamina full, momentum +50
+}
+const TARGET_TIME := 20.0
+const TARGET_GOAL := 6
+var target_on := false
+var target_left := 0.0
+var target_hits := 0
+var target_next := 0.0
+var target_best := 0
+var has_medal := false        # 과녁 메달: crits deal x2.0 instead of x1.8 (see crit_mult)
+var inn_nights := 0
+
+func market_key() -> bool:
+	var me := Vector2(player.x, player.z)
+	for key in STALLS:
+		var at: Vector2 = village.marks[key]
+		if me.distance_to(at) < 1.3:
+			buy_stall(key)
+			return true
+	if me.distance_to(village.marks.Q) < 1.6:
+		if not target_on:
+			start_targets()
+		return true
+	if me.distance_to(village.marks.N) < 1.4:
+		stay_inn()
+		return true
+	return false
+
+func buy_stall(key: String) -> void:
+	if magpie_q == 0:
+		magpie_q = 1
+		show_story("", STORY.MARKET_NOTE)
+		save_game()
+		return
+	var st: Dictionary = STALLS[key]
+	var price: int = st.price
+	if key == "2" and magpie_q >= 3:
+		price = 25 # the magpie's thanks: moon dust for less
+	if player.gold < price:
+		toast(tr("%s: 금화 %d. 금화가 모자라다") % [tr(st.what), price])
+		return
+	match key:
+		"1":
+			if player.hp >= player.max_hp:
+				toast("배가 부르다. 사과는 다치면 먹자")
+				return
+			player.hp = minf(player.max_hp, player.hp + 40.0)
+			pop_num(Vector3(player.x, 1.8, player.z), "+40", Color("#7aff9a"))
+		"2":
+			if crown_pips >= 8:
+				toast("왕관 달빛이 이미 가득하다")
+				return
+			crown_pips = mini(8, crown_pips + 2)
+			pip_flash = 0.3
+		"3":
+			player.sp = 100.0
+			player.mp = minf(player.max_mp, player.mp + 50.0)
+	player.gold -= price
+	sfx(880, 0.08, "triangle", 0.18)
+	burst(Vector3(village.marks[key].x, 1.0, village.marks[key].y - 0.8), Color("#e8c050"), 10, 1.5)
+	toast(tr("상자에 금화 %d을 넣고 %s을(를) 집었다") % [price, tr(st.what)])
+	save_game()
+
+# the target yard: for 20 s a brick target stands up somewhere in the yard every 1.6 s and falls back after 2.4 s;
+# one sword hit knocks it down. Six or more wins: the first time the target medal, later 20 gold
+func start_targets() -> void:
+	target_on = true
+	target_left = TARGET_TIME
+	target_hits = 0
+	target_next = 0.6
+	sfx(660, 0.2, "triangle", 0.2)
+	toast(tr("과녁 맞히기! %d초 동안 일어서는 과녁을 베자") % int(TARGET_TIME))
+
+func update_market(dt: float) -> void:
+	for b in village.bottles: # the bottles bob on the pond; she picks one up running over it on the water skip
+		if b.got:
+			continue
+		b.node.position.y = -0.3 + sin(t * 2.0 + b.pos.x) * 0.05
+		if Vector2(player.x, player.z).distance_to(b.pos) < 0.9:
+			pick_bottle(b)
+	if not target_on:
+		return
+	target_left -= dt
+	target_next -= dt
+	for e in enemies:
+		if e.has("practice") and not e.dead:
+			e.life -= dt
+			if e.life <= 0.0:
+				e.dead = true
+				e.node.queue_free()
+				e.shadow.queue_free()
+	if target_next <= 0.0 and target_left > 1.0:
+		target_next = 1.6
+		spawn_target()
+	if target_left <= 0.0 or Vector2(player.x, player.z).distance_to(village.marks.Q) > 9.0:
+		end_targets()
+
+func spawn_target() -> void:
+	var q: Vector2 = village.marks.Q
+	var at := q + Vector2(rnd(-3.0, 3.5), rnd(-2.0, 2.0))
+	for tries in 10:
+		if walkable(at.x, at.y) and at.distance_to(Vector2(player.x, player.z)) > 1.2 and at.distance_to(q) > 0.8:
+			break
+		at = q + Vector2(rnd(-3.0, 3.5), rnd(-2.0, 2.0))
+	var root := Node3D.new()
+	var mats: Array = []
+	brick(root, mats, Vector3(0.5, 0.7, 0.2), Vector3(0, 0.35, 0), Color("#f2ead8"))
+	brick(root, mats, Vector3(0.32, 0.32, 0.22), Vector3(0, 0.5, 0), Color("#c8322a"), false)
+	add_child(root)
+	root.position = Vector3(at.x, 0, at.y)
+	root.scale = Vector3.ONE * 0.2
+	root.create_tween().tween_property(root, "scale", Vector3.ONE, 0.15)
+	enemies.append({"x": at.x, "z": at.y, "hp": 1.0, "max_hp": 1, "node": root, "shadow": blob(0.4), "t": 0.0,
+		"atk_cd": 99.0, "hurt": 0.0, "kx": 0.0, "kz": 0.0, "wx": at.x, "wz": at.y, "dead": false, "respawn": 9999.0,
+		"practice": true, "life": 2.4, "cave": true, "prop": true})
+	root.set_meta("mats", mats)
+	root.set_meta("body", root)
+
+func target_hit(e: Dictionary) -> void:
+	e.dead = true
+	e.node.queue_free()
+	e.shadow.queue_free()
+	target_hits += 1
+	burst(Vector3(e.x, 0.6, e.z), Color("#c8322a"), 14, 2.5)
+	sfx(700 + target_hits * 40, 0.08, "triangle", 0.2)
+	pop_num(Vector3(e.x, 1.2, e.z), str(target_hits), Color("#ffd84a"))
+
+func end_targets() -> void:
+	target_on = false
+	for e in enemies:
+		if e.has("practice") and not e.dead:
+			e.dead = true
+			e.node.queue_free()
+			e.shadow.queue_free()
+	target_best = maxi(target_best, target_hits)
+	if target_hits >= TARGET_GOAL and not has_medal:
+		has_medal = true
+		show_story("", STORY.TARGET_MEDAL)
+	elif target_hits >= TARGET_GOAL:
+		player.gold += 20
+		toast(tr("과녁 %d개! 금화 +20") % target_hits)
+	else:
+		toast(tr("과녁 %d개. %d개를 맞히면 상이 있다") % [target_hits, TARGET_GOAL])
+	save_game()
+
+func crit_mult() -> float:
+	return 2.0 if has_medal else 1.8
+
+# the inn: 10 gold for a night. Everyone is healed, and she wakes at 7 the next morning (the first night, a short talk)
+func stay_inn() -> void:
+	if player.gold < 10:
+		toast("하룻밤에 금화 10. 금화가 모자라다")
+		return
+	player.gold -= 10
+	inn_nights += 1
+	fade_then(func():
+		player.hp = float(player.max_hp)
+		player.sp = 100.0
+		for id in ["mulgyeol", "noeul"]:
+			mate_hp[id] = mate_max()
+			mate_down[id] = 0.0
+		if hour >= 7.0:
+			day += 1
+		hour = 7.0
+		player.x = village.marks.N.x
+		player.z = village.marks.N.y + 0.8
+		snap_mates()
+		save_game())
+	if inn_nights == 1:
+		get_tree().create_timer(0.9).timeout.connect(func(): show_story("", STORY.INN_FIRST))
+	else:
+		toast("푹 자고 일어났다. 아침 7시")
+
+func pick_bottle(b: Dictionary) -> void:
+	b.got = true
+	b.node.visible = false
+	var i: int = village.bottles.find(b)
+	burst(Vector3(b.pos.x, 0.3, b.pos.y), Color("#bfe6c8"), 16, 2.0)
+	sfx(880, 0.12, "triangle", 0.2)
+	show_story("", STORY.BOTTLES[i])
+	if village.bottles_got() == village.bottles.size():
+		player.gold += 120
+		player.max_hp += 10
+		player.hp = float(player.max_hp)
+		get_tree().create_timer(0.2).timeout.connect(func(): toast("유리병 편지 셋을 다 찾았다. 금화 +120, 최대 체력 +10"))
+	save_game()
+
+# ---- 장터의 반짝이 도둑 (the village's story thread): coins go missing from the market's honesty boxes. At night a
+# brick magpie sits on the moon-dust stall; when Sora comes near it flies on (the inn roof, the dark moon lantern at
+# the pier's end, then its nest out on the pond). At the nest she learns it was Hangyeol's lantern bird, piling up
+# shiny coins as a small moon since the pier's moon lantern went dark. Lighting that lantern (2 pips) ends it: the
+# coins go back, Sora gets 100 gold and max HP +10, and moon dust costs 25 from then on.
+var magpie_q := 0             # 0 not started, 1 the note read (watch at night), 2 the nest found, 3 done
+var magpie: Node3D
+var magpie_at := 0            # the perch it sits on now
+var magpie_flying := false
+var moon_lamp_node: Node3D
+
+func magpie_perches() -> Array:
+	var vx := float(VILLAGE.VILLAGE_X)
+	# [x, z, height]: the moon-dust stall's awning, the inn roof, the moon lantern at the pier's end, the nest on the pond
+	return [Vector3(vx + 38.5, 2.0, 1.75), Vector3(vx + 5.0, 23.6, 3.2), Vector3(vx + 36.0, 28.2, 2.1), Vector3(vx + 41.0, 31.0, 0.15)]
+
+func build_magpie() -> void:
+	magpie = Node3D.new()
+	var body := Node3D.new()
+	magpie.add_child(body)
+	var black := mat_color(Color("#1e2230"))
+	var white := mat_color(Color("#eef3ff"))
+	var blue := mat_color(Color("#3a6ac8"))
+	for part in [[Vector3(0.34, 0.22, 0.2), Vector3(0, 0.2, 0), black], [Vector3(0.2, 0.14, 0.21), Vector3(0.02, 0.15, 0), white],
+			[Vector3(0.16, 0.16, 0.16), Vector3(0.2, 0.32, 0), black], [Vector3(0.08, 0.04, 0.04), Vector3(0.31, 0.31, 0), mat_color(Color("#d9b04a"))],
+			[Vector3(0.3, 0.06, 0.08), Vector3(-0.28, 0.26, 0), blue], [Vector3(0.22, 0.05, 0.24), Vector3(-0.04, 0.27, 0), blue]]:
+		var b := box(part[0], part[2])
+		b.position = part[1]
+		body.add_child(b)
+	magpie.set_meta("body", body)
+	add_child(magpie)
+	# the nest out on the pond: a ring of twigs with coins glinting in it
+	var nest := Node3D.new()
+	var twig := mat_color(Color("#6a4a2a"))
+	for k in 6:
+		var tw := box(Vector3(0.5, 0.1, 0.12), twig)
+		tw.rotation.y = k * PI / 3.0
+		tw.position = Vector3(cos(k * PI / 3.0) * 0.22, 0.0, sin(k * PI / 3.0) * 0.22)
+		nest.add_child(tw)
+	for k in 5:
+		var coin := box(Vector3(0.1, 0.03, 0.1), glow_mat(Color("#ffd84a"), 1.2))
+		coin.position = Vector3(rnd(-0.12, 0.12), 0.07 + k * 0.02, rnd(-0.12, 0.12))
+		nest.add_child(coin)
+	var np: Vector3 = magpie_perches()[3]
+	nest.position = Vector3(np.x, -0.05, np.y)
+	add_child(nest)
+	# the old moon lantern at the end of the pier: a tall post, dark until the crown lights it
+	moon_lamp_node = Node3D.new()
+	var post := box(Vector3(0.16, 1.9, 0.16), mat_color(Color("#3b2a1e")))
+	post.position = Vector3(0, 0.95, 0)
+	moon_lamp_node.add_child(post)
+	var glass := box(Vector3(0.36, 0.36, 0.36), mat_color(Color("#3a3428")))
+	glass.position = Vector3(0, 1.95, 0)
+	glass.name = "glass"
+	moon_lamp_node.add_child(glass)
+	var lp: Vector3 = magpie_perches()[2]
+	moon_lamp_node.position = Vector3(lp.x, 0.1, lp.y)
+	add_child(moon_lamp_node)
+	magpie.visible = false
+
+func light_moon_lamp() -> void:
+	if magpie == null:
+		return
+	var glass: MeshInstance3D = moon_lamp_node.get_node("glass")
+	glass.material_override = glow_mat(Color("#dfe8ff"), 3.0)
+	if not moon_lamp_node.has_node("light"):
+		var l := OmniLight3D.new()
+		l.name = "light"
+		l.light_color = Color("#cfe0ff")
+		l.light_energy = 2.0
+		l.omni_range = 6.0
+		l.position = Vector3(0, 2.0, 0)
+		moon_lamp_node.add_child(l)
+	magpie_at = 2
+	place_magpie()
+
+func place_magpie() -> void:
+	var p: Vector3 = magpie_perches()[magpie_at]
+	magpie.position = Vector3(p.x, p.z, p.y)
+
+func update_magpie(dt: float) -> void:
+	if magpie == null:
+		return
+	var showing := magpie_q >= 3 or (magpie_q == 1 and is_night()) or magpie_q == 2
+	magpie.visible = showing
+	if not showing:
+		if magpie_q == 1 and magpie_at != 0 and not magpie_flying: # the night ended mid-chase: back on the stall tomorrow
+			magpie_at = 0
+			place_magpie()
+		return
+	var body: Node3D = magpie.get_meta("body")
+	body.position.y = sin(t * 3.0) * 0.03
+	body.rotation.y = PI if player.x < magpie.position.x else 0.0
+	if magpie_q != 1 or magpie_flying:
+		return
+	var me := Vector2(player.x, player.z)
+	var here := Vector2(magpie.position.x, magpie.position.z)
+	if magpie_at < 3 and me.distance_to(here) < 3.2:
+		fly_magpie(magpie_at + 1)
+	elif magpie_at == 3 and me.distance_to(here) < 1.4:
+		magpie_q = 2
+		show_story("", STORY.MAGPIE_NEST)
+		save_game()
+
+func fly_magpie(to: int) -> void:
+	magpie_flying = true
+	var p: Vector3 = magpie_perches()[to]
+	var goal := Vector3(p.x, p.z, p.y)
+	var mid := (magpie.position + goal) / 2.0 + Vector3(0, 2.5, 0)
+	sfx(1200, 0.12, "triangle", 0.12, 400)
+	var tw := create_tween()
+	tw.tween_property(magpie, "position", mid, 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.tween_property(magpie, "position", goal, 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tw.tween_callback(func():
+		magpie_at = to
+		magpie_flying = false
+		if to == 1:
+			toast("까치가 여관 지붕으로 날아갔다")
+		elif to == 2:
+			toast("까치가 부두 끝 낡은 등불 위에 앉았다")
+		elif to == 3:
+			toast("까치가 연못 한가운데로 날아갔다. 물수제비 걸음으로 따라가자"))
+
+func magpie_key() -> bool:
+	if magpie_q != 2:
+		return false
+	var lp: Vector3 = magpie_perches()[2]
+	if Vector2(player.x, player.z).distance_to(Vector2(lp.x, lp.y)) > 1.8:
+		return false
+	if not spend_pips(2):
+		return true
+	magpie_q = 3
+	light_moon_lamp()
+	burst(Vector3(lp.x, 2.0, lp.y), Color("#dfe8ff"), 30, 3.0)
+	sfx(523, 0.5, "sine", 0.25, 300)
+	player.gold += 100
+	player.max_hp += 10
+	player.hp = float(player.max_hp)
+	show_story("", STORY.MAGPIE_DONE)
+	save_game()
+	return true

@@ -1,37 +1,55 @@
-# 등불 마을 (story step 8): a separate 32x24 area at x >= VILLAGE_X, built from blocks like the cave.
+# 등불 마을 (story step 8): a separate 48x36 area at x >= VILLAGE_X, built from blocks like the cave.
 # Holds the map, its build, the lamplighter Simji, the three dark lanterns and the first errand.
+# The first 32x24 is the old village; the market (three honesty-box stalls 1 2 3, the target yard Q) lies east,
+# the inn (I, door N) and the pond with its pier (P, fishing spot f, three drifting bottles B) south.
+# It moved from x 140 to x 560 when it grew, because the forest starts at x 180.
 extends RefCounted
 
-const VILLAGE_X := 140
-const W := 32
-const H := 24
-const ROWS := """################################
-#..HHH.......HHH.......HHH.....#
-#..HHH...L...HHH...L...HHH.....#
-#....=.........=.........=.....#
-#....=.........=.........=.....#
-#....===========.........=.....#
-#..............=.........=.....#
-#.........L.oooooooo.L...=.....#
-#...........oooooooo.....=.....#
-#L..........ooooMooo.....=.....#
-G=S=========oooooooo===========F
-#L..........oooooooo.....=.....#
-#.........L.oooooooo.L...=.....#
-#..............=.........=.....#
-#..HHH.........=.......b.=.b...#
-#..HHH...L.....=.......d.=.d...#
-#....=.........=.........=.....#
-#....===========.........=.....#
-#..........HHH...........=.....#
-#..........HHH.......b...=.....#
-#....................d...=.....#
-#....R.........................#
-#..............................#
-################K###############"""
+const VILLAGE_X := 560
+const OLD_X := 140 # where it stood before it grew (old saves are moved over)
+const W := 48
+const H := 36
+const ROWS := """################################################
+#..HHH.......HHH.......HHH.....................#
+#..HHH...L...HHH...L...HHH........TT..TT..TT..L#
+#....=.........=.........=........1...2...3....#
+#....=.........=.........=.......:::::::::::::.#
+#....===========.........=.......:::::::::::::.#
+#..............=.........=.......::::::::::::L.#
+#.........L.oooooooo.L...=.......:::::::::::::.#
+#...........oooooooo.....=.......:::::::::::::.#
+#L..........ooooMooo.....=.....................#
+G=S=========oooooooo===========================F
+#L..........oooooooo.....=.....................#
+#.........L.oooooooo.L...=........##########...#
+#..............=.........=........#........#...#
+#..HHH.........=.......b.=.b......#........#...#
+#..HHH...L.....=.......d.=.d......#...Q....#.L.#
+#....=.........=.........=........#........#...#
+#....===========.........=........#........#...#
+#..........HHH...........=........####..####...#
+#..........HHH.......b...=.....................#
+#....................d...=..............L......#
+#....R.........................................#
+#..............................................#
+#...............=..............................#
+#...............=.......L......................#
+#..IIIII........=.........~~~~~~~~~~~~~~~~~~~~.#
+#..IIIII....L...=.........~~~~~~~~~~~~~~~B~~~~.#
+#..IIIII........=.........~~~~~~~~~~~~~~~~~~~~.#
+#....N..........=.........~~~~~~~~~~~~~~~~~~~~.#
+#....============......PPPPPPPPPPPPPf~~~~~~~~~.#
+#...............=.........~~~~~~~~~~~~~~~~~~~~.#
+#.........L.....=....L....~~~~~~~~~~~~~~~~~~~~.#
+#...............=.........~~~~~~~~~~~~~~~~~B~~.#
+#..L............=.........~~~~~B~~~~~~~~~~~~~~.#
+#...............=..............................#
+################K###############################"""
 
 var grid: Array = []
-var marks := {}          # S, G, M, F, K, R (the moon-trial stone) -> world Vector2
+var marks := {}          # S, G, M, F, K, R (the moon-trial stone), Q the target post, N the inn door, f the pier's end, 1 2 3 stalls -> world Vector2
+var bottles: Array = []  # [{"pos": Vector2, "node": Node3D, "got": bool}]
+var stall_names := {"1": "과일 가판대", "2": "달빛 가루 가판대", "3": "찻집 가판대"}
 var dark: Array = []     # [{"pos": Vector2, "light": OmniLight3D, "glass": MeshInstance3D, "lit": bool, "brick": Vector2}]
 var simji_node: Node3D
 # villagers you can talk to with E: id and tile in the village grid
@@ -58,7 +76,7 @@ func char_at(x: float, z: float) -> String:
 # fence and houses block; everything else is walkable ground
 func blocked(x: float, z: float) -> bool:
 	var c := char_at(x, z)
-	return c == "#" or c == "H"
+	return c in "#HTI~B"
 
 func build(m: Node) -> void:
 	var blocks: Array = [] # [Transform3D, Color]
@@ -69,18 +87,28 @@ func build(m: Node) -> void:
 		for x in W:
 			var c: String = grid[z][x]
 			var w := Vector2(VILLAGE_X + x, z)
-			if c in "SGMFKR":
+			if c in "SGMFKRQNf123":
 				marks[c] = w
+			if c == "B":
+				bottles.append({"pos": w, "node": null, "got": false})
 			var col := Color("#5e8f30")
 			match c:
 				"=": col = Color("#b8a888")
 				"o": col = Color("#9a9a8e")
 				"#": col = Color("#6a4a2c")
 				"H": col = Color("#4a6a2c")
+				":", "1", "2", "3": col = Color("#a89880")
+				"P", "f": col = Color("#9a7448")
+				"~", "B": col = Color("#2a5a8a")
 			col = col.lightened(m.rnd(0, 0.08))
 			var hgt := 0.4
 			if c == "#":
 				hgt = 0.9 # low fence blocks
+			if c == "~" or c == "B":
+				blocks.append([Transform3D(Basis().scaled(Vector3(1, 0.05, 1)), Vector3(w.x, -0.42, w.y)), col])
+				continue
+			if c == "P" or c == "f":
+				hgt = 0.5 # pier boards stand a little above the ground
 			blocks.append([Transform3D(Basis().scaled(Vector3(1, hgt, 1)), Vector3(w.x, hgt / 2.0 - 0.4, w.y)), col])
 			if c == "L":
 				lamp_spots.append(w)
@@ -123,6 +151,9 @@ func build(m: Node) -> void:
 						seen[Vector2i(x + dx, z + dz)] = true
 				house(m, Vector3(VILLAGE_X + x + 1, 0, z + 0.5))
 				doors.append(Vector2(VILLAGE_X + x + 0.4, z + 1.9)) # just in front of the door
+	build_market(m)
+	build_inn(m)
+	build_pond(m)
 	var post_mat: Material = m.mat_color(Color("#3b2a1e"))
 	var glass: Material = m.glow_mat(Color("#ffc46a"), 4.0)
 	glass.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
@@ -262,10 +293,136 @@ func map_tex(width: int) -> ImageTexture:
 				"#": col = Color(0, 0, 0, 0)
 				"=": col = Color("#2c4a48")
 				"o": col = Color("#3a5a6a")
-				"H": col = Color("#c8962a")
+				"H", "I", "T": col = Color("#c8962a")
 				"L", "d": col = Color("#ffd060")
+				":", "1", "2", "3": col = Color("#3a4a50")
+				"~", "B": col = Color("#2c5a8a")
+				"P", "f": col = Color("#6a5034")
+				"Q", "N": col = Color("#ffd060")
 			img.set_pixel(VILLAGE_X + x, z, col)
 	return ImageTexture.create_from_image(img)
 
 func lit_count() -> int:
 	return dark.filter(func(d): return d.lit).size()
+
+# three honesty-box stalls with striped awnings, each with a little sign; nobody minds them, the coins go in the box
+func build_market(m: Node) -> void:
+	var wood: Material = m.mat_color(Color("#7a5232"))
+	var cloths := [Color("#c84a3a"), Color("#3a7ac8"), Color("#3aa86a")]
+	var goods := [Color("#e84a4a"), Color("#bfe6ff"), Color("#c8a46a")]
+	for k in 3:
+		var key := str(k + 1)
+		var at: Vector2 = marks[key]
+		var g := Node3D.new()
+		g.position = Vector3(at.x + 0.5, 0, at.y - 1.0)
+		m.add_child(g)
+		for side in [-0.85, 0.85]:
+			var post: MeshInstance3D = m.box(Vector3(0.1, 1.6, 0.1), wood)
+			post.position = Vector3(side, 0.8, 0.3)
+			g.add_child(post)
+		var counter: MeshInstance3D = m.box(Vector3(1.9, 0.7, 0.6), wood)
+		counter.position = Vector3(0, 0.35, 0.1)
+		g.add_child(counter)
+		for st in 4: # striped awning
+			var cloth: MeshInstance3D = m.box(Vector3(0.48, 0.06, 0.9), m.mat_color(cloths[k] if st % 2 == 0 else Color("#f2ead8")))
+			cloth.position = Vector3(-0.72 + st * 0.48, 1.62, 0.2)
+			cloth.rotation.x = 0.25
+			g.add_child(cloth)
+		for n in 5: # goods on the counter
+			var item: MeshInstance3D = m.box(Vector3(0.18, 0.16, 0.18), m.mat_color(goods[k].darkened(0.1 * (n % 2))))
+			item.position = Vector3(-0.7 + n * 0.35, 0.78, 0.1 + m.rnd(-0.1, 0.1))
+			g.add_child(item)
+		var box: MeshInstance3D = m.box(Vector3(0.26, 0.22, 0.2), m.mat_color(Color("#4a3a2a")))
+		box.position = Vector3(0.7, 0.81, 0.36)
+		g.add_child(box)
+		var sign := Label3D.new()
+		sign.text = tr(stall_names[key])
+		sign.font = m.ui_font
+		sign.font_size = 34
+		sign.pixel_size = 0.006
+		sign.modulate = Color("#3a2414")
+		sign.outline_size = 8
+		sign.outline_modulate = Color("#f2ead8")
+		sign.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+		sign.position = Vector3(0, 2.0, 0.3)
+		g.add_child(sign)
+	# the target post in the fenced yard: a pole with a round red and white board
+	var q: Vector2 = marks.Q
+	var tg := Node3D.new()
+	tg.position = Vector3(q.x, 0, q.y)
+	m.add_child(tg)
+	var pole: MeshInstance3D = m.box(Vector3(0.14, 1.4, 0.14), wood)
+	pole.position = Vector3(0, 0.7, 0)
+	tg.add_child(pole)
+	for r in 3:
+		var ring: MeshInstance3D = m.box(Vector3(0.7 - r * 0.2, 0.7 - r * 0.2, 0.06), m.mat_color(Color("#c8322a") if r % 2 == 0 else Color("#f2ead8")))
+		ring.position = Vector3(0, 1.3, 0.1 + r * 0.02)
+		tg.add_child(ring)
+	m.rocks.append({"x": q.x, "z": q.y, "r": 0.3})
+
+# the inn: a long two-storey house with a hanging sign
+func build_inn(m: Node) -> void:
+	var n: Vector2 = marks.N
+	var g := Node3D.new()
+	g.position = Vector3(n.x, 0, n.y - 2.0)
+	m.add_child(g)
+	var body: MeshInstance3D = m.box(Vector3(4.8, 2.4, 2.8), m.mat_color(Color("#e8dcc4")))
+	body.position = Vector3(0, 1.2, 0)
+	g.add_child(body)
+	for side in [-1.0, 1.0]:
+		var r: MeshInstance3D = m.box(Vector3(5.2, 0.14, 1.9), m.mat_color(Color("#3a5a7a")))
+		r.position = Vector3(0, 2.8, side * 0.7)
+		r.rotation.x = side * 0.6
+		g.add_child(r)
+	var door: MeshInstance3D = m.box(Vector3(0.7, 1.1, 0.06), m.mat_color(Color("#5a3a26")))
+	door.position = Vector3(0, 0.55, 1.42)
+	g.add_child(door)
+	for wx in [-1.6, 1.6]:
+		for wy in [0.9, 1.8]:
+			var win: MeshInstance3D = m.box(Vector3(0.6, 0.45, 0.06), m.glow_mat(Color("#ffc46a"), 1.5))
+			win.position = Vector3(wx, wy, 1.42)
+			g.add_child(win)
+	var sign := Label3D.new()
+	sign.text = tr("여관 · 하룻밤 금화 10")
+	sign.font = m.ui_font
+	sign.font_size = 34
+	sign.pixel_size = 0.006
+	sign.modulate = Color("#3a2414")
+	sign.outline_size = 8
+	sign.outline_modulate = Color("#f2ead8")
+	sign.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+	sign.position = Vector3(0, 3.4, 1.4)
+	g.add_child(sign)
+
+# the pond: a water face, posts under the pier, and three glass bottles drifting with letters inside
+func build_pond(m: Node) -> void:
+	var wet: Material = m.glow_mat(Color("#2f78b8"), 0.6)
+	wet.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
+	wet.blend_mode = BaseMaterial3D.BLEND_MODE_MIX
+	var face: MeshInstance3D = m.box(Vector3(20.0, 0.02, 9.0), wet)
+	face.position = Vector3(VILLAGE_X + 35.5, -0.34, 29)
+	m.add_child(face)
+	var wood: Material = m.mat_color(Color("#5a3e26"))
+	for x in range(26, 37, 2):
+		for dz in [-0.45, 0.45]:
+			var post: MeshInstance3D = m.box(Vector3(0.12, 0.7, 0.12), wood)
+			post.position = Vector3(VILLAGE_X + x, -0.15, 29 + dz)
+			m.add_child(post)
+	var glass: Material = m.glow_mat(Color("#bfe6c8"), 1.0)
+	glass.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
+	glass.blend_mode = BaseMaterial3D.BLEND_MODE_MIX
+	for b in bottles:
+		var g := Node3D.new()
+		var body: MeshInstance3D = m.box(Vector3(0.18, 0.32, 0.18), glass)
+		body.position = Vector3(0, 0.1, 0)
+		g.add_child(body)
+		var cork: MeshInstance3D = m.box(Vector3(0.1, 0.1, 0.1), m.mat_color(Color("#8a6a44")))
+		cork.position = Vector3(0, 0.31, 0)
+		g.add_child(cork)
+		g.rotation.z = 0.9
+		g.position = Vector3(b.pos.x, -0.3, b.pos.y)
+		m.add_child(g)
+		b.node = g
+
+func bottles_got() -> int:
+	return bottles.filter(func(b): return b.got).size()
