@@ -306,7 +306,7 @@ const SCENES := {
 	"title": {},
 	"start": {"play": true},
 	"night": {"play": true, "hour": 23.0, "day": 4},
-	"dusk": {"play": true, "hour": 18.5},
+	"dusk": {"play": true, "hour": 19.5},
 	"noon": {"play": true, "hour": 13.0},
 	"cottage": {"play": true, "at": "cottage"},
 	"shop": {"play": true, "at": "shop", "gold": 120, "shop": true},
@@ -2206,7 +2206,7 @@ var fest_seen := false
 var fest_t := 0.0
 
 func festival_now() -> bool:
-	return mail_got[1] and in_village and in_house < 0 and (hour >= 19.0 or hour < 5.0) and moon_phase().x >= 0.95
+	return mail_got[1] and in_village and in_house < 0 and is_night() and moon_phase().x >= 0.95
 
 func update_festival(dt: float) -> void:
 	if not festival_now() or story_open:
@@ -3008,17 +3008,21 @@ func interact() -> void:
 # The clock runs on its own: one in-game hour every DAY_SPEED seconds (a full day in 6 minutes).
 # Light, fog and sky blend between these key hours; T skips ahead three hours.
 const DAY_SPEED := 15.0
-const KEY_HOURS := [
+const KEY_HOURS := [ # a summer day: the sun sets late and rises early, so night runs only 21:00 - 04:00
 	{"h": 0.0, "sun": "#6a7cc8", "si": 0.25, "amb": "#2a3460", "ai": 0.55, "fog": "#141a30", "el": 0.9, "night": 1.0, "beams": 0.0},
-	{"h": 5.0, "sun": "#6a7cc8", "si": 0.25, "amb": "#2a3460", "ai": 0.55, "fog": "#141a30", "el": 0.1, "night": 1.0, "beams": 0.0},
-	{"h": 6.5, "sun": "#ff9a6a", "si": 0.9, "amb": "#b08aa0", "ai": 0.8, "fog": "#d8a08a", "el": 0.2, "night": 0.4, "beams": 0.6},
-	{"h": 9.0, "sun": "#fff0d0", "si": 1.5, "amb": "#e8eef8", "ai": 1.0, "fog": "#cfe0e8", "el": 0.7, "night": 0.0, "beams": 0.3},
+	{"h": 4.0, "sun": "#6a7cc8", "si": 0.25, "amb": "#2a3460", "ai": 0.55, "fog": "#141a30", "el": 0.1, "night": 1.0, "beams": 0.0},
+	{"h": 5.5, "sun": "#ff9a6a", "si": 0.9, "amb": "#b08aa0", "ai": 0.8, "fog": "#d8a08a", "el": 0.2, "night": 0.4, "beams": 0.6},
+	{"h": 8.0, "sun": "#fff0d0", "si": 1.5, "amb": "#e8eef8", "ai": 1.0, "fog": "#cfe0e8", "el": 0.7, "night": 0.0, "beams": 0.3},
 	{"h": 13.0, "sun": "#fff4e0", "si": 1.7, "amb": "#eaf4ff", "ai": 1.05, "fog": "#cfe2ee", "el": 1.1, "night": 0.0, "beams": 0.2},
-	{"h": 16.5, "sun": "#ffc06a", "si": 1.5, "amb": "#fff0d0", "ai": 0.95, "fog": "#e8c98a", "el": 0.55, "night": 0.1, "beams": 1.0},
-	{"h": 18.5, "sun": "#ff7a4a", "si": 0.9, "amb": "#9a7aa8", "ai": 0.7, "fog": "#b07a80", "el": 0.2, "night": 0.6, "beams": 0.5},
-	{"h": 20.0, "sun": "#6a7cc8", "si": 0.3, "amb": "#2a3460", "ai": 0.55, "fog": "#141a30", "el": 0.6, "night": 1.0, "beams": 0.0},
+	{"h": 17.5, "sun": "#ffc06a", "si": 1.5, "amb": "#fff0d0", "ai": 0.95, "fog": "#e8c98a", "el": 0.55, "night": 0.1, "beams": 1.0},
+	{"h": 19.5, "sun": "#ff7a4a", "si": 0.9, "amb": "#9a7aa8", "ai": 0.7, "fog": "#b07a80", "el": 0.2, "night": 0.6, "beams": 0.5},
+	{"h": 21.0, "sun": "#6a7cc8", "si": 0.3, "amb": "#2a3460", "ai": 0.55, "fog": "#141a30", "el": 0.6, "night": 1.0, "beams": 0.0},
 	{"h": 24.0, "sun": "#6a7cc8", "si": 0.25, "amb": "#2a3460", "ai": 0.55, "fog": "#141a30", "el": 0.9, "night": 1.0, "beams": 0.0},
 ]
+
+# night for game rules (fireflies, moonflowers, crown costs, resting, the lantern night): 21:00 - 04:00
+func is_night() -> bool:
+	return hour >= 21.0 or hour < 4.0
 var hour := 16.5
 var day := 0                 # counts noons; the moon runs an 8-night cycle
 
@@ -4328,7 +4332,7 @@ func leave_village() -> void:
 	save_game()
 
 func lamp_cost() -> int:
-	return 1 if (hour >= 19.0 or hour < 5.0) else 2 # the crown is half as strong by day
+	return 1 if is_night() else 2 # the crown is half as strong by day
 
 func spend_pips(n: int) -> bool:
 	if crown_pips < n:
@@ -4591,7 +4595,7 @@ func start_night() -> void:
 
 # Noeul keeps a few steps ahead of Sora along the path; at the last point he turns and she falls
 func update_night(dt: float) -> void:
-	var night_now := hour >= 19.0 or hour < 5.0
+	var night_now := is_night()
 	if in_village and in_house < 0 and night_q == 0 and mul_q == 3 and night_now and not story_open and fade_rect.color.a == 0.0:
 		start_night()
 	if night_q != 1 or noeul_node == null or story_open:
@@ -4766,7 +4770,7 @@ func leave_forest() -> void:
 	save_game()
 
 func unbrick_cost() -> int:
-	return 2 if (hour >= 19.0 or hour < 5.0) else 3 # the crown is weaker by day
+	return 2 if is_night() else 3 # the crown is weaker by day
 
 # E next to a closed brick wall: the crown turns it back into soil, and the noise wakes nearby bricks
 func try_unbrick() -> bool:
@@ -6424,7 +6428,7 @@ var rest_need := 10.0        # seconds of rest for the next pip (lantern 10, jar
 
 func update_pips(dt: float) -> void:
 	pip_flash -= dt
-	var night_now := hour >= 19.0 or hour < 5.0
+	var night_now := is_night()
 	if crown_pips >= 8 or not night_now:
 		rest_t = 0.0
 		return
@@ -7227,8 +7231,8 @@ func _process(dt: float) -> void:
 	update_oar()
 	if in_marsh() and not intro:
 		marsh.update(self)
-	marsh.update_flies(self, in_marsh() and (hour >= 19.0 or hour < 5.0))
-	marsh.update_flowers(self, in_marsh() and not intro and (hour >= 19.0 or hour < 5.0) and moon_phase().x >= 0.6)
+	marsh.update_flies(self, in_marsh() and is_night())
+	marsh.update_flowers(self, in_marsh() and not intro and is_night() and moon_phase().x >= 0.6)
 	if jar_node != null:
 		jar_node.visible = night > 0.5
 		jar_node.position = Vector3(player.x + 0.35, ground_y + 0.55 + sin(t * 2.0) * 0.04, player.z + 0.1)
