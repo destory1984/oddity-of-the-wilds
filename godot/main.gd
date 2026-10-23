@@ -2098,6 +2098,41 @@ func check_feats() -> void:
 			save_game()
 			return # one at a time, so each toast is seen
 
+# ---- Doran's three letters (after the island is home again): to Bori at the cottage, to Simji on the square,
+# and to the mailbox of Mulgyeol's island hut. Bringing word back gets 150 gold and max HP +10.
+var mail_q := 0             # 0 not asked, 1 carrying letters, 2 done
+var mail_got := [false, false, false] # Bori, Simji, the island hut
+
+func mail_errand() -> bool:
+	if mail_q == 0:
+		mail_q = 1
+		show_story("", STORY.MAIL_ASK)
+		save_game()
+		return true
+	if mail_q == 1 and mail_got.count(true) == 3:
+		mail_q = 2
+		player.gold += 150
+		player.max_hp += 10
+		player.hp = float(player.max_hp)
+		show_story("", STORY.MAIL_DONE)
+		save_game()
+		return true
+	if mail_q == 1:
+		show_story("", STORY.FOLK_AGAIN.doran_mail)
+		return true
+	return false
+
+func deliver(i: int, lines: Array) -> bool:
+	if mail_q != 1 or mail_got[i]:
+		return false
+	mail_got[i] = true
+	show_story("", lines)
+	sfx(660, 0.15, "triangle", 0.2)
+	if mail_got.count(true) == 3:
+		toast("편지를 모두 전했다. 도란에게 알리자")
+	save_game()
+	return true
+
 func spawn_boss() -> void:
 	var spot := Vector2(16, 4)
 	for tries in 40:
@@ -2683,6 +2718,8 @@ func interact() -> void:
 		return
 	if near_shop() and doran_q == 2 and not shop_open:
 		deliver_letter()
+		return
+	if near_shop() and not shop_open and deliver(0, STORY.MAIL_BORI):
 		return
 	if near_shop() and marsh.picked_count() == 3 and not has_tea and not shop_open:
 		has_tea = true
@@ -3431,7 +3468,7 @@ func save_game() -> void:
 		"fly_q": fly_q, "flies": marsh.flies.map(func(f): return f.caught),
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
-		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes,
+		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "mail_q": mail_q, "mail_got": mail_got, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes,
 		"castle_q": castle_q, "bars": castle.bars, "levers": castle.levers.map(func(lv): return lv.up), "vault": castle.vault_open, "has_armour": has_armour, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -3561,6 +3598,10 @@ func load_game() -> void:
 	has_acorn = bool(d.get("has_acorn", false))
 	trial_best = float(d.get("trial_best", 0.0))
 	race_best = float(d.get("race_best", 0.0))
+	mail_q = int(d.get("mail_q", 0))
+	var mg: Array = d.get("mail_got", [])
+	for i in mini(mg.size(), mail_got.size()):
+		mail_got[i] = bool(mg[i])
 	var st: Dictionary = d.get("stats", {})
 	for k in stats:
 		stats[k] = int(st.get(k, 0))
@@ -4009,6 +4050,8 @@ func crown_key() -> void:
 		return
 	if in_lake and not in_grotto() and fish_key():
 		return
+	if in_lake and not in_grotto() and Vector2(player.x, player.z).distance_to(lake.marks.h) < 2.0 and deliver(2, STORY.MAIL_HUT):
+		return
 	if in_lake and lake_key():
 		return
 	if in_hill and race_key():
@@ -4019,6 +4062,8 @@ func crown_key() -> void:
 		if cupboard_key():
 			return
 		if trial_key():
+			return
+		if me.distance_to(village.marks.M) < 1.8 and deliver(1, STORY.MAIL_SIMJI):
 			return
 		if me.distance_to(village.marks.M) < 1.8:
 			if errand == 0:
@@ -4044,6 +4089,9 @@ func crown_key() -> void:
 					return
 				if id == "doran" and kid_q >= 3 and doran_q < 2:
 					doran_errand()
+					return
+				if id == "doran" and doran_q >= 3 and lake_q >= 4 and mail_q < 2 and mail_errand():
+					met[id] = true
 					return
 				folk_talk(id)
 				met[id] = true
@@ -6386,6 +6434,8 @@ func journal_lines() -> Array:
 		side.call("마을 집 찬장", tr("%d/5 열어 봄") % house_seen.count(true))
 		var done := int(errand >= 3) + int(kid_q >= 3) + int(doran_q >= 3) + int(mul_q >= 3) + int(fly_q >= 3)
 		side.call("마을 심부름", tr("%d/5 마침") % done)
+	if mail_q >= 1:
+		side.call("도란의 편지 세 통", tr("끝") if mail_q >= 2 else (tr("도란에게 알리자") if mail_got.count(true) == 3 else tr("%d/3 전함 · 보리 할머니, 심지, 섬 오두막") % mail_got.count(true)))
 	if fly_q >= 1:
 		side.call("꼬마의 반딧불 병", tr("끝") if fly_q >= 3 else (tr("콩알에게 가져가자") if fly_q == 2 else tr("밤의 늪에서 %d/5") % marsh.caught()))
 	if lake_q >= 2:

@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -1758,6 +1758,55 @@ func run() -> void:
 		var listed: bool = "도전 과제" in "\n".join(main.journal_lines())
 		calm_enemies(false)
 		check("feats", done and listed, "crit feat at 50=%s kill counted, journal lists feats=%s" % [done, listed])
+	if want.call("mail"):
+		main.story_step = maxi(main.story_step, 10)
+		if main.intro:
+			main.start_game(false)
+		await wait(0.2)
+		main.close_story()
+		main.doran_q = 3
+		main.kid_q = 3
+		main.lake_q = 4
+		main.mail_q = 0
+		main.mail_got = [false, false, false]
+		main.met["doran"] = true
+		calm_enemies(true)
+		main.in_village = true
+		main.in_lake = false
+		var dp: Vector2 = main.village.folk_pos.doran
+		reset_to(dp + Vector2(-1.0, 0))
+		tap(KEY_E)
+		await wait(0.2)
+		main.close_story()
+		var asked: bool = main.mail_q == 1
+		reset_to(main.village.marks.M + Vector2(-1.2, 0))
+		tap(KEY_E)
+		await wait(0.2)
+		main.close_story()
+		main.in_village = false
+		reset_to(Vector2(main.shop_pos.x, main.shop_pos.z))
+		tap(KEY_SPACE)
+		await wait(0.2)
+		main.close_story()
+		if main.shop_open:
+			main.toggle_shop(false)
+		main.in_lake = true
+		reset_to(main.lake.marks.h + Vector2(0, 1.2))
+		tap(KEY_E)
+		await wait(0.2)
+		main.close_story()
+		var all3: bool = main.mail_got.count(true) == 3
+		main.in_lake = false
+		main.in_village = true
+		var hp0: int = main.player.max_hp
+		reset_to(dp + Vector2(-1.0, 0))
+		tap(KEY_E)
+		await wait(0.2)
+		main.close_story()
+		var paid: bool = main.mail_q == 2 and main.player.max_hp == hp0 + 10
+		main.in_village = false
+		calm_enemies(false)
+		check("mail", asked and all3 and paid, "asked=%s delivered=%s paid=%s" % [asked, main.mail_got, paid])
 	calm_enemies(false)
 	var failed := results.count(false)
 	print("TESTS %d passed, %d failed" % [results.size() - failed, failed])
