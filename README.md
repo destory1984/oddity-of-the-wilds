@@ -85,6 +85,8 @@
 | ![섬 밑 물빛 동굴의 벽돌 게](docs/shots/crab.jpg) | ![구름 둔덕의 벽돌 허수아비](docs/shots/scarecrow.jpg) |
 | ![가라앉은 달지기 성](docs/shots/castle.jpg) | ![옥좌의 방의 벽돌 기사](docs/shots/knight.jpg) |
 | ![숲의 달 순서 돌](docs/shots/grove.jpg) | ![동굴의 세 돌단](docs/shots/shrine.jpg) |
+| ![마을의 달빛 시련](docs/shots/trial.jpg) | ![보름달 밤의 등불 축제](docs/shots/festival.jpg) |
+| ![보이지 않는 구름길](docs/shots/cloudpath.jpg) | ![마을 집 안](docs/shots/house.jpg) |
 
 ## 만든 방법
 
