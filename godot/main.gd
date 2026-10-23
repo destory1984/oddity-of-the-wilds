@@ -3092,7 +3092,7 @@ func save_game() -> void:
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
 		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "has_shoes": has_shoes,
-		"castle_q": castle_q, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read)}
+		"castle_q": castle_q, "bars": castle.bars, "levers": castle.levers.map(func(lv): return lv.up), "vault": castle.vault_open, "has_armour": has_armour, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify(d))
@@ -3225,6 +3225,13 @@ func load_game() -> void:
 		castle_q = 1 # the knight fight starts over
 	if bool(d.get("castle_gate", false)):
 		castle.open_gate()
+	var lvs: Array = d.get("levers", [])
+	for i in mini(lvs.size(), castle.levers.size()):
+		if bool(lvs[i]):
+			castle.flip_lever(i)
+	if bool(d.get("vault", false)):
+		castle.open_vault_look()
+	has_armour = bool(d.get("has_armour", false))
 	var cps: Array = d.get("castle_pages", [])
 	for i in mini(cps.size(), castle.pages.size()):
 		castle.pages[i].read = bool(cps[i])
@@ -3536,6 +3543,7 @@ const CASTLE := preload("res://castle.gd")
 var castle = CASTLE.new()   # 가라앉은 달지기 성 between the hill and the garden (Sora is still in_hill in there)
 var castle_q := 0           # 0 never entered, 1 inside, 2 fighting the knight, 3 knight beaten (east gate open)
 var castle_spawned := false
+var has_armour := false     # 달지기 갑옷 from the castle treasury: damage taken x0.85
 var cloud = CLOUD.new()     # 구름 둔덕 above the hill (Sora is still in_hill up there)
 var cloud_q := 0            # 0 never entered, 1 inside, 2 fighting the scarecrow, 3 scarecrow beaten
 var cloud_chest := false
@@ -4755,6 +4763,28 @@ func castle_key() -> bool:
 				set_quest(castle_quest())
 				save_game()
 				return true
+	for i in castle.levers.size():
+		if me.distance_to(castle.levers[i].pos) < 1.3:
+			var was := castle.vault_solved()
+			castle.flip_lever(i)
+			sfx(220 + i * 60, 0.15, "square", 0.15, -60)
+			burst(Vector3(castle.levers[i].pos.x, 0.9, castle.levers[i].pos.y), Color("#c8962a"), 6, 1.5)
+			ui.mini.map_tex = castle.map_tex(CASTLE.CASTLE_X + CASTLE.W)
+			if castle.vault_solved() and not was:
+				shake = 0.2
+				sfx(330, 0.4, "triangle", 0.25, 200)
+				toast("보물고의 창살 세 개가 모두 올라갔다")
+			save_game()
+			return true
+	if not castle.vault_open and me.distance_to(Vector2(castle.vault_chest.position.x, castle.vault_chest.position.z)) < 1.6:
+		castle.open_vault_look()
+		has_armour = true
+		player.gold += 150
+		burst(castle.vault_chest.position + Vector3(0, 0.8, 0), Color("#e8c050"), 40, 3.0)
+		sfx(784, 0.12, "triangle", 0.25)
+		show_story("", STORY.ARMOUR)
+		save_game()
+		return true
 	for i in castle.pages.size():
 		var p: Dictionary = castle.pages[i]
 		if me.distance_to(p.pos) < 1.5:
@@ -5994,6 +6024,7 @@ func journal_lines() -> Array:
 		side.call("구름 둔덕", tr("끝") if cloud_q >= 3 else tr("언덕 북쪽 바람구멍으로"))
 	if castle_q >= 1:
 		side.call("한결의 일기", tr("%d/3 읽음") % castle.pages_read())
+		side.call("성의 보물고", tr("끝") if castle.vault_open else (tr("상자를 열자") if castle.vault_solved() else tr("경비실의 지렛대 셋")))
 	if night_q >= 4:
 		side.call("달빛 시련", tr("최고 기록 %d분 %02d초") % [int(trial_best) / 60, int(trial_best) % 60] if trial_best > 0.0 else tr("마을 남서쪽 돌 둘레에서"))
 	out.append("")
@@ -6007,6 +6038,7 @@ func journal_lines() -> Array:
 	if has_acorn: keep.append(tr("다람쥐 도토리"))
 	if has_ring: keep.append(tr("수정 반지"))
 	if has_shoes: keep.append(tr("바람 신발"))
+	if has_armour: keep.append(tr("달지기 갑옷"))
 	out.append("  " + (", ".join(keep) if not keep.is_empty() else tr("왕관 하나")))
 	return out
 
@@ -6715,6 +6747,8 @@ func player_hit(dmg: int, src: Vector2, attacker: Dictionary) -> String:
 	return "hit"
 
 func hurt_player(dmg: int, gy: float) -> void:
+	if has_armour:
+		dmg = maxi(1, int(round(dmg * 0.85)))
 	player.hp -= dmg
 	player.hurt_t = 0.2
 	player.inv = 0.8

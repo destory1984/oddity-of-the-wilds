@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -1546,6 +1546,37 @@ func run() -> void:
 		main.in_hill = false
 		calm_enemies(false)
 		check("race", spots and started and won and timed_out, "spots walkable=%s started=%s won shoes=%s (best %.1f s) runs out of time=%s" % [spots, started, won, main.race_best, timed_out])
+	if want.call("vault"):
+		main.story_step = maxi(main.story_step, 10)
+		if main.intro:
+			main.start_game(false)
+		await wait(0.2)
+		main.close_story()
+		main.in_village = false
+		main.in_hill = true
+		main.has_armour = false
+		var cx: float = main.CASTLE.CASTLE_X
+		var shut: bool = not main.player_can(cx + 22, 23)
+		for i in [0, 1, 2]: # all three: gates 1 and 3 open, gate 2 flipped twice
+			reset_to(main.castle.levers[i].pos + Vector2(0, 1.0))
+			tap(KEY_E)
+			await wait(0.1)
+		var wrong: bool = not main.castle.vault_solved()
+		reset_to(main.castle.levers[1].pos + Vector2(0, 1.0))
+		tap(KEY_E) # back off the middle lever: levers 1 and 3 alone open everything
+		await wait(0.1)
+		var solved: bool = main.castle.vault_solved() and main.player_can(cx + 22, 23)
+		reset_to(Vector2(cx + 27, 23))
+		tap(KEY_E)
+		await wait(0.2)
+		main.close_story()
+		var hp0: float = main.player.hp
+		main.player.inv = 0.0
+		main.hurt_player(20, 0.0)
+		var less: bool = main.has_armour and absf((hp0 - main.player.hp) - 17.0) < 0.01
+		main.player.hp = float(main.player.max_hp)
+		main.in_hill = false
+		check("vault", shut and wrong and solved and less, "gates shut=%s all three levers wrong=%s levers 1+3 open=%s armour takes 20 as 17=%s" % [shut, wrong, solved, less])
 	calm_enemies(false)
 	var failed := results.count(false)
 	print("TESTS %d passed, %d failed" % [results.size() - failed, failed])

@@ -2,6 +2,8 @@
 # The bricked gate (W) opens to the crown's unwinding; a deep channel (~) in the great hall needs the water skip;
 # a broken floor (_) is crossed by wind vents (> <). Hangyeol's three diary pages (j) lie in the library and the guard
 # room; reading all three opens the moon door (D) to the throne room, where the brick knight (K) guards the east gate (E).
+# East of the guard room, three barred gates (1 2 3) guard the treasury (T); the levers (l) on the guard room's
+# north wall each flip two gates or one: open all three to reach the moonkeeper armour.
 # Sora counts as "on the hill" in here.
 extends RefCounted
 
@@ -29,11 +31,11 @@ S........W...~~~.......>___....D...K...E
 ##########...~~~....L.#####..L.#.......#
 ##########...~~~......#####....#.......#
 ##################..############.L...L.#
-##########...........###########.......#
-##########.......a...###################
-##########..g........###################
-##########.....j...g.###################
-##########...........###################
+##########...l.l.l...###......##.......#
+##########.......a...###......##########
+##########..g........123....T.##########
+##########.....j...g.###......##########
+##########...........###......##########
 ########################################
 ########################################"""
 const VENTS := {">": Vector2(1, 0), "<": Vector2(-1, 0)}
@@ -46,6 +48,12 @@ var gate_open := false   # the bricked west gate
 var door_open := false   # the moon door, after all three pages
 var gate_nodes: Array = []
 var door: Node3D
+const LEVER_FLIPS := [[0, 1], [1, 2], [2]] # which gates each lever flips (solved by the first and third)
+var bars := [false, false, false]       # gate open?
+var bar_nodes: Array = []
+var levers: Array = []                  # [{"pos": Vector2, "handle": Node3D, "up": bool}]
+var vault_chest: Node3D
+var vault_open := false
 
 func _init() -> void:
 	for line in ROWS.split("\n"):
@@ -67,6 +75,10 @@ func blocked(x: float, z: float) -> bool:
 		return not gate_open
 	if c == "D":
 		return not door_open
+	if c in "123":
+		return not bars[int(c) - 1]
+	if c == "l" or c == "T":
+		return true
 	return c == "#" or c == "~" or c == "_" or c == "j"
 
 func pages_read() -> int:
@@ -138,6 +150,59 @@ func build(m: Node) -> void:
 	throne.rotation.y = PI
 	m.add_child(throne)
 	m.rocks.append({"x": CASTLE_X + 37.5, "z": 9.0, "r": 0.9})
+	build_vault(m)
+
+func build_vault(m: Node) -> void:
+	var iron: Material = m.mat_color(Color("#4a4a56"))
+	for i in 3:
+		var g := Node3D.new()
+		for k in 4:
+			var b: MeshInstance3D = m.box(Vector3(0.12, 1.4, 0.12), iron)
+			b.position = Vector3(0, 0.7, -0.36 + k * 0.24)
+			g.add_child(b)
+		g.position = Vector3(CASTLE_X + 21 + i, 0, 23)
+		m.add_child(g)
+		bar_nodes.append(g)
+	for z in H:
+		for x in W:
+			if grid[z][x] == "l":
+				var g := Node3D.new()
+				var base: MeshInstance3D = m.box(Vector3(0.5, 0.5, 0.3), m.mat_color(Color("#6a6458")))
+				base.position = Vector3(0, 0.6, -0.3)
+				g.add_child(base)
+				var handle := Node3D.new()
+				handle.position = Vector3(0, 0.6, -0.15)
+				var stick: MeshInstance3D = m.box(Vector3(0.08, 0.6, 0.08), m.mat_color(Color("#c8962a")))
+				stick.position = Vector3(0, 0.3, 0)
+				handle.add_child(stick)
+				handle.rotation.x = 0.6
+				g.add_child(handle)
+				g.position = Vector3(CASTLE_X + x, 0, z)
+				m.add_child(g)
+				levers.append({"pos": Vector2(CASTLE_X + x, z), "handle": handle, "up": false})
+	vault_chest = Node3D.new()
+	for part in [[Vector3(0.9, 0.5, 0.6), Vector3(0, 0.25, 0), m.mat_color(Color("#5a3a6a"))], [Vector3(0.94, 0.12, 0.64), Vector3(0, 0.56, 0), m.glow_mat(Color("#e8c050"), 1.0)]]:
+		var b: MeshInstance3D = m.box(part[0], part[2])
+		b.position = part[1]
+		vault_chest.add_child(b)
+	vault_chest.position = Vector3(CASTLE_X + 28, 0, 23)
+	m.add_child(vault_chest)
+
+func flip_lever(i: int) -> void:
+	var lv: Dictionary = levers[i]
+	lv.up = not lv.up
+	(lv.handle as Node3D).rotation.x = -0.6 if lv.up else 0.6
+	for gi in LEVER_FLIPS[i]:
+		bars[gi] = not bars[gi]
+		bar_nodes[gi].visible = not bars[gi]
+
+func vault_solved() -> bool:
+	return bars[0] and bars[1] and bars[2]
+
+func open_vault_look() -> void:
+	vault_open = true
+	for b in vault_chest.get_children():
+		b.transparency = 0.45
 
 # wall blocks are drawn only along the rooms, so the solid rock between them costs nothing
 func _floor_near(x: int, z: int) -> bool:
@@ -199,6 +264,9 @@ func map_tex(width: int) -> ImageTexture:
 				"W": col = Color("#3a3630") if gate_open else Color("#c8322a")
 				"D": col = Color("#3a3630") if door_open else Color("#dfe8ff")
 				"j": col = Color("#f2e2b0")
+				"1", "2", "3": col = Color("#3a3630") if bars[int(c) - 1] else Color("#8a8a96")
+				"l": col = Color("#c8962a")
+				"T": col = Color("#e8c050")
 				"L": col = Color("#ffd060")
 				"K": col = Color("#c8322a")
 			img.set_pixel(CASTLE_X + x, z, col)
