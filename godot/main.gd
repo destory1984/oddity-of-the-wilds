@@ -347,6 +347,7 @@ const SCENES := {
 	"market": {"play": true, "village": true, "vat": Vector2(38, 6), "hour": 14.0},
 	"house_designs": {"play": true, "village": true, "house_designs": true, "hour": 14.0},
 	"swing_designs": {"play": true, "village": true, "swing_designs": true, "hour": 14.0},
+	"swing": {"play": true, "village": true, "swing": true, "hour": 14.0},
 	"pier": {"play": true, "village": true, "vat": Vector2(32, 29), "hour": 14.0},
 	"inn": {"play": true, "village": true, "vat": Vector2(8, 30), "hour": 14.0},
 	"forest": {"play": true, "village": true, "forest": true, "hour": 16.0},
@@ -723,6 +724,10 @@ func apply_test_args(args: PackedStringArray) -> void:
 		toggle_help(true)
 	if sc.get("settings", false):
 		toggle_settings(true)
+	if sc.get("swing", false): # a swing caught mid-sweep, just before the picture at 4 s
+		cam_dist = 11.0
+		player.face = Vector2(1, 0)
+		get_tree().create_timer(3.86).timeout.connect(func(): player.atk_cd = 0.0; attack())
 	if sc.get("hush", false): # the sound switched off: a finger to her lips, held for the picture
 		get_tree().create_timer(1.5).timeout.connect(func():
 			muted = false
@@ -2657,6 +2662,7 @@ const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 256분 / 목표 300분 (85%)",
 	"",
 	"2026-10-23 저녁",
+	"· v0.0.8: 칼 휘두르는 효과를 금빛 별가루로 바꿨다(시안 5개 중 3번). 가는 금빛 호가 칼끝을 따라 쓸고, 바깥으로 마름모 불티가 튄다.",
 	"· v0.0.7: 심지가 열셋째 등불을 마을 동쪽 문에 거는 장면에 삽화를 붙였다.",
 	"· v0.0.6: 벽돌왕을 쓰러뜨린 뒤의 저장을 불러오면 이야기가 동굴이 열린 때로 되돌아가고 할 일 줄이 \"땅 아래로 가는 동굴이 열렸다\"로 바뀌던 것을 고쳤다. 이미 되돌아간 저장은 한 일을 보고 제 단계로 되살린다.",
 	"· v0.0.5: 상점의 보리 할머니 그림을 440x600 → 220x300(넓이 1/4)으로 줄였다.",
@@ -3679,17 +3685,58 @@ func swing_draft(k: int, prog: float, span: float) -> Node3D:
 				g.add_child(bk)
 	return g
 
+# the sword swing: a thin gold line sweeps along the arc, bright at its head and fading to nothing at its tail,
+# and diamond sparks fly off its outer side (draft 3 "금빛 별가루", the user's pick of five on 2026-10-23).
+# A spin or a slam draws the whole gold ring and throws sparks all round.
+var swing_line_cache := {}
+var spark_mats: Array = []
+
+func swing_line(arc: float, r: float) -> ArrayMesh:
+	var key := "%.2f/%.2f" % [arc, r]
+	if not swing_line_cache.has(key):
+		swing_line_cache[key] = arc_strip(arc, 28, func(u: float) -> Array:
+			var a := pow(u, 1.4) if arc < TAU - 0.01 else 1.0
+			return [r - 0.06, r + 0.06, Color(1.0, 0.66, 0.1, a), Color(1.0, 0.82, 0.32, a)])
+	return swing_line_cache[key]
+
 func slash_fx(pos: Vector3, ang: float, big: bool, span := 1.8) -> void:
-	var m := MeshInstance3D.new()
+	if spark_mats.is_empty():
+		spark_mats = [glow_mat(Color("#ffb21a"), 1.6), glow_mat(Color("#ffe9a8"), 1.6)]
 	ang += (1.8 - span) / 2.0 # keep the arc centred where the 1.8-rad arc was
-	m.mesh = ring_mesh(1.6 if big else 0.55, 2.4 if big else 1.25, 0.0, TAU if big else span)
-	var mat := glow_mat(Color("#bfe7ff") if big else Color.WHITE, 2.5)
+	var arc := TAU if big else span
+	var r := 1.66 if big else 1.2
+	var m := MeshInstance3D.new()
+	m.mesh = swing_line(arc, r)
+	var mat := strip_mat(1.6)
 	m.material_override = mat
 	m.position = pos + Vector3(0, 0.5, 0)
-	m.rotation.y = ang
-	add_fx(m, 0.22, func(n: Node3D, k: float, _dt: float):
-		mat.albedo_color.a = 1.0 - k
-		n.scale = Vector3.ONE * (1.0 + k * 0.4))
+	var sweep := 0.0 if big else span * 0.6 # the head travels the last of the arc while the line shows
+	m.rotation.y = ang - sweep
+	add_fx(m, 0.3, func(n: Node3D, k: float, _dt: float):
+		n.rotation.y = ang - sweep * maxf(0.0, 1.0 - k * 3.0)
+		mat.albedo_color = Color(1.6, 1.6, 1.6, clampf(k * 8.0, 0.0, 1.0) * (1.0 - maxf(0.0, k - 0.35) / 0.65))
+		if big:
+			n.scale = Vector3.ONE * (1.0 + k * 0.3))
+	var count := 14 if big else 7
+	for i in count:
+		var u := (i + 0.5) / count
+		var a := arc * u - ang # a point at angle a on the strip sits at world angle a - rotation.y
+		var dir := Vector3(cos(a), 0, sin(a))
+		var d := box(Vector3.ONE * (0.07 + 0.06 * u), spark_mats[i % 2])
+		d.position = m.position + dir * (r + 0.1)
+		d.rotation = Vector3(PI / 4.0, rnd(0, TAU), PI / 4.0)
+		var speed := rnd(1.6, 2.8)
+		var delay := 0.0 if big else u * 0.08 # sparks leave along the sweep, tail first
+		d.visible = delay <= 0.0
+		add_fx(d, 0.32 + delay, func(n: Node3D, k: float, dt: float):
+			var life := (0.32 + delay) * k
+			n.visible = life >= delay
+			if life < delay:
+				return
+			n.position += dir * speed * dt
+			n.position.y += dt * 0.6
+			n.rotation.y += dt * 9.0
+			n.scale = Vector3.ONE * maxf(0.05, 1.0 - (life - delay) / 0.32))
 
 func pillar(pos: Vector3) -> void:
 	var m := MeshInstance3D.new()
