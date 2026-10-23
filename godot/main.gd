@@ -3563,6 +3563,7 @@ func save_game() -> void:
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
 		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "shop_bought": shop_bought, "play_secs": play_secs, "ng": ng, "fest_gift": fest_gift, "mail_q": mail_q, "mail_got": mail_got, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes,
+		"seals": garden.seals.map(func(sl): return sl.open),
 		"castle_q": castle_q, "bars": castle.bars, "levers": castle.levers.map(func(lv): return lv.up), "vault": castle.vault_open, "has_armour": has_armour, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -3727,6 +3728,10 @@ func load_game() -> void:
 		castle_q = 1 # the knight fight starts over
 	if bool(d.get("castle_gate", false)):
 		castle.open_gate()
+	var sls: Array = d.get("seals", [])
+	for i in mini(sls.size(), garden.seals.size()):
+		if bool(sls[i]):
+			garden.open_seal(garden.seals[i])
 	var lvs: Array = d.get("levers", [])
 	for i in mini(lvs.size(), castle.levers.size()):
 		if bool(lvs[i]):
@@ -4145,6 +4150,8 @@ func crown_key() -> void:
 		return
 	if in_garden and garden_q == 4:
 		final_wind()
+		return
+	if in_garden and garden_q == 1 and seal_key():
 		return
 	if in_grotto() and grotto_key():
 		return
@@ -5786,7 +5793,10 @@ func enter_garden() -> void:
 		garden_q = 1
 		show_story("", STORY.GARDEN_IN)
 	if garden_q < 5:
-		set_quest("굳은달 거푸집의 심장을 노리자")
+		if garden.seals_open() < garden.seals.size():
+			set_quest(tr("거푸집 둘레의 벽돌 봉인을 풀자 (E) %d/3") % garden.seals_open())
+		else:
+			set_quest("굳은달 거푸집의 심장을 노리자")
 	if garden_q >= 5:
 		garden.set_posts(8)
 	save_game()
@@ -5805,12 +5815,35 @@ func leave_garden() -> void:
 	save_game()
 
 func update_garden(dt: float) -> void:
-	if garden_q == 1 and not story_open and Vector2(player.x, player.z).distance_to(garden.marks.C) < 8.0:
+	if garden_q == 1 and not story_open and garden.seals_open() == garden.seals.size() and Vector2(player.x, player.z).distance_to(garden.marks.C) < 8.0:
 		garden_q = 2
 		spawn_mold()
 	if not mold_wave.is_empty():
 		update_mold_wave(dt)
 	update_ring(dt)
+
+# E beside a seal: one pip unwinds it (the heart is near, so the crown is strong), and two goblins break out
+func seal_key() -> bool:
+	for sl in garden.seals:
+		if not sl.open and Vector2(player.x, player.z).distance_to(sl.pos) < 1.6:
+			if not spend_pips(1):
+				return true
+			garden.open_seal(sl)
+			burst(Vector3(sl.pos.x, 0.8, sl.pos.y), Color("#9a4ad8"), 30, 3.5)
+			shake = 0.25
+			sfx(150, 0.5, "triangle", 0.3, -40)
+			for k in 2:
+				spawn_enemy(sl.pos + Vector2(rnd(-1.5, 1.5), rnd(-1.5, 1.5)))
+				enemies[enemies.size() - 1].cave = true
+			var n: int = garden.seals_open()
+			if n == garden.seals.size():
+				toast("마지막 봉인이 풀렸다. 거푸집이 깨어난다")
+			else:
+				toast(tr("벽돌 봉인 %d/3") % n)
+				set_quest(tr("거푸집 둘레의 벽돌 봉인을 풀자 (E) %d/3") % n)
+			save_game()
+			return true
+	return false
 
 func spawn_mold() -> void:
 	if enemies.any(func(e): return e.get("mold", false) and not e.dead):

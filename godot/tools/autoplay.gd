@@ -947,6 +947,19 @@ func run() -> void:
 		var entered: bool = main.in_garden and main.garden_q == 1
 		main.close_story()
 		reset_to(main.garden.marks.C + Vector2(-6.0, 0))
+		await wait(0.3)
+		var asleep: bool = main.garden_q == 1 # seals still shut
+		main.crown_pips = 8
+		for sl in main.garden.seals:
+			reset_to(sl.pos + (main.garden.marks.C - sl.pos).normalized() * -1.2)
+			tap(KEY_E)
+			await wait(0.1)
+		var seals_ok: bool = asleep and main.garden.seals_open() == 3
+		for e in main.enemies.filter(func(e): return not e.dead and e.x > main.GARDEN.GARDEN_X and not e.get("mold", false)):
+			e.dead = true
+			e.node.visible = false
+			e.shadow.visible = false
+		reset_to(main.garden.marks.C + Vector2(-6.0, 0))
 		main.player.inv = 30.0
 		await wait(0.3)
 		var mold: Array = main.enemies.filter(func(e): return e.get("mold", false) and not e.dead)
@@ -979,8 +992,8 @@ func run() -> void:
 		await wait(0.4)
 		var ended: bool = main.story_step == 12 and main.garden_q == 5 and mold[0].dead
 		main.close_story()
-		check("garden_end", entered and fought and locked and ready and ended,
-			"entered=%s fought=%s locked at 12%%=%s lights filled=%s ended=%s step=%d" % [entered, fought, locked, ready, ended, main.story_step])
+		check("garden_end", entered and seals_ok and fought and locked and ready and ended,
+			"entered=%s seals=%s fought=%s locked at 12%%=%s lights filled=%s ended=%s step=%d" % [entered, seals_ok, fought, locked, ready, ended, main.story_step])
 		reset_to(main.garden.marks.S + Vector2(0.3, 0))
 		await wait(1.5)
 		main.in_hill = false

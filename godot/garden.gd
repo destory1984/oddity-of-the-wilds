@@ -10,6 +10,7 @@ const RADIUS := 9.5
 
 var marks := {}          # S (entry from the forest), C (centre) -> world Vector2
 var posts: Array = []    # the 8 ring lanterns: OmniLight3D, dark until the last wind
+var seals: Array = []    # [{"pos": Vector2, "node": Node3D, "open": bool}] the brick seals that keep the mold asleep
 
 func char_at(x: float, z: float) -> String:
 	var tx := int(round(x)) - GARDEN_X
@@ -21,7 +22,19 @@ func char_at(x: float, z: float) -> String:
 	return "." if Vector2(tx, tz).distance_to(CENTER) <= RADIUS else "#"
 
 func blocked(x: float, z: float) -> bool:
-	return char_at(x, z) == "#"
+	if char_at(x, z) == "#":
+		return true
+	for sl in seals:
+		if not sl.open and Vector2(x, z).distance_to(sl.pos) < 0.6:
+			return true
+	return false
+
+func seals_open() -> int:
+	return seals.filter(func(sl): return sl.open).size()
+
+func open_seal(sl: Dictionary) -> void:
+	sl.open = true
+	sl.node.visible = false
 
 func build(m: Node) -> void:
 	marks.S = Vector2(GARDEN_X + 1, CENTER.y)
@@ -79,6 +92,22 @@ func build(m: Node) -> void:
 		g.set_meta("lit_mat", g.material_override)
 		posts.append(l)
 	set_posts(0)
+	# three brick seals around the heart: the mold sleeps until all are unwound
+	for k in 3:
+		var a2 := TAU * k / 3.0 - PI / 2.0
+		var at: Vector2 = marks.C + Vector2(cos(a2), sin(a2)) * 5.0
+		var g := Node3D.new()
+		var grey: Material = m.mat_color(Color("#6a6672"))
+		var violet: Material = m.glow_mat(Color("#9a4ad8"), 1.0)
+		var block: MeshInstance3D = m.box(Vector3(1.0, 1.4, 1.0), grey)
+		block.position = Vector3(0, 0.7, 0)
+		g.add_child(block)
+		var rune: MeshInstance3D = m.box(Vector3(0.4, 0.4, 0.06), violet)
+		rune.position = Vector3(0, 0.9, 0.52)
+		g.add_child(rune)
+		g.position = Vector3(at.x, 0, at.y)
+		m.add_child(g)
+		seals.append({"pos": at, "node": g, "open": false})
 
 # light the first n ring posts (0 = all dark)
 func set_posts(n: int) -> void:
