@@ -1072,12 +1072,88 @@ const POST_BORI := [
 	"||회복약 2개를 받았다.",
 ]
 
+# ---- 물지기의 아랫못 (chapter 4, below Mulgyeol's island): the water keeper's lower pond. Lines reworked with
+# GPT's notes (2026-10-24): Mulgyeol says the closing "let's follow the water", the chain snaps out of his hands,
+# the tin carries the keeper's facts so skipping the boat shed loses nothing.
+const SOUTH_HINT := [
+	"||섬 남쪽 끝을 낮은 벽돌 둑이 막고 있다. 둑 너머로 고인 못이 보인다.",
+	"물결|mulgyeol|아랫못이야. 할아버지가 여덟 밤마다 내려가던 데. 나는 따라가 본 적 없어.",
+	"소라|determined|그럼 같이 가 보자. 벽돌은 내가 풀게.",
+]
+
+const SOUTH_WEIR := [
+	"||둑의 벽돌이 흙으로 풀리자, 좁은 둑길이 남쪽으로 드러났다. 물가의 벽돌들이 고개를 든다.",
+]
+
+const SOUTH_SHED := [
+	"||물가의 낡은 배 창고. 문 위에 물레 모양 나무패가 걸려 있다.",
+	"||벽에 일지 한 권. 「물지기 일지. 여덟 밤마다 아랫못 물 태엽을 감는다. 감으면 호수가 돌고, 섬 밑 물레가 돈다.」",
+	"물결|mulgyeol_grumpy|물지기……? 할아버지는 섬에서 고기나 잡는다고만 했는데.",
+	"물결|mulgyeol|섬 밑 동굴에 못 들어가게 한 게 이것 때문이었구나. 할아버지 일터였어.",
+]
+
+const SOUTH_ROPE1 := [
+	"소라|calm|물속에 사슬이 보여. 너무 깊어서 나는 손이 안 닿아.",
+	"물결|mulgyeol|수달한테 맡겨. 금방 다녀올게.",
+]
+
+const SOUTH_ROPE2 := [
+	"물결|mulgyeol|이 사슬은 놓으면 창살이 도로 내려와. 내가 잡고 있을게. 먼저 들어가.",
+	"소라|surprised|나 혼자? ……알았어. 금방 와야 해.",
+]
+
+const SOUTH_SHUT := [
+	"||사슬이 물결의 손에서 튕겨 나가고, 창살이 쿵 하고 내려앉았다. 마당의 벽돌들이 덜그럭거리며 일어선다.",
+	"물결|mulgyeol_grumpy|사슬이 튕겨 나갔어! 안쪽 걸쇠가 벽돌로 굳었나 봐. 다시 당겨 볼게, 버텨!",
+]
+
+const SOUTH_LATCH := [
+	"||마지막 벽돌이 무너지자 걸쇠의 벽돌도 부서지고, 창살이 다시 올라갔다.",
+	"물결|mulgyeol|혼자 두어서 미안. ……다음엔 둘 다 지나갈 때까지 잡고 있을게.",
+	"소라|laugh|괜찮아. 밖에서 계속 당겨 준 거 다 들렸어.",
+]
+
+const SOUTH_SPRING := [
+	"||물에 반쯤 잠긴 커다란 태엽 열쇠. 왕관을 대자 열쇠가 천천히 돌기 시작했다.",
+	"||못 바닥에서 '딸깍' 소리가 나고, 남쪽 물막이 벽돌이 무너졌다. 수문으로 든 호수 물이 아랫못을 돌아 물넘이로 빠져나간다.",
+	"물결|mulgyeol|들려? 못 바닥에서도 물이 돌고 있어.",
+	"물결|mulgyeol|태엽이 멈춰서 들어오는 물도 멎었구나. 그래서 수문부터 굳었어.",
+]
+
+const SOUTH_BOX := [
+	"||열쇠 기둥에 묶인 작은 깡통. 일지 마지막 장과 낡은 호루라기가 들어 있다.",
+	"||「물지기 일지 끝 장. 여덟 밤마다 감던 아랫못 태엽이 풀린다. 감아도 감아도 풀린다. 호수도 섬 밑 물레도 멎었다. 한가운데가 멈췄나 보다.」",
+	"||「물이 다 굳기 전에 물넘이를 열어 물고기들을 바다로 내보낸다. 나도 이 물을 따라간다. 물결에게 남길 말은 도란에게 맡겼다.」",
+]
+
+# said only when the boat shed was not read first: the tin alone gives the keeper's facts
+const SOUTH_BOX_KEEPER := "물결|mulgyeol_grumpy|물지기 일지……? 할아버지가 이 못의 물지기였구나. 섬 밑 동굴에 못 들어가게 한 것도, 할아버지 일터라서였어."
+const SOUTH_BOX_GOT := "물결|mulgyeol|……그 편지가 이거였구나. '섬은 네가 지켜라.'"
+const SOUTH_BOX_NOT := "물결|mulgyeol|도란 아저씨한테? 그런 편지는 못 받았는데. ……물어봐야겠다."
+
+const SOUTH_BOX_END := [
+	"물결|mulgyeol|할아버지는 바다로 갔어. 늘 같은 노래를 부른다던 그 바다.",
+	"물결|mulgyeol|다 끝나면 이 물길 따라가 보자. 바다 노래, 같이 듣자.",
+	"소라|calm|응. 같이.",
+	"||물지기 호루라기를 얻었다. 물결이 쓰러져도 5초 만에 일어난다. 최대 체력 +10, 회복약 1.",
+]
+
+# the grotto's first visit, when the lower pond's clockwork already turns again
+const GROTTO_IN_WOUND := [
+	"물결|mulgyeol|여기가 섬 밑 물동굴이야. 어릴 때 할아버지가 절대 들어가지 말라던 곳.",
+	"||동굴 벽마다 낡은 물레가 박혀 있다. 몇 개는 아랫못 물을 받아 천천히 돌고 있다.",
+	"물결|mulgyeol|할아버지가 감던 태엽이 이 물레까지 돌리는 거야. 그래도 물길이 끊긴 데는 물 위를 달려야 할걸.",
+	"소라|determined|물수제비 걸음이라면 자신 있어. 가 보자.",
+]
+
 const REST_TALK_STORY := [
 	["mul_new", [["mulgyeol", "섬 밖에서 이렇게 오래 있어 본 건 처음이야."], ["sora", "할아버지 생각 나?"], ["mulgyeol", "응. 그래도 할아버지라면 가라고 했을 거야."]]],
 	["noeul_new", [["noeul", "……내가 같이 가도 괜찮은 거야? 마을 등불을 끈 건 나였는데."], ["mulgyeol", "그건 이제 다 갚았잖아."], ["sora", "응. 지금은 우리 편이야."], ["noeul", "……고마워."]]],
 	["hollow_hint", [["noeul", "숲 빈터 남쪽에 회색 문이 있었어."], ["sora", "가 보고 싶어?"], ["noeul", "……응. 언젠가."]]],
 	["hawk", [["sora", "풍차가 다시 도니까 언덕이 노래하는 것 같아."], ["noeul", "벽돌 매가 바람을 막고 있었던 거야."], ["mulgyeol", "바람이 돌아오니 털이 다 날린다!"]]],
 	["post_done", [["sora", "보리 할머니 엽서, 백 년 만에 할머니한테 돌아갔어."], ["noeul", "한결이 그걸 받았으면 안 갔을까."], ["mulgyeol", "그래도 갔겠지. 그러니까 우리는 같이 가는 거야."]]],
+	["south_hint", [["mulgyeol", "섬 남쪽 끝 둑 너머, 할아버지가 일하던 데야."], ["sora", "가 보고 싶어?"], ["mulgyeol", "……응. 혼자는 좀 그렇고."]]],
+	["south_done", [["mulgyeol", "물이 다시 한 바퀴 도니까 물고기들이 돌아와."], ["sora", "할아버지 소식도 흘러올까?"], ["mulgyeol", "물결이 전해 주겠지. 내 이름처럼."]]],
 	["mill_hint", [["mulgyeol", "언덕 남쪽 담에 참새들이 모여 있더라."], ["sora", "매 속에서 나온 애들?"], ["noeul", "뭘 찾나 봐."]]],
 	["mill_done", [["noeul", "장터 달빛 가루, 그 방앗간에서 빻던 거래."], ["mulgyeol", "그 가루 배로 실어 날랐겠지."], ["sora", "언젠가 그 배 고쳐서 셋이 타 보자."]]],
 	["scare", [["mulgyeol", "구름 위를 걸었다고 하면 아무도 안 믿을걸."], ["noeul", "바람 깃털이 증거지."], ["sora", "구르는 게 훨씬 가벼워졌어."]]],

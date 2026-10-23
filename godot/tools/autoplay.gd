@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "mill", "post", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "mill", "post", "lake_south", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -2477,6 +2477,162 @@ func run() -> void:
 		main.in_cave = false
 		check("post", dry and wet and told and woke == 5 and gate and card and bori and kept,
 			"no skip, no way=%s skip crosses (not the shallow pool)=%s by the stream=%s woke=%d of 5 crystals lowest first sink the grate=%s postcard=%s Bori gets it=%s saved=%s" % [dry, wet, told, woke, gate, card, bori, kept])
+	if want.call("lake_south"):
+		# the water keeper's lower pond below Mulgyeol's island (DESIGN.md "물지기의 아랫못"); state is set directly
+		# and waits poll, so a slow machine does not flake
+		if main.intro:
+			main.start_game(false)
+		await wait(0.2)
+		main.close_story()
+		main.in_village = false
+		main.in_forest = false
+		main.in_garden = false
+		main.in_hill = false
+		main.in_cave = false
+		main.in_lake = true
+		main.night_q = 4
+		main.lake_q = 4
+		main.lake.thaw()
+		main.join_mate()
+		main.south_q = 0
+		main.south_spawned = false
+		main.south_hint_seen = true
+		main.south_shed_seen = false
+		main.has_whistle = false
+		main.lake.south_look(0)
+		main.clear_south_job()
+		main.mate_down.mulgyeol = 0.0
+		calm_enemies(true)
+		reset_to(Vector2(284, 22))
+		main.player.inv = 120.0
+		main.snap_mates()
+		var shut: bool = not main.player_can(284, 23)
+		main.hour = 12.0
+		main.crown_pips = 3
+		var n0: int = main.enemies.size()
+		tap(KEY_E)
+		await wait(0.15)
+		main.close_story()
+		var foes: Array = main.enemies.slice(n0)
+		var weir: bool = shut and main.south_q == 1 and main.crown_pips == 0 and main.player_can(284, 23) \
+			and foes.size() == 5 and foes.all(func(e): return e.cave)
+		calm_enemies(true)
+		main.skipping = true
+		var sunk: bool = not main.player_can(280, 33) and not main.skip_water(280, 30)
+		main.skipping = false
+		sunk = sunk and not main.player_can(280, 33)
+		# R1: Mulgyeol swims to the first chain and the stones come up
+		reset_to(Vector2(277, 32))
+		main.player.inv = 120.0
+		main.snap_mates()
+		tap(KEY_E)
+		await wait(0.15)
+		main.close_story()
+		await wait(0.2)
+		var swam: bool = main.mate_job_state() in ["swim", "pull"]
+		for i in 80:
+			if main.south_q == 2:
+				break
+			await wait(0.1)
+		var stones: bool = swam and main.south_q == 2 and main.player_can(280, 33)
+		for i in 60:
+			if main.mate_job.is_empty():
+				break
+			await wait(0.1)
+		stones = stones and main.mate_job.is_empty()
+		# R2: he holds the grate up; Sora goes in alone, the chain snaps away, three bricks rise
+		reset_to(Vector2(287, 32))
+		main.player.inv = 120.0
+		main.snap_mates()
+		tap(KEY_E)
+		await wait(0.15)
+		main.close_story()
+		for i in 80:
+			if main.player_can(292, 31):
+				break
+			await wait(0.1)
+		var held: bool = main.player_can(292, 31)
+		reset_to(Vector2(294, 31))
+		main.player.inv = 120.0
+		for i in 60:
+			if not main.player_can(292, 31):
+				break
+			await wait(0.1)
+		main.close_story()
+		var amb: Array = main.enemies.filter(func(e): return e.get("south_ambush", false) and not e.dead)
+		var mp := Vector2(main.mate.position.x, main.mate.position.z)
+		var alone: bool = held and not main.player_can(292, 31) and amb.size() == 3 and mp.x < 292.0 \
+			and absf(mp.x - 288.0) <= 2.5 and absf(mp.y - 32.0) <= 3.5 and main.mate_job_state() == "wait"
+		for e in amb:
+			main.damage_enemy(e, 100000.0, Vector2(e.x - 1.0, e.z))
+		for i in 60:
+			if main.south_q == 3:
+				break
+			await wait(0.1)
+		main.close_story()
+		var latch: bool = main.south_q == 3 and main.player_can(292, 31) and main.mate_job.is_empty()
+		# the water clockwork, then the keeper's tin
+		main.crown_pips = 2
+		reset_to(Vector2(295, 34))
+		main.player.inv = 120.0
+		tap(KEY_E)
+		await wait(0.15)
+		main.close_story()
+		var spring: bool = main.south_q == 4 and main.crown_pips == 0 and main.fish_weight(4) == 15 and main.fish_weight(0) == 40
+		var hp0: int = main.player.max_hp
+		var pots0: int = main.player.pots
+		reset_to(Vector2(297, 33))
+		main.player.inv = 120.0
+		tap(KEY_E)
+		await wait(0.15)
+		main.close_story()
+		await wait(2.0)
+		main.close_story()
+		var tin: bool = main.south_q == 5 and main.has_whistle and main.player.max_hp == hp0 + 10 and main.player.pots == pots0 + 1
+		main.mate_hp.mulgyeol = 1.0
+		main.hurt_mate("mulgyeol", 30)
+		var quick: bool = main.mate_down.mulgyeol == 5.0
+		main.mate_down.mulgyeol = 0.05
+		await wait(0.2)
+		quick = quick and main.mate_down.mulgyeol == 0.0
+		# saves keep it; a save inside the yard mid-ambush wakes outside the grate with no ambush
+		main.save_game()
+		var sd = JSON.parse_string(FileAccess.get_file_as_string(main.SAVE_PATH))
+		var kept: bool = sd != null and int(sd.get("south_q", 0)) == 5 and bool(sd.get("has_whistle", false))
+		main.south_q = 2
+		reset_to(Vector2(295, 30))
+		main.save_game()
+		main.spawn_south_ambush()
+		var grey: bool = main.forest.gate_open # a load opens what earlier tests left in the save (the forest's grey gate)
+		main.load_game()
+		await wait(0.2)
+		main.close_story()
+		main.forest.gate_open = grey
+		main.forest.grey_gate.visible = not grey
+		var live: int = main.enemies.filter(func(e): return e.get("south_ambush", false) and not e.dead).size()
+		var outside: bool = main.south_q == 2 and absf(main.player.x - 289.0) < 0.1 and absf(main.player.z - 31.0) < 0.1 and live == 0 \
+			and main.lake.weir_open and main.lake.stones_up and not main.lake.latch_open and not main.player_can(292, 31)
+		main.south_q = 5
+		main.has_whistle = true
+		main.write_new_round()
+		var ng = JSON.parse_string(FileAccess.get_file_as_string(main.SAVE_PATH))
+		var round_ok: bool = ng != null and int(ng.get("south_q", 0)) == 0 and bool(ng.get("has_whistle", false))
+		# leave it as it was for the other tests
+		for e in foes:
+			if not e.dead:
+				e.dead = true
+				e.node.queue_free()
+				e.shadow.queue_free()
+		main.clear_south_job()
+		main.south_q = 0
+		main.has_whistle = false
+		main.south_spawned = false
+		main.lake.south_look(0)
+		main.save_game()
+		calm_enemies(false)
+		main.in_lake = false
+		check("lake_south", weir and sunk and stones and alone and latch and spring and tin and quick and kept and outside and round_ok,
+			"weir unwound, 5 foes=%s stones sunk, no skip=%s R1 raises them=%s R2 grate, alone, 3 bricks, Mulgyeol outside=%s latch=%s clockwork, carp 15=%s tin whistle=%s up in 5 s=%s saved=%s yard load outside=%s new round=%s" % [weir, sunk, stones, alone, latch, spring, tin, quick, kept, outside, round_ok])
 	if want.call("trial_repeat"):
 		# after the first clear, the trial's foes give nothing (the field is where gold and XP come from)
 		var best0: float = main.trial_best

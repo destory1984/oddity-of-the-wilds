@@ -384,6 +384,9 @@ const SCENES := {
 	"hollow": {"play": true, "village": true, "forest": true, "hollow": true, "hour": 21.0},
 	"road": {"play": true, "village": true, "road": true, "hour": 14.0},
 	"post": {"play": true, "post": true, "hour": 14.0},
+	"lake_south": {"play": true, "village": true, "lake_south": true, "hour": 15.0},
+	"lake_pond": {"play": true, "village": true, "lake_south": true, "pond": true, "hour": 15.0},
+	"lake_spring": {"play": true, "village": true, "lake_south": true, "spring": true, "hour": 21.0},
 	"mill": {"play": true, "village": true, "mill": true, "hour": 15.0},
 	"mill_water": {"play": true, "village": true, "mill": true, "water": true, "hour": 15.0},
 	"road_echo": {"play": true, "village": true, "road": true, "echo": true, "hour": 14.0},
@@ -604,6 +607,27 @@ func apply_test_args(args: PackedStringArray) -> void:
 				ui.boss.visible = false
 				player.x = lake.marks.G.x + 1.5
 				player.z = lake.marks.G.y - 1.5
+		if sc.get("lake_south", false): # the island's south tip, the weir ahead; "pond": the stones up, by R2; "spring": the yard
+			night_q = 4
+			lake_q = 4
+			enter_lake()
+			lake.thaw()
+			join_mate()
+			close_story()
+			south_hint_seen = true
+			player.x = 284.0
+			player.z = 22.0
+			if sc.has("pond"):
+				south_q = 2
+				player.x = 286.0
+				player.z = 31.0
+			if sc.has("spring"):
+				south_q = 3
+				player.x = 294.0
+				player.z = 33.0
+			lake.south_look(south_q)
+			ui.mini.map_tex = lake_map()
+			snap_mate()
 		if sc.get("crab", false): # the brick crab in the grotto under the island, Mulgyeol along
 			night_q = 4
 			lake_q = 4
@@ -2285,7 +2309,11 @@ func fish_key() -> bool:
 			var cast := Vector2(0, 2.0) if fish_at == lake.marks.f else Vector2(2.0, 0) # the pier looks east over the pond
 			bobber.position = Vector3(fish_at.x + cast.x, -0.25, fish_at.y + cast.y)
 			sfx(300, 0.15, "noise", 0.08, -100)
-			toast("낚싯줄을 던졌다. 찌가 흔들리면 E!")
+			if south_q >= 4 and not south_fish_told and fish_at == lake.marks.f:
+				south_fish_told = true
+				toast("다시 도는 물을 따라 바다 물고기가 올라온다")
+			else:
+				toast("낚싯줄을 던졌다. 찌가 흔들리면 E!")
 		"wait":
 			fish_state = ""
 			bobber.visible = false
@@ -2298,12 +2326,12 @@ func land_fish() -> void:
 	fish_state = ""
 	bobber.visible = false
 	var total := 0
-	for f in FISH:
-		total += f[1]
+	for i in FISH.size():
+		total += fish_weight(i)
 	var roll := rng.randi() % total
 	var k := 0
 	for i in FISH.size():
-		roll -= FISH[i][1]
+		roll -= fish_weight(i)
 		if roll < 0:
 			k = i
 			break
@@ -2648,7 +2676,7 @@ func festival_key() -> bool:
 # attack, max HP, gold, potions, keepsakes, the woken skill, feats and records. Monsters then take
 # 1/(1 + 0.5 x round) of the damage and deal (1 + 0.5 x round) times as much.
 const NG_KEEP := ["lv", "xp", "max_hp", "atk", "gold", "pots", "has_pearl", "has_feather", "has_acorn", "has_ring", "has_shoes",
-	"has_armour", "has_tea", "has_shard", "has_bookmark", "has_lamp", "has_medal", "has_oar_ring", "skill_up", "stats", "feats", "trial_best", "race_best", "fish"]
+	"has_armour", "has_tea", "has_shard", "has_bookmark", "has_lamp", "has_medal", "has_oar_ring", "has_whistle", "skill_up", "stats", "feats", "trial_best", "race_best", "fish"]
 var ng := 0                 # how many rounds were finished before this one
 var ng_armed := 0.0         # seconds left to confirm with a second E
 
@@ -2793,9 +2821,10 @@ func travel(i: int) -> void:
 		save_game())
 
 const CHANGES := [
-	"개발 상황: 놀 수 있는 분량 약 280분 / 목표 300분 (93%)",
+	"개발 상황: 놀 수 있는 분량 약 285분 / 목표 300분 (95%)",
 	"",
 	"2026-10-24 새벽",
+	"· v0.0.18: 4장에 물지기의 아랫못(약 5분). 거북을 물리친 뒤 섬 남쪽 끝 둑을 풀면 할아버지가 일하던 못이 나온다. 말뚝에서 E를 누르면 물결이 헤엄쳐 물밑 사슬을 당긴다. 디딤돌을 띄우고, 창살 마당에서 혼자 버티고, 물 태엽을 감으면 호수 물이 다시 한 바퀴 돈다. 깡통에서 일지 마지막 장과 물지기 호루라기(물결이 10 → 5초 만에 일어남, 최대 체력 +10). 황금 잉어가 5 → 15로 잘 잡힌다.",
 	"· v0.0.17: 2장에 물길 끝 굴(약 7분). 두더지를 잡고 물수제비 걸음을 얻으면 두더지 방 남쪽 물길을 따라 내려간다. 섬 넷의 수정을 낮은 소리부터 울려 창살을 가라앉히고, 쓸려 온 물건 더미에서 보리 할머니가 한결에게 부친 \"혼자 가지 마\" 엽서를 찾는다. 3장에서 할머니께 건넨다.",
 	"· v0.0.16: 6장에 참새 방앗간(약 9분). 벽돌 매를 물리친 뒤 언덕 남쪽 무너진 담을 풀면 바람 없는 골이 나온다. 큰 풍차를 감고, 깃대에서 12초 안에 바람개비 넷을 지나 바람을 불러 내리면 물길이 찬다. 어귀의 큰 수호자를 쓰러뜨리고 물수제비로 나루에 건너가면 가루 배, 종, 궤짝(삿대 고리: 물결의 장대 60 → 70%, 최대 체력 +10). 장터의 달빛 가루는 이 방앗간에서 빻던 것이다.",
 	"· v0.0.15: 8 → 9장에 한결의 마지막 길(약 8분). 계단 꼭대기에서 정원 아래 무너진 뜰로 들어간다. 뿌리 벽돌을 풀고, 한결의 야영터에서 다섯째 일기와 빈 등불 고리를 찾고, 왕관으로 비춰야 보이는 발자국을 따라 깊은 틈을 건너, 거푸집이 떠 둔 벽돌 한결과 싸운다. 한결이 왕관을 늪으로 보낸 까닭이 밝혀진다. 일곱째 길돌 정원 앞 야영터.",
@@ -3382,6 +3411,8 @@ func story_talk_ok(key: String) -> bool:
 		"hawk": return hill_q >= 3 and cloud_q < 3
 		"scare": return cloud_q >= 3
 		"post_done": return post_q >= 4
+		"south_hint": return lake_q >= 4 and south_q == 0
+		"south_done": return south_q >= 5
 		"mill_hint": return hill_q >= 3 and mill_q == 0
 		"mill_done": return mill_q >= 5
 		"pearl": return grotto_q >= 4
@@ -5129,7 +5160,7 @@ func save_game() -> void:
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
 		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "books": castle.books.map(func(b): return b.read), "has_bookmark": has_bookmark, "has_shard": has_shard, "shop_bought": shop_bought, "play_secs": play_secs, "ng": ng, "fest_gift": fest_gift, "mail_q": mail_q, "mail_got": mail_got, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes, "target_best": target_best, "has_medal": has_medal, "bottles": village.bottles.map(func(b): return b.got), "inn_nights": inn_nights, "magpie_q": magpie_q, "talks_heard": talks_heard.keys(),
-		"road_q": road_q, "road_box": road_box, "mill_q": mill_q, "has_oar_ring": has_oar_ring, "post_q": post_q, "hollow_q": hollow_q, "mem_lit": forest.mem_lamps.map(func(l): return l.lit), "hollow_doors": forest.doors.map(func(dr): return dr.open), "hollow_boxes": forest.boxes.map(func(b): return b.open),
+		"road_q": road_q, "road_box": road_box, "mill_q": mill_q, "has_oar_ring": has_oar_ring, "post_q": post_q, "south_q": south_q, "has_whistle": has_whistle, "hollow_q": hollow_q, "mem_lit": forest.mem_lamps.map(func(l): return l.lit), "hollow_doors": forest.doors.map(func(dr): return dr.open), "hollow_boxes": forest.boxes.map(func(b): return b.open),
 		"seals": garden.seals.map(func(sl): return sl.open),
 		"stairs_wall": stairs.wall_open, "stairs_lamps": stairs.lamps.map(func(l): return l.lit),
 		"castle_q": castle_q, "bars": castle.bars, "levers": castle.levers.map(func(lv): return lv.up), "vault": castle.vault_open, "has_armour": has_armour, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read),
@@ -5180,6 +5211,10 @@ func load_game() -> void:
 		lake_q = 2 # the turtle fight starts over from the pier
 	if lake_q >= 2:
 		lake.thaw()
+	south_q = int(d.get("south_q", 0)) # old saves: the weir is still shut
+	has_whistle = bool(d.get("has_whistle", false))
+	lake.south_look(south_q)
+	clear_south_job()
 	if lake_q >= 4:
 		join_mate()
 	if garden_q >= 2 and garden_q < 5:
@@ -5265,6 +5300,9 @@ func load_game() -> void:
 			enter_grotto()
 		player.x = lx
 		player.z = lz
+		if south_q == 2 and in_south_yard(Vector2(lx, lz)): # saved in the yard mid-ambush: outside the grate again
+			player.x = 289.0
+			player.z = 31.0
 		if turtle_cut: # saved on the island mid-fight: back to the pier, where Mulgyeol rows again
 			player.x = lake.marks.P.x
 			player.z = lake.marks.P.y - 1.0
@@ -5917,6 +5955,8 @@ func crown_key() -> void:
 	if in_village and in_house < 0 and market_key():
 		return
 	if in_lake and not in_grotto() and Vector2(player.x, player.z).distance_to(lake.marks.h) < 2.0 and deliver(2, STORY.MAIL_HUT):
+		return
+	if in_lake and not in_grotto() and south_key():
 		return
 	if in_lake and lake_key():
 		return
@@ -6723,6 +6763,7 @@ func enter_lake() -> void:
 	save_game()
 
 func leave_lake() -> void:
+	clear_south_job()
 	in_lake = false
 	in_village = true
 	player.x = village.marks.K.x
@@ -6878,6 +6919,292 @@ func update_turtle(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
 	node.position = Vector3(e.x, 0, e.z)
 	e.shadow.position = Vector3(e.x, 0.02, e.z)
 
+# ---- 물지기의 아랫못 (DESIGN.md, chapter 4): the water keeper's lower pond below Mulgyeol's island. Unwind the weir,
+# then send Mulgyeol down the rope posts' chains (only the otter reaches them): the first raises four stepping
+# stones, the second holds the yard's grate up while Sora goes in alone. The chain snaps out of his hands, the grate
+# drops and three bricks rise; beating them breaks the bricked latch. Winding the water clockwork's key sets the
+# lake's water running its whole round again (golden carp 5 -> 15); the keeper's tin holds his last page and the
+# whistle (Mulgyeol gets up in 5 s, not 10). Eight foes, once.
+const SOUTH_YARD_X := 292.5  # east of the grate
+const SOUTH_SWIM := 3.0      # Mulgyeol's swim, tiles a second
+const SOUTH_HOLD_MAX := 20.0 # he lets go if Sora does not go in
+var south_q := 0             # 0 shut, 1 weir unwound, 2 stones up, 3 latch broken (grate up), 4 clockwork wound, 5 tin
+var has_whistle := false
+var south_spawned := false
+var south_hint_seen := false
+var south_shed_seen := false
+var south_fish_told := false
+var grotto_turn_told := false
+var south_ambush_on := false
+var south_latch_t := -1.0
+var mate_job := {}           # Mulgyeol sent down a chain: state swim / pull / hold / back / wait, "to", "home", "t"
+
+func lake_map() -> ImageTexture:
+	return with_stair_marks(lake.map_tex(LAKE.LAKE_X + LAKE.W), [lake.marks.G])
+
+func in_south_yard(p: Vector2) -> bool:
+	return p.x > SOUTH_YARD_X and p.y > 26.5 and p.y < 37.5
+
+# E in the lower pond (and at the weir from the island's south tip)
+func south_key() -> bool:
+	if lake_q < 4:
+		return false
+	var me := Vector2(player.x, player.z)
+	if not lake.weir_open and me.distance_to(lake.marks.Y) < 1.6:
+		if not spend_pips(unbrick_cost()):
+			return true
+		lake.open_weir()
+		south_q = maxi(south_q, 1)
+		burst(Vector3(lake.marks.Y.x, 0.7, lake.marks.Y.y), Color("#8a6a4a"), 36, 3.5)
+		shake = 0.25
+		sfx(196, 0.5, "triangle", 0.3, -60)
+		ui.mini.map_tex = lake_map()
+		show_story("", STORY.SOUTH_WEIR)
+		spawn_south_foes()
+		save_game()
+		return true
+	if me.y < LAKE.SOUTH_Z + 0.5:
+		return false
+	if me.distance_to(lake.marks.B) < 1.8:
+		south_shed_seen = true
+		show_story("", STORY.SOUTH_SHED)
+		return true
+	for i in lake.ropes.size():
+		if me.distance_to(lake.ropes[i]) < 1.6 and south_q == i + 1:
+			if not mate_job.is_empty():
+				return true
+			if mate == null or mate_down.mulgyeol > 0.0:
+				toast("물결이 일어날 때까지 기다리자")
+				return true
+			var chain: Vector2 = lake.chains[i]
+			var home: Vector2 = lake.ropes[i] + Vector2(-1.0, 0)
+			show_story("", STORY.SOUTH_ROPE1 if i == 0 else STORY.SOUTH_ROPE2)
+			after_story = func(): send_mate(chain, "pull" if i == 0 else "hold", home)
+			return true
+	if south_q == 3 and me.distance_to(lake.marks.K) < 1.6:
+		if not spend_pips(2):
+			return true
+		lake.turn_spring()
+		south_q = 4
+		burst(Vector3(lake.marks.K.x, 1.2, lake.marks.K.y), Color("#e8c84a"), 30, 3.0)
+		burst(Vector3(lake.marks.W.x, 0.5, lake.marks.W.y), Color("#9fd4ff"), 36, 3.5)
+		shake = 0.2
+		sfx(330, 0.5, "sine", 0.25, 200)
+		ui.mini.map_tex = lake_map()
+		show_story("", STORY.SOUTH_SPRING)
+		save_game()
+		return true
+	if south_q == 4 and me.distance_to(lake.marks.c) < 1.6:
+		south_q = 5
+		lake.tin_look()
+		var rest: Array = []
+		if not south_shed_seen:
+			rest.append(STORY.SOUTH_BOX_KEEPER)
+		rest.append(STORY.SOUTH_BOX_GOT if mail_got[2] else STORY.SOUTH_BOX_NOT)
+		rest.append_array(STORY.SOUTH_BOX_END)
+		if not has_whistle:
+			has_whistle = true
+			player.max_hp += 10
+			player.hp = float(player.max_hp)
+			player.pots += 1
+		else: # a new round: the whistle came along
+			rest.pop_back()
+			player.gold += 40
+			player.pots += 1
+			toast("금화 40, 회복약 1")
+		burst(Vector3(lake.marks.c.x, 0.6, lake.marks.c.y), Color("#9fb4c8"), 30, 2.5)
+		sfx(784, 0.12, "triangle", 0.25)
+		ui.mini.map_tex = lake_map()
+		show_story("", STORY.SOUTH_BOX)
+		# after the keeper's last page, a moment of running water before Mulgyeol speaks (GPT's note)
+		after_story = func():
+			for k in 4:
+				get_tree().create_timer(0.3 * k).timeout.connect(func(): sfx(260 - k * 30, 0.4, "noise", 0.05, -80))
+			get_tree().create_timer(1.6).timeout.connect(func(): if not story_open: show_story("", rest))
+		save_game()
+		return true
+	return false
+
+func send_mate(at: Vector2, kind: String, home: Vector2) -> void:
+	if mate == null or mate_down.mulgyeol > 0.0:
+		toast("물결이 일어날 때까지 기다리자")
+		return
+	mate_job = {"state": "swim", "kind": kind, "to": at, "home": home, "t": 0.0, "fx": 0.0, "inside": 0.0}
+
+func mate_job_state() -> String:
+	return mate_job.get("state", "")
+
+# Mulgyeol on a job: he swims straight (3 tiles a second, half under water) and does not follow or fight
+func update_mate_job(dt: float) -> void:
+	var spr: Sprite3D = mate.get_child(0)
+	var at := Vector2(mate.position.x, mate.position.z)
+	var to: Vector2 = mate_job.to
+	var st: String = mate_job.state
+	var wet: bool = lake.char_at(at.x, at.y) in "Xo-"
+	mate_job.t += dt
+	mate_job.fx += dt
+	if st == "swim" or st == "back" or st == "wait":
+		var d := to - at
+		if d.length() > 0.05:
+			at += d.normalized() * minf(d.length(), dt * SOUTH_SWIM)
+			spr.flip_h = not screen_left(d)
+			if wet and mate_job.fx > 0.2:
+				mate_job.fx = 0.0
+				burst(Vector3(at.x, 0.0, at.y), Color("#9fd4ff"), 4, 0.8)
+		elif st == "swim":
+			mate_job.state = "pull" if mate_job.kind == "pull" else "hold"
+			mate_job.t = 0.0
+			if mate_job.kind == "hold":
+				lake.grate_held = true
+				lake.set_grate(self, true)
+				ui.mini.map_tex = lake_map()
+				sfx(240, 0.4, "triangle", 0.2, 120)
+		elif st == "back":
+			mate_job = {}
+		elif st == "wait": # by the post, hauling on the rope again and again
+			var ph := fmod(mate_job.t, 2.0)
+			at = to + Vector2(-0.18 if ph < 0.35 else 0.0, 0)
+			if ph < dt * 1.5:
+				var ch: Node3D = lake.chain_nodes[1]
+				var tw := create_tween()
+				tw.tween_property(ch, "position:y", -0.1, 0.12)
+				tw.tween_property(ch, "position:y", -0.25, 0.2)
+				if int(mate_job.t / 2.0) % 3 == 1:
+					say_bubble(mate, tr("끄응, 한 번만 더……!"), 1.8)
+	elif st == "pull" or st == "hold":
+		mate.position.y = -0.25 + sin(t * 9.0) * 0.04
+		if st == "pull" and mate_job.t >= 1.0:
+			lake.raise_stones(self)
+			south_q = maxi(south_q, 2)
+			burst(Vector3(lake.stones[1].x + 0.5, 0.2, lake.stones[1].y), Color("#9fd4ff"), 30, 3.0)
+			sfx(392, 0.3, "triangle", 0.2, 120)
+			toast("물밑에서 디딤돌 넷이 떠올랐다")
+			ui.mini.map_tex = lake_map()
+			mate_job = {"state": "back", "to": mate_job.home, "home": mate_job.home, "t": 0.0, "fx": 0.0}
+			save_game()
+		elif st == "hold":
+			if in_south_yard(Vector2(player.x, player.z)):
+				mate_job.inside += dt
+			else:
+				mate_job.inside = 0.0
+			var on_grate: bool = Vector2(player.x, player.z).distance_to(lake.marks.H) < 0.9 # never drop it on her
+			if mate_job.inside >= 1.0 or (mate_job.t >= SOUTH_HOLD_MAX and not on_grate):
+				south_let_go(mate_job.inside >= 1.0)
+		mate.position.x = at.x
+		mate.position.z = at.y
+		return
+	mate.position = Vector3(at.x, -0.25 if wet else 0.0, at.y)
+
+# the grate's chain gets away from Mulgyeol: with Sora in the yard it snaps out of his hands and the bricks rise
+func south_let_go(inside: bool) -> void:
+	lake.grate_held = false
+	lake.set_grate(self, false)
+	ui.mini.map_tex = lake_map()
+	var ch: Node3D = lake.chain_nodes[1]
+	var tw := create_tween() # a short jerk as it gets away
+	tw.tween_property(ch, "position:y", 0.15, 0.08)
+	tw.tween_property(ch, "position:y", -0.25, 0.25)
+	burst(Vector3(ch.position.x, 0.2, ch.position.z), Color("#9fd4ff"), 20, 2.5)
+	sfx(90, 0.35, "square", 0.25, -30)
+	if inside:
+		shake = 0.3
+		mate_job = {"state": "wait", "to": mate_job.home, "home": mate_job.home, "t": 0.0, "fx": 0.0}
+		if mate2 != null:
+			mate2.position = Vector3(mate_job.home.x, 0, mate_job.home.y - 1.0)
+		spawn_south_ambush()
+		show_story("", STORY.SOUTH_SHUT)
+	else:
+		toast("물결이 사슬을 놓고 돌아왔다. 말뚝에서 다시 E")
+		mate_job = {"state": "back", "to": mate_job.home, "home": mate_job.home, "t": 0.0, "fx": 0.0}
+
+func spawn_south_foes() -> void:
+	if south_spawned or south_q < 1 or south_q > 2:
+		return
+	south_spawned = true
+	for f in lake.south_foes:
+		var w: Vector2 = f[0]
+		if w.x >= 296.0: # the yard's ambush waits for the grate
+			continue
+		spawn_enemy(w, f[1] == "a")
+		var e: Dictionary = enemies[enemies.size() - 1]
+		e.cave = true
+		if f[1] == "s":
+			give_shield(e)
+
+func spawn_south_ambush() -> void:
+	clear_south_ambush()
+	for f in lake.south_foes:
+		var w: Vector2 = f[0]
+		if w.x < 296.0:
+			continue
+		spawn_enemy(w, f[1] == "a")
+		var e: Dictionary = enemies[enemies.size() - 1]
+		e.cave = true
+		e.south_ambush = true
+		burst(Vector3(w.x, 0.5, w.y), Color("#8a8a90"), 14, 2.0)
+	south_ambush_on = true
+
+func clear_south_ambush() -> void:
+	for e in enemies:
+		if e.get("south_ambush", false) and not e.dead:
+			e.dead = true
+			e.node.queue_free()
+			e.shadow.queue_free()
+	south_ambush_on = false
+
+# Sora faints or leaves: the ambush goes, Mulgyeol comes back to her side and the grate drops
+func clear_south_job() -> void:
+	clear_south_ambush()
+	south_latch_t = -1.0
+	if not mate_job.is_empty():
+		mate_job = {}
+		if mate != null:
+			mate.position.y = 0.0
+	if lake.grate_held:
+		lake.grate_held = false
+		lake.grate.position.y = 0.0
+
+func south_latch() -> void:
+	south_ambush_on = false
+	lake.break_latch(self)
+	south_q = maxi(south_q, 3)
+	mate_job = {}
+	if mate != null:
+		mate.position.y = 0.0
+	burst(Vector3(lake.marks.l.x, 0.4, lake.marks.l.y), Color("#8a8a90"), 24, 2.5)
+	sfx(196, 0.4, "triangle", 0.25, -60)
+	ui.mini.map_tex = lake_map()
+	show_story("", STORY.SOUTH_LATCH)
+	save_game()
+
+func update_lake_south(dt: float) -> void:
+	var me := Vector2(player.x, player.z)
+	lake.tick(dt, t)
+	if me.y > LAKE.SOUTH_Z + 0.5:
+		ui.zone_sub.text = "아랫못"
+	elif ui.zone_sub.text == "아랫못":
+		ui.zone_sub.text = "물결의 섬"
+	if south_latch_t > 0.0:
+		south_latch_t -= dt
+		if south_latch_t <= 0.0:
+			south_latch_t = -1.0
+			south_latch()
+	if story_open:
+		return
+	if lake_q >= 4 and south_q == 0 and not south_hint_seen and me.distance_to(lake.marks.Y) < 3.0:
+		south_hint_seen = true
+		show_story("", STORY.SOUTH_HINT)
+		return
+	if south_q >= 1 and south_q <= 2:
+		spawn_south_foes()
+	if south_q == 2 and south_ambush_on and south_latch_t < 0.0 \
+			and not enemies.any(func(e): return e.get("south_ambush", false) and not e.dead):
+		south_latch_t = 1.2
+
+func fish_weight(i: int) -> int:
+	return 15 if i == 4 and south_q >= 4 else int(FISH[i][1])
+
+
 # ---- 물빛 동굴 under the island (after the turtle): water-skip runs, archers, the brick crab and the water pearl
 func in_grotto() -> bool:
 	return in_lake and player.x >= GROTTO.GROTTO_X - 0.5
@@ -6920,9 +7247,14 @@ func enter_grotto() -> void:
 		grotto_spawned = true
 		for f in grotto.foes:
 			spawn_enemy(f[0], f[1])
+	clear_south_job()
 	if grotto_q == 0:
 		grotto_q = 1
-		show_story("", STORY.GROTTO_IN)
+		grotto_turn_told = south_q >= 4
+		show_story("", STORY.GROTTO_IN_WOUND if south_q >= 4 else STORY.GROTTO_IN)
+	elif south_q >= 4 and not grotto_turn_told:
+		grotto_turn_told = true
+		toast("벽의 물레들이 천천히 돌고 있다")
 	save_game()
 
 func leave_grotto() -> void:
@@ -7638,7 +7970,7 @@ func hurt_mate(id: String, dmg: int) -> void:
 	sfx(260, 0.08, "triangle", 0.1, -100)
 	if mate_hp[id] <= 0.0:
 		mate_hp[id] = 0.0
-		mate_down[id] = MATE_REST
+		mate_down[id] = 5.0 if id == "mulgyeol" and has_whistle else MATE_REST
 		var spr: Sprite3D = node.get_child(0)
 		spr.billboard = BaseMaterial3D.BILLBOARD_DISABLED # tilt by hand, as for Sora
 		spr.rotation = Vector3(0, cam_yaw, PI / 2.0)
@@ -7678,6 +8010,10 @@ func update_mate2(dt: float) -> void:
 	if mate2 == null:
 		return
 	mate2.visible = true
+	if mate_job_state() == "wait": # waiting outside the grate by Mulgyeol, not at Sora's side
+		var post := Vector3(mate_job.home.x, 0, mate_job.home.y - 1.0)
+		mate2.position = post if mate2.position.distance_to(post) > 3.0 else mate2.position.move_toward(post, dt * 5.5)
+		return
 	var me := Vector3(player.x, 0, player.z)
 	if mate2.position.distance_to(me) > 8.0:
 		mate2.position = me + Vector3(1.3, 0, -0.6)
@@ -7712,6 +8048,11 @@ func update_mate(dt: float) -> void:
 	if mate == null:
 		return
 	mate.visible = true
+	if not mate_job.is_empty():
+		if in_lake and not in_grotto():
+			update_mate_job(dt)
+			return
+		mate_job = {}
 	var me := Vector3(player.x, 0, player.z)
 	if mate.position.distance_to(me) > 8.0:
 		snap_mate()
@@ -9343,6 +9684,7 @@ func journal_lines() -> Array:
 		side.call("호숫가 낚시", tr("끝") if fish_kinds.count(true) == 5 else tr("%d/5 종류") % fish_kinds.count(true))
 	if lake_q >= 4:
 		side.call("섬 밑 물빛 동굴", tr("끝") if grotto_q >= 4 else (tr("상자를 열자") if grotto_q == 3 else tr("섬 남쪽 계단으로")))
+		side.call("아랫못 물지기", [tr("섬 남쪽 끝 둑"), tr("물속 사슬은 물결에게 (E)"), tr("창살 안 걸쇠"), tr("물 태엽 열쇠를 감자"), tr("열쇠 기둥의 깡통"), tr("끝")][south_q])
 	if forest_q >= 1:
 		var nf: int = forest.freed.filter(func(f): return f).size()
 		side.call("갇힌 다람쥐", tr("끝") if has_acorn else tr("%d/5 구함") % nf)
@@ -9391,6 +9733,7 @@ func journal_lines() -> Array:
 	if has_ring: keep.append(tr("수정 반지"))
 	if has_shoes: keep.append(tr("바람 신발"))
 	if has_oar_ring: keep.append(tr("삿대 고리"))
+	if has_whistle: keep.append(tr("물지기 호루라기"))
 	if post_q == 3: keep.append(tr("보리의 엽서"))
 	if has_armour: keep.append(tr("달지기 갑옷"))
 	if has_tea: keep.append(tr("달꽃 차"))
@@ -9750,6 +10093,10 @@ func _process(dt: float) -> void:
 		fade_then(enter_grotto)
 	if in_grotto() and Vector2(player.x, player.z).distance_to(grotto.marks.S) < 0.7 and fade_rect.color.a == 0.0:
 		fade_then(leave_grotto)
+	if in_lake and not in_grotto():
+		update_lake_south(dt)
+	if south_q >= 4:
+		grotto.turn_wheels(dt)
 	if in_grotto() and grotto_q == 1 and player.z > 13.6 and not story_open:
 		grotto_q = 2
 		show_story("", STORY.CRAB_IN)
@@ -10280,6 +10627,7 @@ func faint() -> void:
 					e.node.queue_free()
 					e.shadow.queue_free()
 	if in_lake:
+		clear_south_job()
 		in_lake = false
 		in_village = true
 		if grotto_q == 2:

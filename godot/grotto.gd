@@ -33,6 +33,8 @@ var marks := {}          # S entry/exit, C crab, c pearl chest, p side chest -> 
 var foes: Array = []     # [world Vector2, archer]
 var chest: Node3D
 var side_chest: Node3D
+var wheels: Array = []   # four wall wheels that turn once the lower pond's clockwork is wound (DESIGN.md "물지기의 아랫못")
+const WHEEL_SPOTS := [Vector2(3, 0), Vector2(15, 0), Vector2(25, 0), Vector2(5, 13)] # wall tiles; the wheel sits on their south face
 
 func _init() -> void:
 	for line in ROWS.split("\n"):
@@ -95,6 +97,30 @@ func build(m: Node) -> void:
 	chest = chest_node(m, marks.c, Color("#2a4a7a"))
 	chest.visible = false
 	side_chest = chest_node(m, marks.p, Color("#6a4a2a"))
+	var iron: Material = m.mat_color(Color("#6a6a74"))
+	for sp in WHEEL_SPOTS:
+		var g := Node3D.new()
+		var disc := MeshInstance3D.new()
+		var cyl := CylinderMesh.new()
+		cyl.top_radius = 0.45
+		cyl.bottom_radius = 0.45
+		cyl.height = 0.2
+		disc.mesh = cyl
+		disc.material_override = iron
+		disc.rotation.x = PI / 2.0
+		g.add_child(disc)
+		for k in 2: # paddles, so the turning shows
+			var p: MeshInstance3D = m.box(Vector3(0.95, 0.12, 0.26), m.mat_color(Color("#8a8a94")))
+			p.rotation.z = k * PI / 2.0
+			p.position = Vector3(0, 0, 0.06)
+			g.add_child(p)
+		g.position = Vector3(GROTTO_X + sp.x, 0.75, sp.y + 0.6)
+		m.add_child(g)
+		wheels.append(g)
+
+func turn_wheels(dt: float) -> void:
+	for g in wheels:
+		g.rotation.z += dt * TAU * 0.3
 
 # the way back up to the island: three pale steps rising west, a stone frame and a warm lamp, so it is easy to find
 func exit_steps(m: Node, at: Vector2) -> void:
