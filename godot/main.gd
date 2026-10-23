@@ -1377,9 +1377,8 @@ func sync_ghost() -> void:
 	hero_ghost.flip_h = hero.flip_h
 
 func set_hero_frame(dir: String, frame: int) -> void:
-	# the drawn down-right row turns the head right but the body left, so down-right is the down-left row mirrored
-	hero.flip_h = dir == "downright"
-	var e: Array = hero_tex["downleft" if dir == "downright" else dir]
+	hero.flip_h = false
+	var e: Array = hero_tex[dir]
 	var tex: Texture2D = e[0]
 	var cw := tex.get_width() / 4.0
 	var ch := tex.get_height() / 4.0
