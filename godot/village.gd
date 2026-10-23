@@ -426,3 +426,85 @@ func build_pond(m: Node) -> void:
 
 func bottles_got() -> int:
 	return bottles.filter(func(b): return b.got).size()
+
+# ---- five house drafts for the user to pick from (scene "house_designs"); door faces south (+z) like house()
+const HOUSE_DRAFTS := ["동화 초가집", "레고 벽돌집", "등불 목조집", "버섯 집", "물가 기둥집"]
+
+func house_draft(m: Node, at: Vector3, k: int) -> void:
+	var g := Node3D.new()
+	g.position = at
+	m.add_child(g)
+	var add := func(size: Vector3, pos: Vector3, col: Color, rot := Vector3.ZERO, glow := false) -> MeshInstance3D:
+		var b: MeshInstance3D = m.box(size, m.glow_mat(col, 1.5) if glow else m.mat_color(col))
+		b.position = pos
+		b.rotation = rot
+		g.add_child(b)
+		return b
+	match k:
+		0: # 동화 초가집: cream walls, a thick stepped straw roof, a round window and a flower box
+			add.call(Vector3(2.6, 1.3, 1.8), Vector3(0, 0.65, 0), Color("#f2e6c8"))
+			for s in 4:
+				add.call(Vector3(3.2 - s * 0.6, 0.3, 2.3 - s * 0.45), Vector3(0, 1.45 + s * 0.28, 0), Color("#d8b25a").darkened(s * 0.05))
+			add.call(Vector3(0.55, 0.9, 0.06), Vector3(-0.6, 0.45, 0.92), Color("#7a4a2a"))
+			add.call(Vector3(0.45, 0.45, 0.06), Vector3(0.6, 0.85, 0.92), Color("#ffc46a"), Vector3(0, 0, PI / 4), true)
+			add.call(Vector3(0.7, 0.16, 0.2), Vector3(0.6, 0.5, 1.0), Color("#8a5a32"))
+			for f in 4:
+				add.call(Vector3(0.12, 0.12, 0.12), Vector3(0.35 + f * 0.17, 0.64, 1.0), [Color("#e84a6a"), Color("#ffd23a"), Color("#e84a6a"), Color("#9a6ae8")][f])
+		1: # 레고 벽돌집: walls stacked from studded toy bricks in four colours, a red studded roof
+			var cols := [Color("#c8322a"), Color("#2f5fb8"), Color("#e8c23a"), Color("#3a9a4a")]
+			for row in 4:
+				for c in 4:
+					add.call(Vector3(0.64, 0.32, 1.8), Vector3(-0.96 + c * 0.64 + (0.16 if row % 2 else 0.0), 0.16 + row * 0.32, 0), cols[(row + c) % 4])
+			add.call(Vector3(2.9, 0.3, 2.1), Vector3(0, 1.43, 0), Color("#b4231e"))
+			for sx in 4:
+				for sz in 3:
+					add.call(Vector3(0.18, 0.12, 0.18), Vector3(-1.05 + sx * 0.7, 1.64, -0.6 + sz * 0.6), Color("#d8342c"))
+			add.call(Vector3(0.55, 0.9, 0.06), Vector3(-0.5, 0.45, 0.92), Color("#f2ead8"))
+			add.call(Vector3(0.5, 0.4, 0.06), Vector3(0.6, 0.85, 0.92), Color("#bfe6ff"), Vector3.ZERO, true)
+		2: # 등불 목조집: white plaster in dark timber frames, a slate roof, a lantern hung over the door
+			add.call(Vector3(2.6, 1.5, 1.8), Vector3(0, 0.75, 0), Color("#efe8da"))
+			for x in [-1.25, -0.4, 0.4, 1.25]:
+				add.call(Vector3(0.12, 1.5, 0.05), Vector3(x, 0.75, 0.92), Color("#3a2618"))
+			add.call(Vector3(2.62, 0.12, 0.05), Vector3(0, 0.8, 0.93), Color("#3a2618"))
+			add.call(Vector3(1.2, 0.1, 0.05), Vector3(0.82, 0.8, 0.94), Color("#3a2618"), Vector3(0, 0, 0.55))
+			for side in [-1.0, 1.0]:
+				add.call(Vector3(3.0, 0.12, 1.3), Vector3(0, 1.85, side * 0.5), Color("#4a5468"), Vector3(side * 0.7, 0, 0))
+			add.call(Vector3(0.55, 0.95, 0.06), Vector3(-0.15, 0.47, 0.95), Color("#5a3a26"))
+			add.call(Vector3(0.22, 0.28, 0.22), Vector3(-0.15, 1.15, 1.15), Color("#ffc46a"), Vector3.ZERO, true)
+			add.call(Vector3(0.5, 0.4, 0.06), Vector3(0.85, 1.05, 0.95), Color("#ffc46a"), Vector3.ZERO, true)
+		3: # 버섯 집: a fat pale stem with a door and a big red cap with white spots
+			add.call(Vector3(1.8, 1.4, 1.6), Vector3(0, 0.7, 0), Color("#efe2c8"))
+			add.call(Vector3(3.0, 0.5, 2.6), Vector3(0, 1.6, 0), Color("#c83a32"))
+			add.call(Vector3(2.2, 0.4, 1.9), Vector3(0, 2.0, 0), Color("#c83a32"))
+			add.call(Vector3(1.2, 0.3, 1.0), Vector3(0, 2.3, 0), Color("#c83a32"))
+			for sp in [Vector3(-0.9, 1.87, 0.9), Vector3(0.7, 1.87, 1.0), Vector3(0.2, 2.21, 0.75), Vector3(-0.5, 2.21, -0.3), Vector3(0.9, 1.87, -0.6)]:
+				add.call(Vector3(0.28, 0.06, 0.28), sp, Color("#f8f4ea"))
+			add.call(Vector3(0.5, 0.85, 0.06), Vector3(-0.3, 0.42, 0.82), Color("#6a4a2a"))
+			add.call(Vector3(0.36, 0.36, 0.06), Vector3(0.45, 0.85, 0.82), Color("#ffc46a"), Vector3.ZERO, true)
+		4: # 물가 기둥집: a blue-shuttered house on stilts with a porch, steps and a chimney under a tall roof
+			for x in [-1.1, 1.1]:
+				for z in [-0.7, 0.7]:
+					add.call(Vector3(0.16, 0.6, 0.16), Vector3(x, 0.3, z), Color("#5a3e26"))
+			add.call(Vector3(2.8, 0.12, 2.4), Vector3(0, 0.62, 0.2), Color("#9a7448"))
+			add.call(Vector3(2.4, 1.2, 1.6), Vector3(0, 1.28, -0.1), Color("#e8e0cc"))
+			for side in [-1.0, 1.0]:
+				add.call(Vector3(2.8, 0.12, 1.25), Vector3(0, 2.25, -0.1 + side * 0.45), Color("#2f5a7a"), Vector3(side * 0.85, 0, 0))
+			add.call(Vector3(0.3, 0.8, 0.3), Vector3(0.8, 2.5, -0.4), Color("#7a5a4a"))
+			add.call(Vector3(0.5, 0.85, 0.06), Vector3(-0.5, 1.1, 0.72), Color("#5a3a26"))
+			for sx in [0.35, 0.95]:
+				add.call(Vector3(0.18, 0.45, 0.06), Vector3(sx, 1.35, 0.72), Color("#3a6ac8"))
+			add.call(Vector3(0.4, 0.45, 0.06), Vector3(0.65, 1.35, 0.71), Color("#ffc46a"), Vector3.ZERO, true)
+			for st in 3:
+				add.call(Vector3(0.6, 0.08, 0.25), Vector3(-0.5, 0.48 - st * 0.18, 1.5 + st * 0.25), Color("#9a7448"))
+	var t := Label3D.new()
+	t.text = "%d  %s" % [k + 1, tr(HOUSE_DRAFTS[k])]
+	t.font = m.ui_font
+	t.font_size = 40
+	t.pixel_size = 0.008
+	t.modulate = Color("#3a2414")
+	t.outline_size = 10
+	t.outline_modulate = Color("#f2ead8")
+	t.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+	t.no_depth_test = true
+	t.position = Vector3(0, 3.4, 0)
+	g.add_child(t)

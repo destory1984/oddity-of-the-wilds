@@ -2122,8 +2122,20 @@ func run() -> void:
 		await wait(8.0)
 		var said: int = main.bubbles_said - said0
 		var three: bool = said == 4
+		await wait(11.0)
+		var said1: int = main.bubbles_said
+		main.rest_talk(main.STORY.REST_TALK[0])
+		await wait(0.3)
+		main.spawn_enemy(Vector2(main.player.x + 3.0, main.player.z)) # a goblin turns up: the talk stops
+		await wait(5.5)
+		var hushed: bool = main.bubbles_said - said1 == 1 and main.talk_bubbles.is_empty()
+		var chat_gob: Dictionary = main.enemies[main.enemies.size() - 1]
+		if not chat_gob.dead: # the companions may have beaten it already
+			chat_gob.dead = true
+			chat_gob.node.queue_free()
+			chat_gob.shadow.queue_free()
 		calm_enemies(false)
-		check("mate_chat", talked and three and main.chat_cd > 10.0, "a balloon after standing still=%s a four-line talk among all three=%s (%d balloons)" % [talked, three, said])
+		check("mate_chat", talked and three and hushed and main.chat_cd > 10.0, "a balloon after standing still=%s a four-line talk among all three=%s (%d balloons) a monster stops it=%s" % [talked, three, said, hushed])
 	if want.call("east_bridge"):
 		main.in_village = false
 		main.in_hill = false

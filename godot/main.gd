@@ -158,7 +158,7 @@ func walkable(x: float, z: float) -> bool:
 	if tile_at(x, z) == WATER:
 		return false
 	for r in rocks:
-		if Vector2(r.x - x, r.z - z).length() < r.r:
+		if not r.has("bush") and Vector2(r.x - x, r.z - z).length() < r.r:
 			return false
 	return true
 
@@ -343,6 +343,7 @@ const SCENES := {
 	"village": {"play": true, "village": true},
 	"village_night": {"play": true, "village": true, "hour": 22.0},
 	"market": {"play": true, "village": true, "vat": Vector2(38, 6), "hour": 14.0},
+	"house_designs": {"play": true, "village": true, "house_designs": true, "hour": 14.0},
 	"pier": {"play": true, "village": true, "vat": Vector2(32, 29), "hour": 14.0},
 	"inn": {"play": true, "village": true, "vat": Vector2(8, 30), "hour": 14.0},
 	"forest": {"play": true, "village": true, "forest": true, "hour": 16.0},
@@ -423,6 +424,15 @@ func apply_test_args(args: PackedStringArray) -> void:
 		enter_village()
 		player.x = village.marks.M.x - 2.0
 		player.z = village.marks.M.y + 1.0
+		if sc.get("house_designs", false): # five house drafts in a row across the screen, in the village's east field
+			var right := Vector2(cos(cam_yaw), -sin(cam_yaw))
+			var c := Vector2(VILLAGE.VILLAGE_X + 33.0, 20.0)
+			for k in 5:
+				var hp := c + right * (k - 2) * 4.6
+				village.house_draft(self, Vector3(hp.x, 0, hp.y), k)
+			player.x = c.x + 1.0
+			player.z = c.y + 3.5
+			cam_dist = 22.0
 		if sc.has("vat"): # a spot in village tiles
 			player.x = VILLAGE.VILLAGE_X + sc.vat.x
 			player.z = sc.vat.y
@@ -1016,8 +1026,105 @@ func build_vegetation() -> void:
 					cattail_spots.append(Vector4(x + rnd(-0.5, 0.5), h, z + rnd(-0.5, 0.5), rnd(0.8, 1.2)))
 			if ty == WATER and rng.randf() < 0.07:
 				cattail_spots.append(Vector4(x + rnd(-0.4, 0.4), -0.3, z + rnd(-0.4, 0.4), rnd(0.9, 1.2)))
-	vegetation(tuft, 0.8, 0.55, grass_spots, 0.12)
+	var gs := grass_style()
+	if gs > 0: # a grass draft (env GRASS_STYLE): its own random stream, so the world after this stays where it was
+		var made: Array = grass_draft(gs, grass_spots)
+		vegetation(made[0], made[1], made[2], made[3], made[4])
+	else:
+		vegetation(tuft, 0.8, 0.55, grass_spots, 0.12)
 	vegetation(cattail, 0.8, 1.7, cattail_spots, 0.07)
+
+# the ways down under the ground (the cave mouth, the island's stair to the grotto, the castle's stair to the
+# undercroft) show on the minimap as a violet square with a pale middle (the user asked for them on the map)
+func with_stair_marks(tex: ImageTexture, spots: Array) -> ImageTexture:
+	var img := tex.get_image()
+	for sp: Vector2 in spots:
+		for dz in range(-1, 2):
+			for dx in range(-1, 2):
+				var x := int(round(sp.x)) + dx
+				var z := int(round(sp.y)) + dz
+				if x >= 0 and z >= 0 and x < img.get_width() and z < img.get_height():
+					img.set_pixel(x, z, Color("#f2e6ff") if dx == 0 and dz == 0 else Color("#b45cff"))
+	return ImageTexture.create_from_image(img)
+
+# ---- five grass drafts for the user to choose from (python tools/dev.py shot with GRASS_STYLE=1..5)
+func grass_style() -> int:
+	return int(OS.get_environment("GRASS_STYLE")) if OS.get_environment("GRASS_STYLE") != "" else 0
+
+# returns [texture, width, height, spots, sway]
+func grass_draft(k: int, base: Array) -> Array:
+	var vr := RandomNumberGenerator.new()
+	vr.seed = 99
+	var spots: Array = []
+	var blade := func(img: Image, x0: float, h: float, lean: float, wide: float, ramp: Array) -> void:
+		var x := x0
+		for y in int(h):
+			var t := y / h
+			var w := maxi(1, int(round(wide * (1.0 - t))))
+			var ci := mini(ramp.size() - 1, int(t * ramp.size()))
+			px(img, x - w / 2.0, img.get_height() - 1 - y, w, 1, Color(ramp[ci]))
+			x += lean * (0.3 + t)
+	match k:
+		1: # 가는 잎 촘촘히: many thin blades, darker roots, a few more per tile
+			var tex := make_tex(48, 64, func(img: Image):
+				for i in 90:
+					blade.call(img, 4.0 + vr.randf() * 40.0, 22.0 + vr.randf() * 40.0, (vr.randf() - 0.5) * 0.5, 1.0,
+						["#2f5a1e", "#3e7426", "#4f8a2c", "#62a034", "#7ab842", "#a6d064"]))
+			for b in base:
+				spots.append(b)
+				if vr.randf() < 0.5:
+					spots.append(Vector4(b.x + vr.randf_range(-0.3, 0.3), b.y, b.z + vr.randf_range(-0.3, 0.3), b.w))
+			return [tex, 0.75, 0.75, spots, 0.14]
+		2: # 굵은 잎 다발: broad pointed leaves in three greens, in clumps
+			var tex := make_tex(48, 48, func(img: Image):
+				for i in 22:
+					var tone := vr.randi() % 3
+					var ramp: Array = [["#3a6e22", "#4f8c2c", "#6aa83a", "#8cc452"], ["#447a26", "#5c9a32", "#7cb846", "#a2d066"], ["#356624", "#4a8030", "#5f9a38", "#7eb44a"]][tone]
+					blade.call(img, 6.0 + vr.randf() * 36.0, 18.0 + vr.randf() * 26.0, (vr.randf() - 0.5) * 0.7, 4.0, ramp))
+			for b in base:
+				if vr.randf() < 0.7:
+					spots.append(b)
+			return [tex, 0.85, 0.6, spots, 0.1]
+		3: # 바람결 풀밭: every blade leans the same way, pale tips, a stronger sway
+			var tex := make_tex(48, 56, func(img: Image):
+				for i in 60:
+					blade.call(img, 2.0 + vr.randf() * 34.0, 24.0 + vr.randf() * 30.0, 0.35 + vr.randf() * 0.15, 2.0,
+						["#3c7024", "#4e8a2c", "#66a436", "#86bc48", "#b4d878", "#e2f0b0"]))
+			for b in base:
+				spots.append(b)
+			return [tex, 0.85, 0.7, spots, 0.22]
+		4: # 들꽃 섞인 풀: the blades of now with clover leaves and many small flowers
+			var tex := make_tex(48, 48, func(img: Image):
+				for i in 50:
+					blade.call(img, 4.0 + vr.randf() * 40.0, 14.0 + vr.randf() * 28.0, (vr.randf() - 0.4) * 0.5, 2.0,
+						["#4e8a2c", "#62a034", "#76b23e", "#96c856", "#c2e07c"])
+				for i in 10:
+					var x := 6.0 + vr.randf() * 34.0
+					var y := 6.0 + vr.randf() * 28.0
+					var c := Color(["#fff6d8", "#ffd24a", "#8f9cff", "#ffb0cc", "#ff7a6a"][vr.randi() % 5])
+					px(img, x - 1, y, 3, 1, c)
+					px(img, x, y - 1, 1, 3, c)
+					px(img, x, y, 1, 1, Color("#ffb030"))
+				for i in 6:
+					var x := 6.0 + vr.randf() * 34.0
+					px(img, x - 2, 44, 2, 2, Color("#3e7a2a"))
+					px(img, x + 1, 44, 2, 2, Color("#3e7a2a"))
+					px(img, x, 42, 2, 2, Color("#4e8e32")))
+			for b in base:
+				spots.append(b)
+			return [tex, 0.8, 0.55, spots, 0.12]
+		5: # 짧은 잔디와 키 큰 무더기: a low even lawn everywhere, tall clumps here and there
+			var tex := make_tex(48, 64, func(img: Image):
+				for i in 70:
+					blade.call(img, 2.0 + vr.randf() * 44.0, 6.0 + vr.randf() * 8.0, (vr.randf() - 0.5) * 0.4, 1.0,
+						["#4a8a2a", "#5e9e34", "#78b444", "#9acc5c"])
+				for i in 14:
+					blade.call(img, 16.0 + vr.randf() * 16.0, 30.0 + vr.randf() * 32.0, (vr.randf() - 0.5) * 0.6, 2.0,
+						["#3a6e22", "#4e8a2c", "#66a436", "#8cc452", "#b8dc7a"]))
+			for b in base:
+				spots.append(b)
+			return [tex, 0.9, 0.85, spots, 0.12]
+	return []
 
 # ---------------------------------------------------------------- props
 func build_props() -> void:
@@ -1042,7 +1149,7 @@ func build_props() -> void:
 			var s := rnd(0.35, 0.6)
 			cubes.append([Transform3D(Basis().scaled(Vector3.ONE * s), Vector3(x + rnd(-0.4, 0.4), height_at(x, z) + rnd(0.2, 0.7), z + rnd(-0.4, 0.4))),
 				Color.from_hsv(0.25 + rnd(-0.03, 0.03), 0.55, rnd(0.58, 0.72))])
-		rocks.append({"x": x, "z": z, "r": 0.6})
+		rocks.append({"x": x, "z": z, "r": 0.6, "bush": true}) # Sora walks through low bushes (kept here so trees stay clear of them)
 	var trunks: Array = []
 	for i in 180:
 		var x := rnd(3, N - 3)
@@ -2676,26 +2783,40 @@ func set_button(parent: Control, text: String, pos: Vector2, size: Vector2, fn: 
 	parent.add_child(b)
 	return b
 
-# Space Oddity's settings sheet: the whole screen in #0d1a3a, a back arrow 8 px from the corner, and a column at most
-# 640 px wide: the head (title at left, sound and 가- 가+ at right), four equal tabs, the page as label rows with the
-# description beside and a small button under it, and the way back at the foot
+# the settings popup (the user wanted a popup of fitting size, not the whole screen): a dimmed backdrop that closes it
+# when clicked, and a centred 688 x 584 card in Space Oddity's dialog look (#091627, #53718b line, 14 px corners) holding
+# the corner back key and the 640 px column: the head (title at left, sound and 가- 가+ at right), four equal tabs,
+# the page as label rows with the description beside and a small button under it, and the way back at the foot
 func build_settings(root: Control) -> void:
-	var sp := Panel.new()
+	var sp := Panel.new() # the backdrop
 	sp.set_anchors_preset(Control.PRESET_FULL_RECT)
-	sp.add_theme_stylebox_override("panel", flat(Color("#0d1a3a"), Color(0, 0, 0, 0), 0, 0))
+	sp.add_theme_stylebox_override("panel", flat(Color(0.02, 0.04, 0.1, 0.55), Color(0, 0, 0, 0), 0, 0))
 	sp.theme = get_menu_theme()
 	sp.mouse_filter = Control.MOUSE_FILTER_STOP
+	sp.gui_input.connect(func(ev: InputEvent):
+		if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
+			toggle_settings(false))
 	root.add_child(sp)
-	back_key(sp, func(): toggle_settings(false))
-	var col := Control.new() # the 640 px column, centred
-	col.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	col.offset_left = -320
-	col.offset_right = 320
-	col.offset_top = 54
-	col.offset_bottom = 54 + 560
+	var card := Panel.new()
+	card.set_anchors_preset(Control.PRESET_CENTER)
+	card.offset_left = -344
+	card.offset_right = 344
+	card.offset_top = -292
+	card.offset_bottom = 292
+	var sb := flat(Color("#091627"), Color("#53718b"), 1, 14, 0.0)
+	sb.shadow_color = Color(0, 0, 0, 0.53)
+	sb.shadow_size = 24
+	sb.shadow_offset = Vector2(0, 12)
+	card.add_theme_stylebox_override("panel", sb)
+	card.mouse_filter = Control.MOUSE_FILTER_STOP # clicks on the card do not reach the backdrop
+	sp.add_child(card)
+	back_key(card, func(): toggle_settings(false))
+	var col := Control.new() # the 640 px column
+	col.position = Vector2(24, 12) # the head row shares its line with the back key
+	col.size = Vector2(640, 556)
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	sp.add_child(col)
-	var h1 := label(col, "설정", Vector2(0, 2), 24, ODD_INK)
+	card.add_child(col)
+	var h1 := label(col, "설정", Vector2(48, 2), 24, ODD_INK)
 	h1.size = Vector2(300, 40)
 	ui.set_sound = Button.new()
 	ui.set_sound.icon = odd_icon("sound")
@@ -2898,6 +3019,8 @@ func chat_lines(id: String) -> Array:
 
 func update_chat(dt: float) -> void:
 	chat_cd -= dt
+	if not talk_bubbles.is_empty() and enemies.any(func(e): return not e.dead and not e.get("prop", false) and Vector2(e.x - player.x, e.z - player.z).length() < 8.0):
+		hush_talk()
 	var still: bool = Vector2(player.vx, player.vz).length() < 0.3 and not story_open and not intro and in_house < 0
 	chat_t = chat_t + dt if still else 0.0
 	if chat_t < 9.0 or chat_cd > 0.0:
@@ -2930,12 +3053,17 @@ func update_chat(dt: float) -> void:
 	say_bubble(pick[1], tr(lines[rng.randi() % lines.size()]))
 
 # a short talk at rest: each line in its speaker's balloon, 2.4 s apart; Sora's balloon stands where she rests
+var talk_id := 0          # bumped to cut a rest talk short
+var talk_bubbles: Array = [] # balloons of the talk now running
+
 func rest_talk(talk: Array) -> void:
 	chat_cd = maxf(chat_cd, talk.size() * 2.4 + 10.0)
+	talk_id += 1
+	var my_id := talk_id
 	for i in talk.size():
 		var ln: Array = talk[i]
 		get_tree().create_timer(i * 2.4 + 0.01).timeout.connect(func():
-			if story_open:
+			if story_open or my_id != talk_id:
 				return
 			var node: Node3D = null
 			match ln[0]:
@@ -2947,7 +3075,16 @@ func rest_talk(talk: Array) -> void:
 					add_child(node)
 					get_tree().create_timer(4.5).timeout.connect(node.queue_free)
 			if node != null and is_instance_valid(node):
-				say_bubble(node, tr(ln[1]), 2.2))
+				say_bubble(node, tr(ln[1]), 2.2)
+				talk_bubbles.append(node.get_child(node.get_child_count() - 1)))
+
+# a monster within 8 tiles ends the chatter at once (the user asked)
+func hush_talk() -> void:
+	talk_id += 1
+	for b in talk_bubbles:
+		if is_instance_valid(b):
+			b.queue_free()
+	talk_bubbles = []
 
 # the signpost by the east bridge: the only way from the marsh to the village
 # Built after the map, props, plants and monsters so the random draws that place them are the same as before.
@@ -3110,7 +3247,7 @@ func leave_stairs() -> void:
 	player.z = castle.marks.E.y
 	ground_y = 0.0
 	gust_dir = Vector2.ZERO
-	ui.mini.map_tex = castle.map_tex(CASTLE.CASTLE_X + CASTLE.W)
+	ui.mini.map_tex = with_stair_marks(castle.map_tex(CASTLE.CASTLE_X + CASTLE.W), [UNDER_STAIR])
 	ui.zone_name.text = "가라앉은 달지기 성"
 	ui.zone_sub.text = "옥좌의 방"
 	snap_mates()
@@ -3857,9 +3994,10 @@ func update_daylight(dt: float) -> void:
 	var k := smoothstep(0.0, 1.0, (hour - a.h) / (b.h - a.h))
 	sun.light_color = Color(a.sun).lerp(Color(b.sun), k)
 	night = lerpf(a.night, b.night, k)
-	sun.light_energy = lerpf(a.si, b.si, k) * 1.1 * lerpf(1.0, 0.5 + 0.7 * moon_phase().x, night) # fuller moon, brighter night
+	# night is brighter than it was (the user asked twice): more moonlight and about 2.8x the ambient at full night
+	sun.light_energy = lerpf(a.si, b.si, k) * 1.1 * lerpf(1.0, 1.1 + 0.9 * moon_phase().x, night) # fuller moon, brighter night
 	env.ambient_light_color = Color(a.amb).lerp(Color(b.amb), k)
-	env.ambient_light_energy = lerpf(a.ai, b.ai, k) * 0.4
+	env.ambient_light_energy = lerpf(a.ai, b.ai, k) * 0.4 * lerpf(1.0, 2.8, night)
 	var fog := Color(a.fog).lerp(Color(b.fog), k)
 	env.fog_light_color = fog
 	env.background_color = fog
@@ -4419,6 +4557,9 @@ func clear_vegetation(at: Vector2, r: float) -> void:
 func open_cave(at: Vector2, with_story := true) -> void:
 	story_step = 5
 	cave_pos = at + Vector2(0, -1.5)
+	var marsh_tex: ImageTexture = ui.mini.map_tex if not ui.has("outside_map") or ui.mini.map_tex == ui.outside_map else ui.outside_map
+	if marsh_tex != null:
+		marsh_tex.set_image(with_stair_marks(marsh_tex, [cave_pos]).get_image())
 	clear_vegetation(cave_pos, 2.2)
 	var g := Node3D.new()
 	g.position = Vector3(cave_pos.x, height_at(cave_pos.x, cave_pos.y), cave_pos.y)
@@ -5720,7 +5861,7 @@ func enter_lake() -> void:
 	player.x = lake.marks.S.x
 	player.z = lake.marks.S.y + 1.2
 	ground_y = 0.0
-	ui.mini.map_tex = lake.map_tex(LAKE.LAKE_X + LAKE.W)
+	ui.mini.map_tex = with_stair_marks(lake.map_tex(LAKE.LAKE_X + LAKE.W), [lake.marks.G])
 	ui.zone_name.text = "남쪽 호수"
 	ui.zone_sub.text = "굳은 물가"
 	if lake_q < 3:
@@ -5757,7 +5898,7 @@ func lake_key() -> bool:
 			burst(Vector3(lake.marks.D.x, 0.6, lake.marks.D.y), Color("#9fd4ff"), 40, 4.0)
 			shake = 0.3
 			sfx(196, 0.6, "triangle", 0.3, -60)
-			ui.mini.map_tex = lake.map_tex(LAKE.LAKE_X + LAKE.W)
+			ui.mini.map_tex = with_stair_marks(lake.map_tex(LAKE.LAKE_X + LAKE.W), [lake.marks.G])
 			show_story("", STORY.LAKE_THAW)
 			set_quest("부두의 물결에게 말을 걸자 (E)")
 			save_game()
@@ -5942,7 +6083,7 @@ func leave_grotto() -> void:
 	player.x = lake.marks.G.x
 	player.z = lake.marks.G.y - 1.2
 	ground_y = 0.0
-	ui.mini.map_tex = lake.map_tex(LAKE.LAKE_X + LAKE.W)
+	ui.mini.map_tex = with_stair_marks(lake.map_tex(LAKE.LAKE_X + LAKE.W), [lake.marks.G])
 	ui.zone_name.text = "남쪽 호수"
 	ui.zone_sub.text = "물결의 섬"
 	ui.boss.visible = false
@@ -6298,7 +6439,7 @@ func enter_castle() -> void:
 	player.z = castle.marks.S.y
 	ground_y = 0.0
 	gust_dir = Vector2.ZERO
-	ui.mini.map_tex = castle.map_tex(CASTLE.CASTLE_X + CASTLE.W)
+	ui.mini.map_tex = with_stair_marks(castle.map_tex(CASTLE.CASTLE_X + CASTLE.W), [UNDER_STAIR])
 	ui.zone_name.text = "가라앉은 달지기 성"
 	ui.zone_sub.text = "굳은 성문"
 	snap_mates()
@@ -6351,7 +6492,7 @@ func castle_key() -> bool:
 				shake = 0.25
 				sfx(196, 0.5, "triangle", 0.3, -60)
 				toast("성문의 벽돌이 흙으로 풀렸다")
-				ui.mini.map_tex = castle.map_tex(CASTLE.CASTLE_X + CASTLE.W)
+				ui.mini.map_tex = with_stair_marks(castle.map_tex(CASTLE.CASTLE_X + CASTLE.W), [UNDER_STAIR])
 				set_quest(castle_quest())
 				save_game()
 				return true
@@ -6361,7 +6502,7 @@ func castle_key() -> bool:
 			castle.flip_lever(i)
 			sfx(220 + i * 60, 0.15, "square", 0.15, -60)
 			burst(Vector3(castle.levers[i].pos.x, 0.9, castle.levers[i].pos.y), Color("#c8962a"), 6, 1.5)
-			ui.mini.map_tex = castle.map_tex(CASTLE.CASTLE_X + CASTLE.W)
+			ui.mini.map_tex = with_stair_marks(castle.map_tex(CASTLE.CASTLE_X + CASTLE.W), [UNDER_STAIR])
 			if castle.vault_solved() and not was:
 				shake = 0.2
 				sfx(330, 0.4, "triangle", 0.25, 200)
@@ -6413,7 +6554,7 @@ func castle_key() -> bool:
 					castle.open_door()
 					shake = 0.3
 					sfx(150, 0.6, "triangle", 0.3, -40)
-					ui.mini.map_tex = castle.map_tex(CASTLE.CASTLE_X + CASTLE.W)
+					ui.mini.map_tex = with_stair_marks(castle.map_tex(CASTLE.CASTLE_X + CASTLE.W), [UNDER_STAIR])
 				set_quest(castle_quest())
 				save_game()
 			return true
@@ -6740,7 +6881,7 @@ func update_mate(dt: float) -> void:
 	if to.length() > stop:
 		mate.position = mate_step(mate.position, to.normalized() * minf(to.length() - stop, dt * 5.5))
 		mate.position.y = absf(sin(t * 11.0)) * 0.06
-		spr.flip_h = screen_left(Vector2(to.x, to.z))
+		spr.flip_h = not screen_left(Vector2(to.x, to.z)) # his picture faces left (Noeul's running frame faces right)
 	else:
 		mate.position.y = 0.0
 	spr.frame = 1 if fmod(t, 3.0) < 0.3 else 0
@@ -9047,7 +9188,7 @@ func leave_under(to_castle := true) -> void:
 	player.z = UNDER_STAIR.y
 	ground_y = 0.0
 	gust_dir = Vector2.ZERO
-	ui.mini.map_tex = castle.map_tex(CASTLE.CASTLE_X + CASTLE.W)
+	ui.mini.map_tex = with_stair_marks(castle.map_tex(CASTLE.CASTLE_X + CASTLE.W), [UNDER_STAIR])
 	ui.zone_name.text = "가라앉은 달지기 성"
 	ui.zone_sub.text = "큰 방"
 	snap_mates()
