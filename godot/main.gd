@@ -2630,6 +2630,7 @@ const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 256분 / 목표 300분 (85%)",
 	"",
 	"2026-10-23 저녁",
+	"· v0.0.6: 벽돌왕을 쓰러뜨린 뒤의 저장을 불러오면 이야기가 동굴이 열린 때로 되돌아가고 할 일 줄이 \"땅 아래로 가는 동굴이 열렸다\"로 바뀌던 것을 고쳤다. 이미 되돌아간 저장은 한 일을 보고 제 단계로 되살린다.",
 	"· v0.0.5: 상점의 보리 할머니 그림을 440x600 → 220x300(넓이 1/4)으로 줄였다.",
 	"· v0.0.4: 설정 창 글자를 13 → 16px, 단추 글자를 13 → 15px로 키웠다. 긴 설명은 줄을 바꾸고, 글자를 키워 넘치면 굴려 본다. 조작법 창(H)이 글자 크기에 맞춰 넓어진다.",
 	"· v0.0.3: 소리를 끄면 소라가 손가락을 입에 대고 \"쉬잇~\" 한다. 우주 한량의 그림을 가져왔다.",
@@ -4748,7 +4749,7 @@ func clear_vegetation(at: Vector2, r: float) -> void:
 				mm.set_instance_transform(i, Transform3D(Basis().scaled(Vector3.ONE * 0.001), o))
 
 func open_cave(at: Vector2, with_story := true) -> void:
-	story_step = 5
+	story_step = maxi(story_step, 5) # loading a later save rebuilds the cave mouth too: never wind the story back
 	cave_pos = at + Vector2(0, -1.5)
 	var marsh_tex: ImageTexture = ui.mini.map_tex if not ui.has("outside_map") or ui.mini.map_tex == ui.outside_map else ui.outside_map
 	if marsh_tex != null:
@@ -5136,11 +5137,35 @@ func load_game() -> void:
 			key_chest.modulate = Color(0.55, 0.55, 0.55)
 	if is_instance_valid(ui.title_hint):
 		ui.title_hint.text = "아무 키나 눌러 이어하기  ·  F9 처음부터"
+	repair_story_step(d)
 	if story_step >= 6: # later chapters: the quest line as it was saved (older saves keep what the zone set)
 		if d.has("quest"):
 			set_quest(String(d.quest))
+		if ui.quest.text.begins_with(tr("땅 아래로 가는 동굴이 열렸다")): # written by the bug below: the main road's last step instead
+			set_quest(main_road_quest())
 	else:
 		set_quest(["", "왕관을 만져 보자 (E)", "서쪽 오두막으로 가 보자", "북쪽 벽돌왕이 늪의 물길을 막고 있다", "", "땅 아래로 가는 동굴이 열렸다"][clampi(story_step, 0, 5)])
+
+# Until v0.0.5 every load with the Brick King down rebuilt the cave mouth with story_step = 5, so the story and the
+# quest line wound back to "the cave opened" (the user, 2026-10-23, level 21 at the cave mouth). The step comes
+# back from what the save shows was done; the quest line from the furthest step of the main road.
+func repair_story_step(d: Dictionary) -> void:
+	var at := story_step
+	if has_skip: at = maxi(at, 7)
+	if errand >= 1: at = maxi(at, 8)
+	if night_q >= 1: at = maxi(at, 9)
+	if forest_q >= 1 or castle_q >= 1: at = maxi(at, 10)
+	if garden_q >= 1: at = maxi(at, 11)
+	story_step = at
+
+func main_road_quest() -> String:
+	if garden_q >= 5: return "끝. 다시 돌기 시작한 정원을 거닐자 (정원 한가운데서 E 두 번: 새 바퀴)"
+	if castle_q >= 3: return "동쪽 문을 지나 정원 한가운데로 가자"
+	if hill_q >= 3: return "언덕 동쪽 끝 길로, 달지기들의 성에 가자"
+	if forest_q >= 3: return "숲 동쪽 끝 길로, 바람 언덕에 가자"
+	if lake_q >= 4: return "물결과 함께 마을 동쪽 문으로, 굳은 숲에 가자"
+	if night_q >= 4: return "물결과 함께 남쪽 호수를 풀자 (마을 남쪽 문)"
+	return ""
 
 # keep level, gold and story, but put Sora back at the starting crossing (F8)
 func return_to_start() -> void:
