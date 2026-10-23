@@ -114,6 +114,8 @@ func cave_char(x: float, z: float) -> String:
 	return c
 
 func tile_at(x: float, z: float) -> int:
+	if x >= UNDER.UNDER_X - 0.5:
+		return WATER if under.blocked(x, z, under_shut()) else GRASS
 	if x >= STAIRS.STAIRS_X - 0.5:
 		return WATER if stairs.blocked(x, z) else GRASS
 	if x >= HOUSE_X - 0.5:
@@ -183,6 +185,8 @@ var skip_grace := 0.0   # a short let-go of Shift or the arrows mid-river does n
 
 # water the water skip can run over: the marsh rivers and ponds, and the deep runs in the grotto
 func skip_water(x: float, z: float) -> bool:
+	if x >= UNDER.UNDER_X - 0.5:
+		return under.char_at(x, z) == "~"
 	if x >= STAIRS.STAIRS_X - 0.5:
 		return stairs.char_at(x, z) == "~"
 	if x >= CASTLE.CASTLE_X - 0.5:
@@ -301,6 +305,8 @@ func _ready() -> void:
 	for l in [ui.story_text, ui.story_who, ui.journal_text, ui.journal_text2, ui.ways_text]:
 		scale_text(l)
 	build_mate_hud(ui.root)
+	under.build(self)
+	build_under_stair()
 	apply_settings()
 	update_daylight(0.0)
 	var targs := OS.get_cmdline_user_args()
@@ -367,6 +373,7 @@ const SCENES := {
 	"stairs": {"play": true, "village": true, "castle": true, "stairs": true, "hour": 16.0},
 	"stairs_foot": {"play": true, "village": true, "castle": true, "stairs": true, "stairs_at": 0, "hour": 16.0},
 	"stairs_drop": {"play": true, "village": true, "castle": true, "stairs": true, "stairs_at": 2, "hour": 16.0},
+	"under": {"play": true, "village": true, "castle": true, "under": true, "hour": 16.0},
 	"stairs_top": {"play": true, "village": true, "castle": true, "stairs": true, "stairs_at": 3, "hour": 16.0},
 	"scrap": {"play": true, "at": Vector2(42.5, 5.5), "hour": 17.0},
 }
@@ -547,6 +554,14 @@ func apply_test_args(args: PackedStringArray) -> void:
 				player.x = castle.marks.K.x - 3.5
 				player.z = castle.marks.K.y + 1.0
 			set_quest(castle_quest())
+			if sc.has("under"): # the lamp hall below the castle, the plug pulled
+				castle_q = 3
+				has_unbrick = true
+				enter_under()
+				close_story()
+				under.drain()
+				player.x = UNDER.UNDER_X + 6.0
+				player.z = 16.5
 			if sc.has("stairs"):
 				castle_q = 3
 				enter_stairs()
@@ -2318,7 +2333,7 @@ func festival_key() -> bool:
 # attack, max HP, gold, potions, keepsakes, the woken skill, feats and records. Monsters then take
 # 1/(1 + 0.5 x round) of the damage and deal (1 + 0.5 x round) times as much.
 const NG_KEEP := ["lv", "xp", "max_hp", "atk", "gold", "pots", "has_pearl", "has_feather", "has_acorn", "has_ring", "has_shoes",
-	"has_armour", "has_tea", "has_shard", "has_bookmark", "skill_up", "stats", "feats", "trial_best", "race_best", "fish"]
+	"has_armour", "has_tea", "has_shard", "has_bookmark", "has_lamp", "skill_up", "stats", "feats", "trial_best", "race_best", "fish"]
 var ng := 0                 # how many rounds were finished before this one
 var ng_armed := 0.0         # seconds left to confirm with a second E
 
@@ -3731,7 +3746,7 @@ func skip_time(hours: float) -> void:
 	toast(tr("%02d시") % int(hour))
 
 func update_daylight(dt: float) -> void:
-	if in_grotto(): # underground: the same soft blue light at any hour, a lamp on Sora (the clock waits, as in the cave)
+	if in_grotto() or in_under(): # underground: the same soft blue light at any hour, a lamp on Sora (the clock waits, as in the cave)
 		sun.light_energy = 0.35
 		env.ambient_light_color = Color("#9ab4d8")
 		env.ambient_light_energy = 1.4
@@ -4410,7 +4425,9 @@ func save_game() -> void:
 		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "books": castle.books.map(func(b): return b.read), "has_bookmark": has_bookmark, "has_shard": has_shard, "shop_bought": shop_bought, "play_secs": play_secs, "ng": ng, "fest_gift": fest_gift, "mail_q": mail_q, "mail_got": mail_got, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes,
 		"seals": garden.seals.map(func(sl): return sl.open),
 		"stairs_wall": stairs.wall_open, "stairs_lamps": stairs.lamps.map(func(l): return l.lit),
-		"castle_q": castle_q, "bars": castle.bars, "levers": castle.levers.map(func(lv): return lv.up), "vault": castle.vault_open, "has_armour": has_armour, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read)}
+		"castle_q": castle_q, "bars": castle.bars, "levers": castle.levers.map(func(lv): return lv.up), "vault": castle.vault_open, "has_armour": has_armour, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read),
+		"under_drained": under.drained, "under_door": under.door_open, "under_guards": under_guards_done, "under_chest": under_chest_open,
+		"under_side": under_side_open, "under_diary": under_diary_read, "has_lamp": has_lamp}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify(d))
@@ -4593,6 +4610,18 @@ func load_game() -> void:
 	for i in mini(sls.size(), garden.seals.size()):
 		if bool(sls[i]):
 			garden.open_seal(garden.seals[i])
+	if bool(d.get("under_drained", false)):
+		under.drain()
+	if bool(d.get("under_door", false)):
+		under.open_door()
+	under_guards_done = bool(d.get("under_guards", false))
+	under_diary_read = bool(d.get("under_diary", false))
+	has_lamp = bool(d.get("has_lamp", false))
+	if bool(d.get("under_chest", false)) or has_lamp: # a new round keeps the lamp: Hangyeol's chest stays empty
+		open_under_chest_look()
+	if bool(d.get("under_side", false)):
+		under_side_open = true
+		under.side_chest.modulate = Color(0.55, 0.55, 0.55)
 	if bool(d.get("stairs_wall", false)):
 		stairs.open_wall()
 	var sl: Array = d.get("stairs_lamps", [])
@@ -4617,7 +4646,9 @@ func load_game() -> void:
 		var hx: float = player.x
 		var hz: float = player.z
 		enter_hill()
-		if hx >= STAIRS.STAIRS_X - 0.5:
+		if hx >= UNDER.UNDER_X - 0.5:
+			enter_under()
+		elif hx >= STAIRS.STAIRS_X - 0.5:
 			enter_stairs()
 		elif hx >= CASTLE.CASTLE_X - 0.5:
 			enter_castle()
@@ -4947,7 +4978,9 @@ const GROTTO := preload("res://grotto.gd")
 const CLOUD := preload("res://cloud.gd")
 const CASTLE := preload("res://castle.gd")
 const STAIRS := preload("res://stairs.gd")
-var stairs = STAIRS.new()   # 달의 계단 from the castle's east gate up to the garden (Sora is still in_hill there)
+var stairs = STAIRS.new()
+const UNDER := preload("res://undercroft.gd")
+var under = UNDER.new()     # 성 아래 잠긴 층, a side zone under the castle's great hall (Sora is still in_hill there)   # 달의 계단 from the castle's east gate up to the garden (Sora is still in_hill there)
 var stairs_spawned := false
 var castle = CASTLE.new()   # 가라앉은 달지기 성 between the hill and the garden (Sora is still in_hill in there)
 var castle_q := 0           # 0 never entered, 1 inside, 2 fighting the knight, 3 knight beaten (east gate open)
@@ -5066,6 +5099,8 @@ func crown_key() -> void:
 	if in_cloud() and cloud_key():
 		return
 	if in_stairs() and stairs_key():
+		return
+	if in_under() and under_key():
 		return
 	if in_castle() and castle_key():
 		return
@@ -5959,6 +5994,8 @@ func in_cloud() -> bool:
 
 # wind vents exist on the cloud mound and on the castle's broken floor
 func vent_here(x: float, z: float) -> Vector2:
+	if in_under():
+		return under.vent_at(x, z)
 	if in_stairs():
 		return stairs.vent_at(x, z)
 	if in_castle():
@@ -5968,6 +6005,8 @@ func vent_here(x: float, z: float) -> Vector2:
 	return Vector2.ZERO
 
 func gust_char(x: float, z: float) -> String:
+	if x >= UNDER.UNDER_X - 0.5:
+		return under.char_at(x, z)
 	if x >= STAIRS.STAIRS_X - 0.5:
 		return stairs.char_at(x, z)
 	return castle.char_at(x, z) if x >= CASTLE.CASTLE_X - 0.5 else cloud.char_at(x, z)
@@ -6174,7 +6213,7 @@ func in_castle() -> bool:
 	return in_hill and player.x >= CASTLE.CASTLE_X - 0.5 and player.x < HOUSE_X - 0.5
 
 func in_stairs() -> bool:
-	return in_hill and player.x >= STAIRS.STAIRS_X - 0.5
+	return in_hill and player.x >= STAIRS.STAIRS_X - 0.5 and player.x < UNDER.UNDER_X - 0.5
 
 func enter_castle() -> void:
 	in_hill = true
@@ -7712,6 +7751,7 @@ func journal_lines() -> Array:
 		side.call("한결의 일기", tr("%d/3 읽음") % castle.pages_read())
 		side.call("서재의 달지기 책", tr("끝") if has_bookmark else tr("%d/5 읽음") % castle.books.filter(func(b): return b.read).size())
 		side.call("성의 보물고", tr("끝") if castle.vault_open else (tr("상자를 열자") if castle.vault_solved() else tr("경비실의 지렛대 셋")))
+		side.call("성 아래 잠긴 층", under_journal())
 	if night_q >= 4:
 		side.call("달빛 시련", tr("최고 기록 %d분 %02d초") % [int(trial_best) / 60, int(trial_best) % 60] if trial_best > 0.0 else tr("마을 남서쪽 돌 둘레에서"))
 	out.append("")
@@ -7736,6 +7776,7 @@ func journal_lines() -> Array:
 	if has_tea: keep.append(tr("달꽃 차"))
 	if has_shard: keep.append(tr("구름 조각"))
 	if has_bookmark: keep.append(tr("달지기 책갈피"))
+	if has_lamp: keep.append(tr("한결의 등잔"))
 	out.append("  " + (", ".join(keep) if not keep.is_empty() else tr("왕관 하나")))
 	return out
 
@@ -8000,7 +8041,7 @@ func _process(dt: float) -> void:
 		if l.visible and not l.get_meta("dark", false):
 			var ld := Vector2(l.position.x - player.x, l.position.z - player.z).length()
 			warm = maxf(warm, clampf(1.0 - (ld - 1.5) / 2.5, 0.0, 1.0))
-	if in_cave or in_grotto() or jar_node != null and jar_node.visible:
+	if in_cave or in_grotto() or in_under() or jar_node != null and jar_node.visible:
 		warm = maxf(warm, 0.6) # the cave lamp on her, or the firefly jar at her side
 	lit = lit.lerp(Color(1.0, 0.95, 0.86), warm * night)
 	hero.modulate = Color(1, 0.5, 0.5) if player.hurt_t > 0 else Color(lit.r, lit.g, lit.b, 0.3 if blink else 1.0)
@@ -8058,6 +8099,10 @@ func _process(dt: float) -> void:
 			fade_then(enter_stairs)
 		elif toast_t <= 0.0:
 			toast("동쪽 문이 굳게 닫혀 있다")
+	if in_castle() and gust_dir == Vector2.ZERO and Vector2(player.x, player.z).distance_to(UNDER_STAIR) < 0.6 and fade_rect.color.a == 0.0:
+		fade_then(enter_under)
+	if in_under() and fade_rect.color.a == 0.0:
+		update_under(dt)
 	if in_stairs() and gust_dir == Vector2.ZERO and Vector2(player.x, player.z).distance_to(stairs.marks.S) < 0.8 and fade_rect.color.a == 0.0:
 		fade_then(leave_stairs)
 	if in_stairs() and Vector2(player.x, player.z).distance_to(stairs.marks.N) < 0.8 and fade_rect.color.a == 0.0:
@@ -8835,3 +8880,230 @@ func update_projectiles(dt: float) -> void:
 		if hit != null or p.life <= 0:
 			node.queue_free()
 			projectiles.remove_at(i)
+
+# ---- 성 아래 잠긴 층 (side zone under the castle's great hall): the channel, the plug that drains the flooded hall, the
+# wind well, four water lamps lit within 8 s, Hangyeol's room with two big guardians, his fourth page and his chest
+const UNDER_STAIR := Vector2(CASTLE.CASTLE_X + 10, 18) # the stair down, on the great hall's floor
+var under_spawned := false
+var under_guards: Array = []   # the two guardians while they stand
+var under_guards_done := false
+var under_chest_open := false
+var under_side_open := false
+var under_diary_read := false
+var has_lamp := false          # 한결의 등잔, a keepsake
+
+func in_under() -> bool:
+	return in_hill and player.x >= UNDER.UNDER_X - 0.5
+
+# the moon door shuts behind her while the guardians stand and she is in Hangyeol's room
+func under_shut() -> bool:
+	return not under_guards.is_empty() and player.z < 12.6 and player.x >= UNDER.UNDER_X - 0.5
+
+func chest_sprite(at: Vector2, tint: Color) -> Sprite3D:
+	var s := Sprite3D.new()
+	s.texture = chests[0].node.texture
+	s.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+	s.scale = Vector3(1, 1.0 / cos(0.78), 1)
+	s.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	s.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
+	s.shaded = false
+	s.pixel_size = 0.05
+	s.offset = Vector2(0, 7)
+	s.modulate = tint
+	s.position = Vector3(at.x, 0.0, at.y)
+	add_child(s)
+	return s
+
+# a dark square in the great hall's floor with three pale steps going down
+func build_under_stair() -> void:
+	var hole := box(Vector3(1.0, 0.04, 1.0), mat_color(Color("#16121e")))
+	hole.position = Vector3(UNDER_STAIR.x, 0.01, UNDER_STAIR.y)
+	add_child(hole)
+	for k in 3:
+		var st := box(Vector3(0.8, 0.05, 0.22), mat_color(Color("#b8b4c4").darkened(k * 0.25)))
+		st.position = Vector3(UNDER_STAIR.x, 0.04 - k * 0.01, UNDER_STAIR.y - 0.3 + k * 0.26)
+		add_child(st)
+	var rim := box(Vector3(1.2, 0.08, 0.12), mat_color(Color("#8a8494")))
+	rim.position = Vector3(UNDER_STAIR.x, 0.04, UNDER_STAIR.y - 0.56)
+	add_child(rim)
+
+func enter_under() -> void:
+	in_hill = true
+	in_garden = false
+	player.x = under.marks.S.x + 1.2
+	player.z = under.marks.S.y + 0.6
+	ground_y = 0.0
+	gust_dir = Vector2.ZERO
+	ui.mini.map_tex = under.map_tex(UNDER.UNDER_X + UNDER.W)
+	ui.zone_name.text = "성 아래 잠긴 층"
+	ui.zone_sub.text = "물에 잠긴 옛 창고"
+	snap_mates()
+	if not under_spawned:
+		under_spawned = true
+		for f in under.foes:
+			match f[1]:
+				"w": spawn_wolf(f[0])
+				"b": spawn_bat(f[0])
+				_:
+					spawn_enemy(f[0], f[1] == "a")
+					enemies[enemies.size() - 1].cave = true
+					if f[1] == "s":
+						give_shield(enemies[enemies.size() - 1])
+		if not under_chest_open:
+			show_story("", STORY.UNDER_IN)
+	save_game()
+
+func leave_under(to_castle := true) -> void:
+	under_guards_clear()
+	player.x = UNDER_STAIR.x + 1.2
+	player.z = UNDER_STAIR.y
+	ground_y = 0.0
+	gust_dir = Vector2.ZERO
+	ui.mini.map_tex = castle.map_tex(CASTLE.CASTLE_X + CASTLE.W)
+	ui.zone_name.text = "가라앉은 달지기 성"
+	ui.zone_sub.text = "큰 방"
+	snap_mates()
+	save_game()
+
+func under_journal() -> String:
+	if under_chest_open:
+		return tr("끝")
+	if under_guards_done:
+		return tr("한결의 상자를 열자")
+	if under.door_open:
+		return tr("한결의 방의 수호자 둘")
+	if under.drained:
+		return tr("물빛 등불 넷을 8초 안에 (%d/4)") % under.lamps_lit()
+	return tr("큰 방 바닥의 계단으로. 북쪽 벽의 벽돌 마개")
+
+func update_under(dt: float) -> void:
+	var me := Vector2(player.x, player.z)
+	if gust_dir == Vector2.ZERO and me.distance_to(under.marks.S) < 0.6:
+		fade_then(leave_under)
+		return
+	if under_chest_open and gust_dir == Vector2.ZERO and me.distance_to(under.marks.U) < 0.6:
+		fade_then(leave_under)
+		return
+	# the lamp clock: from the first lamp lit, the rest must burn within 8 s or all go out
+	if not under.door_open and under.lamp_clock > 0.0:
+		under.lamp_clock -= dt
+		if under.lamp_clock <= 0.0:
+			for l in under.lamps:
+				under.put_out(l)
+			sfx(180, 0.4, "triangle", 0.2, -80)
+			toast("물빛 등불이 모두 꺼졌다. 첫 등불부터 8초 안에")
+			ui.mini.map_tex = under.map_tex(UNDER.UNDER_X + UNDER.W)
+	# Hangyeol's room: two big guardians rise when she steps in; the door shuts behind her until both fall
+	if under.door_open and not under_guards_done and under_guards.is_empty() and me.y < 12.4:
+		for at in under.guard_spots:
+			spawn_enemy(at)
+			var e: Dictionary = enemies[enemies.size() - 1]
+			e.cave = true
+			e.hp = 300.0 + player.lv * 30
+			e.max_hp = int(e.hp)
+			e.size_k = 1.7
+			var mats: Array = e.node.get_meta("mats")
+			mats[2].albedo_color = Color("#5a6470")
+			mats[5].albedo_color = Color("#bfe6ff")
+			e.atk_cd = 1.5
+			under_guards.append(e)
+			burst(Vector3(at.x, 0.6, at.y), Color("#bfe6ff"), 20, 2.5)
+		under.door.visible = true
+		shake = 0.3
+		sfx(110, 0.4, "square", 0.25, 60)
+		toast("문이 닫히고, 큰 수호자 둘이 일어선다")
+	if not under_guards.is_empty():
+		if under_guards.all(func(e): return e.dead):
+			under_guards = []
+			under_guards_done = true
+			under.door.visible = false
+			player.gold += 200
+			gain_xp(250)
+			sfx(660, 0.4, "triangle", 0.25, 200)
+			toast("수호자들이 무너졌다. 금화 +200")
+			ui.mini.map_tex = under.map_tex(UNDER.UNDER_X + UNDER.W)
+			save_game()
+		elif me.y > 13.4: # she got out (a faint, a waystone): the guardians go back to sleep and the fight starts over
+			under_guards_clear()
+
+func under_guards_clear() -> void:
+	for e in under_guards:
+		if not e.dead:
+			e.dead = true
+			e.respawn = 9999.0
+			e.node.queue_free()
+			e.shadow.queue_free()
+	under_guards = []
+	if under.door_open:
+		under.door.visible = false
+
+func open_under_chest_look() -> void:
+	under_chest_open = true
+	under.chest.modulate = Color(0.55, 0.55, 0.55)
+
+func under_key() -> bool:
+	var me := Vector2(player.x, player.z)
+	if not under.drained:
+		for n in under.plug_nodes:
+			if me.distance_to(Vector2(n.position.x, n.position.z)) < 1.8:
+				if not has_unbrick:
+					toast("벽돌로 굳은 마개다. 아직 풀 힘이 없다")
+					return true
+				if not spend_pips(unbrick_cost()):
+					return true
+				under.drain()
+				burst(Vector3(n.position.x, 0.7, n.position.z), Color("#8a6a4a"), 36, 3.5)
+				burst(Vector3(UNDER.UNDER_X + 19.5, 0.3, 9.5), Color("#9fd4ff"), 40, 4.0)
+				shake = 0.3
+				sfx(150, 0.8, "noise", 0.2, -60)
+				toast("마개가 풀리고, 잠긴 바닥의 물이 빠졌다")
+				ui.mini.map_tex = under.map_tex(UNDER.UNDER_X + UNDER.W)
+				save_game()
+				return true
+	if not under.door_open:
+		for l in under.lamps:
+			if not l.lit and me.distance_to(l.pos) < 1.6:
+				if under.lamps_lit() == 0:
+					under.lamp_clock = UNDER.LAMP_TIME
+				under.light(l)
+				burst(Vector3(l.pos.x, 1.8, l.pos.y), Color("#bfe6ff"), 20, 2.0)
+				sfx(523 + under.lamps_lit() * 120, 0.25, "triangle", 0.22)
+				if under.lamps_lit() == under.lamps.size():
+					under.open_door()
+					shake = 0.3
+					toast("네 등불이 함께 타오르자, 달 문이 열렸다")
+					ui.mini.map_tex = under.map_tex(UNDER.UNDER_X + UNDER.W)
+					save_game()
+				else:
+					toast(tr("물빛 등불 %d/4 · %.0f초") % [under.lamps_lit(), maxf(under.lamp_clock, 0.0)])
+				return true
+	if not under_diary_read and me.distance_to(under.marks.j) < 1.4:
+		under_diary_read = true
+		show_story("", STORY.UNDER_DIARY)
+		save_game()
+		return true
+	if not under_chest_open and me.distance_to(under.marks.c) < 1.5:
+		if not under_guards_done:
+			toast("수호자들이 상자를 지키고 있다")
+			return true
+		open_under_chest_look()
+		has_lamp = true
+		player.max_hp += 20
+		player.hp = player.max_hp
+		player.atk += 3
+		burst(under.chest.position + Vector3(0, 0.8, 0), Color("#ffe6a0"), 40, 3.0)
+		sfx(784, 0.12, "triangle", 0.25)
+		show_story("", STORY.UNDER_CHEST)
+		save_game()
+		return true
+	if not under_side_open and me.distance_to(under.marks.p) < 1.5:
+		under_side_open = true
+		under.side_chest.modulate = Color(0.55, 0.55, 0.55)
+		player.pots += 2
+		player.gold += 60
+		burst(under.side_chest.position + Vector3(0, 0.8, 0), Color("#e8c050"), 24, 2.5)
+		sfx(784, 0.12, "triangle", 0.25)
+		toast("회복약 2개와 금화 60을 찾았다")
+		save_game()
+		return true
+	return false
