@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "mill", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "mill", "post", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -485,7 +485,7 @@ func run() -> void:
 		check("cave_enter", main.in_cave and main.story_step == 6 and main.walkable(main.player.x, main.player.z),
 			"stepping on the cave mouth: in cave=%s step=%d at %.1f,%.1f" % [main.in_cave, main.story_step, main.player.x, main.player.z])
 	if want.call("cave_layout"):
-		var ok: bool = main.cave_marks.size() == 9 and not main.walkable(main.cave_marks.D.x, main.cave_marks.D.y) and main.walkable(main.cave_marks.K.x, main.cave_marks.K.y)
+		var ok: bool = main.cave_marks.size() == 12 and not main.walkable(main.cave_marks.D.x, main.cave_marks.D.y) and main.walkable(main.cave_marks.K.x, main.cave_marks.K.y)
 		# the locked door must be the only way to the mole's hall (a playtest found a way round it)
 		var seen: Dictionary = {}
 		var todo: Array = [Vector2i(int(main.cave_marks.S.x), int(main.cave_marks.S.y))]
@@ -1546,7 +1546,7 @@ func run() -> void:
 			main.start_game(false)
 		main.close_story()
 		await wait(0.1)
-		var cr: Array = main.crystals
+		var cr: Array = main.crystals.filter(func(e): return e.get("set", 0) == 0) # the stream's end has a set of its own
 		main.crystal_done = false
 		main.crystal_run = 0
 		main.has_ring = false
@@ -2407,6 +2407,76 @@ func run() -> void:
 		main.in_hill = false
 		check("mill", shut and wall and wound and dry and called and wet and guard_ok and down and chest and kept,
 			"wall shut/unwound=%s/%s windmill wound=%s channel dry=%s wind called and water in=%s skip crosses=%s guardian=%s down=%s chest oar ring=%s saved=%s" % [shut, wall, wound, dry, called, wet, guard_ok, down, chest, kept])
+	if want.call("post"):
+		# the stream's end below the mole's hall: skip in, ring the islands' crystals, Bori's postcard
+		if main.intro:
+			main.start_game(false)
+		await wait(0.2)
+		main.close_story()
+		main.in_village = false
+		main.in_forest = false
+		main.in_lake = false
+		main.in_garden = false
+		main.in_hill = false
+		main.story_step = maxi(main.story_step, 7)
+		main.post_q = 0
+		main.post_spawned = false
+		main.has_skip = false
+		main.enter_cave()
+		main.close_story()
+		calm_enemies(true)
+		var cx: float = main.CAVE_X
+		main.skipping = false
+		var dry: bool = not main.player_can(cx + 26, 21)
+		main.has_skip = true
+		main.skipping = true
+		var wet: bool = main.player_can(cx + 26, 21) and main.skip_water(cx + 26, 21) and not main.skip_water(cx + 15, 12)
+		main.skipping = false
+		reset_to(Vector2(cx + 26, 20))
+		await wait(0.3)
+		if main.post_q == 0: # the mole hall's own scene came first
+			main.close_story()
+			reset_to(Vector2(cx + 26, 20))
+			await wait(0.3)
+		var told: bool = main.post_q == 1
+		main.close_story()
+		var foes0: int = main.enemies.filter(func(e): return not e.dead and e.x > cx and e.x < cx + 32 and e.z > 26.0).size()
+		reset_to(Vector2(cx + 20, 29))
+		await wait(0.3)
+		var woke: int = main.enemies.filter(func(e): return not e.dead and e.x > cx and e.x < cx + 32 and e.z > 26.0).size() - foes0
+		calm_enemies(true)
+		var set1: Array = main.crystals.filter(func(c): return c.get("set", 0) == 1)
+		var shut: bool = not main.player_can(cx + 2, 34)
+		var ring_ok := set1.size() == 4
+		if ring_ok:
+			main.crystal_hit(set1[0]) # A first: wrong, the run stays at the start
+			var wrong: bool = main.post_run == 0
+			for i in [1, 3, 0, 2]: # B D A C: lowest note first
+				set1[i].hurt = 0.0
+				main.crystal_hit(set1[i])
+			ring_ok = wrong
+		await wait(0.2)
+		main.close_story()
+		var gate: bool = ring_ok and main.post_q == 2 and main.player_can(cx + 2, 34) and shut
+		var hp0: int = main.player.max_hp
+		var pots0: int = main.player.pots
+		reset_to(Vector2(cx + 6, 36))
+		tap(KEY_E)
+		await wait(0.15)
+		main.close_story()
+		var card: bool = main.post_q == 3 and main.player.max_hp == hp0 + 10 and main.player.pots == pots0 + 2
+		var pots1: int = main.player.pots
+		var dq: int = main.doran_q
+		main.deliver_letter()
+		main.close_story()
+		var bori: bool = main.post_q == 4 and main.player.pots == pots1 + 2
+		var saved = JSON.parse_string(FileAccess.get_file_as_string(main.SAVE_PATH))
+		var kept: bool = saved != null and int(saved.get("post_q", 0)) == 4
+		main.doran_q = dq
+		calm_enemies(false)
+		main.in_cave = false
+		check("post", dry and wet and told and woke == 5 and gate and card and bori and kept,
+			"no skip, no way=%s skip crosses (not the shallow pool)=%s by the stream=%s woke=%d of 5 crystals lowest first sink the grate=%s postcard=%s Bori gets it=%s saved=%s" % [dry, wet, told, woke, gate, card, bori, kept])
 	if want.call("trial_repeat"):
 		# after the first clear, the trial's foes give nothing (the field is where gold and XP come from)
 		var best0: float = main.trial_best

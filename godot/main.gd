@@ -73,7 +73,7 @@ func idx(x: int, z: int) -> int:
 # The underground cave is a 32x24 grid built far east of the marsh (x >= CAVE_X).
 const CAVE_X := 100
 const CAVE_W := 32
-const CAVE_H := 24
+const CAVE_H := 40 # rows 21 - 39: the stream's end below the mole's hall (DESIGN.md, chapter 2)
 const CAVE_ROWS := """################################
 #......###........###..........#
 #......###...P....###..........#
@@ -95,8 +95,24 @@ const CAVE_ROWS := """################################
 #.............########.........E
 #.............########.........#
 #...1...2...3.########.........#
-#.............##################
-################################
+#.............###########~~~####
+#########################~~~####
+##################~~~~~~~~~~####
+##################~~~~~~~~~~####
+##################~~~###########
+##################~~~###########
+#~~~~~~~~~~..#.................#
+#~..~~~~..~....................#
+#~..~~~~..~....................#
+#~~~~~~~~~~..................T.#
+#~~~~~..~~~....................#
+#~..~~..~~~..###################
+#~..~~~~~~~..###################
+##GG############################
+#........#######################
+#........#######################
+#.....M..#######################
+#........#######################
 ################################"""
 var cave_grid: Array = []   # rows of characters
 var in_cave := false
@@ -110,6 +126,8 @@ func cave_char(x: float, z: float) -> String:
 		return "#"
 	var c: String = cave_grid[tz][tx]
 	if c == "D" and cave_door_open:
+		return "."
+	if c == "G" and post_q >= 2:
 		return "."
 	return c
 
@@ -138,7 +156,7 @@ func tile_at(x: float, z: float) -> int:
 		return WATER if forest.blocked(x, z) else (SAND if forest.char_at(x, z) == "=" else GRASS)
 	if x >= CAVE_X - 0.5:
 		var c := cave_char(x, z)
-		return WATER if c == "#" or c == "D" else (SAND if c == "w" else GRASS)
+		return WATER if c == "#" or c == "D" or c in "~GTM" else (SAND if c == "w" else GRASS)
 	var tx := int(round(x))
 	var tz := int(round(z))
 	if tx < 0 or tz < 0 or tx >= N or tz >= N:
@@ -199,6 +217,8 @@ func skip_water(x: float, z: float) -> bool:
 		return hill.filled and hill.char_at(x, z) == "~"
 	if x >= FOREST.FOREST_X - 0.5 and x < GARDEN.GARDEN_X - 0.5:
 		return forest.char_at(x, z) == "~"
+	if x >= CAVE_X - 0.5 and x < FOREST.FOREST_X - 0.5:
+		return cave_char(x, z) == "~"
 	return x < CAVE_X - 0.5 and tile_at(x, z) == WATER and x > 1.0 and z > 1.0 and z < N - 2.0 and (x < N - 2.0 or (z > 17.5 and z < 23.5 and x < N - 0.5))
 
 func player_can(x: float, z: float) -> bool:
@@ -363,6 +383,7 @@ const SCENES := {
 	"grove": {"play": true, "village": true, "forest": true, "grove": true, "hour": 15.0},
 	"hollow": {"play": true, "village": true, "forest": true, "hollow": true, "hour": 21.0},
 	"road": {"play": true, "village": true, "road": true, "hour": 14.0},
+	"post": {"play": true, "post": true, "hour": 14.0},
 	"mill": {"play": true, "village": true, "mill": true, "hour": 15.0},
 	"mill_water": {"play": true, "village": true, "mill": true, "water": true, "hour": 15.0},
 	"road_echo": {"play": true, "village": true, "road": true, "echo": true, "hour": 14.0},
@@ -738,6 +759,15 @@ func apply_test_args(args: PackedStringArray) -> void:
 		story_step = 5
 		enter_cave()
 		player.x += 2.0
+	if sc.get("post", false): # the stream's end below the mole's hall, the islands' pool ahead
+		story_step = 7
+		has_skip = true
+		enter_cave()
+		close_story()
+		post_q = 1
+		post_spawned = true
+		player.x = CAVE_X + 12.0
+		player.z = 30.0
 	if sc.get("cave", false):
 		for e in enemies:
 			if e.get("boss", false):
@@ -2763,9 +2793,10 @@ func travel(i: int) -> void:
 		save_game())
 
 const CHANGES := [
-	"개발 상황: 놀 수 있는 분량 약 273분 / 목표 300분 (91%)",
+	"개발 상황: 놀 수 있는 분량 약 280분 / 목표 300분 (93%)",
 	"",
 	"2026-10-24 새벽",
+	"· v0.0.17: 2장에 물길 끝 굴(약 7분). 두더지를 잡고 물수제비 걸음을 얻으면 두더지 방 남쪽 물길을 따라 내려간다. 섬 넷의 수정을 낮은 소리부터 울려 창살을 가라앉히고, 쓸려 온 물건 더미에서 보리 할머니가 한결에게 부친 \"혼자 가지 마\" 엽서를 찾는다. 3장에서 할머니께 건넨다.",
 	"· v0.0.16: 6장에 참새 방앗간(약 9분). 벽돌 매를 물리친 뒤 언덕 남쪽 무너진 담을 풀면 바람 없는 골이 나온다. 큰 풍차를 감고, 깃대에서 12초 안에 바람개비 넷을 지나 바람을 불러 내리면 물길이 찬다. 어귀의 큰 수호자를 쓰러뜨리고 물수제비로 나루에 건너가면 가루 배, 종, 궤짝(삿대 고리: 물결의 장대 60 → 70%, 최대 체력 +10). 장터의 달빛 가루는 이 방앗간에서 빻던 것이다.",
 	"· v0.0.15: 8 → 9장에 한결의 마지막 길(약 8분). 계단 꼭대기에서 정원 아래 무너진 뜰로 들어간다. 뿌리 벽돌을 풀고, 한결의 야영터에서 다섯째 일기와 빈 등불 고리를 찾고, 왕관으로 비춰야 보이는 발자국을 따라 깊은 틈을 건너, 거푸집이 떠 둔 벽돌 한결과 싸운다. 한결이 왕관을 늪으로 보낸 까닭이 밝혀진다. 일곱째 길돌 정원 앞 야영터.",
 	"· v0.0.14: 우주 한량의 배치 규칙대로 화면의 단추와 판을 모두 가장자리에서 8px에 맞췄다(왼쪽 아래 단추, 왼쪽 위 초상, 미니맵, 기술 칸, 금화 칸). 단추 사이도 8px이다.",
@@ -3350,6 +3381,7 @@ func story_talk_ok(key: String) -> bool:
 		"noeul_new": return forest_q >= 3 and hill_q < 3
 		"hawk": return hill_q >= 3 and cloud_q < 3
 		"scare": return cloud_q >= 3
+		"post_done": return post_q >= 4
 		"mill_hint": return hill_q >= 3 and mill_q == 0
 		"mill_done": return mill_q >= 5
 		"pearl": return grotto_q >= 4
@@ -4332,6 +4364,12 @@ func interact() -> void:
 	if near_shop() and doran_q == 2 and not shop_open:
 		deliver_letter()
 		return
+	if near_shop() and post_q == 3 and doran_q >= 3 and not shop_open:
+		post_q = 4
+		player.pots += 2
+		show_story("", STORY.POST_BORI)
+		save_game()
+		return
 	if near_shop() and not shop_open and deliver(0, STORY.MAIL_BORI):
 		return
 	if near_shop() and marsh.picked_count() == 3 and not has_tea and not shop_open:
@@ -5091,7 +5129,7 @@ func save_game() -> void:
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
 		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "books": castle.books.map(func(b): return b.read), "has_bookmark": has_bookmark, "has_shard": has_shard, "shop_bought": shop_bought, "play_secs": play_secs, "ng": ng, "fest_gift": fest_gift, "mail_q": mail_q, "mail_got": mail_got, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes, "target_best": target_best, "has_medal": has_medal, "bottles": village.bottles.map(func(b): return b.got), "inn_nights": inn_nights, "magpie_q": magpie_q, "talks_heard": talks_heard.keys(),
-		"road_q": road_q, "road_box": road_box, "mill_q": mill_q, "has_oar_ring": has_oar_ring, "hollow_q": hollow_q, "mem_lit": forest.mem_lamps.map(func(l): return l.lit), "hollow_doors": forest.doors.map(func(dr): return dr.open), "hollow_boxes": forest.boxes.map(func(b): return b.open),
+		"road_q": road_q, "road_box": road_box, "mill_q": mill_q, "has_oar_ring": has_oar_ring, "post_q": post_q, "hollow_q": hollow_q, "mem_lit": forest.mem_lamps.map(func(l): return l.lit), "hollow_doors": forest.doors.map(func(dr): return dr.open), "hollow_boxes": forest.boxes.map(func(b): return b.open),
 		"seals": garden.seals.map(func(sl): return sl.open),
 		"stairs_wall": stairs.wall_open, "stairs_lamps": stairs.lamps.map(func(l): return l.lit),
 		"castle_q": castle_q, "bars": castle.bars, "levers": castle.levers.map(func(lv): return lv.up), "vault": castle.vault_open, "has_armour": has_armour, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read),
@@ -5309,6 +5347,11 @@ func load_game() -> void:
 		castle.open_gate()
 	road_q = int(d.get("road_q", 0))
 	mill_q = int(d.get("mill_q", 0))
+	post_q = int(d.get("post_q", 0))
+	if post_q >= 2 and post_gate != null:
+		post_gate.visible = false
+	if post_q >= 3 and post_pile != null:
+		(post_pile.get_meta("card") as Node3D).visible = false
 	has_oar_ring = bool(d.get("has_oar_ring", false))
 	if mill_q >= 1:
 		hill.open_wall()
@@ -5513,7 +5556,7 @@ func build_cave() -> void:
 		for x in CAVE_W:
 			var c: String = cave_grid[z][x]
 			var w := Vector2(CAVE_X + x, z)
-			if c in "SPKDBE123":
+			if c in "SPKDBE123GMT":
 				cave_marks[c] = w
 			if c == "#":
 				# only walls that touch the floor get built, to keep the count small
@@ -5532,7 +5575,8 @@ func build_cave() -> void:
 	# with irregular protrusions. Everything uses a world-space slate shader, built in 6x6 chunks
 	# because the web renderer lights each mesh with at most 8 lights.
 	var pool_tiles: Array = floors.filter(func(f): return cave_char(f.x, f.y) == "w")
-	floors = floors.filter(func(f): return cave_char(f.x, f.y) != "w")
+	var deep_tiles: Array = floors.filter(func(f): return cave_char(f.x, f.y) == "~")
+	floors = floors.filter(func(f): return cave_char(f.x, f.y) != "w" and cave_char(f.x, f.y) != "~")
 	var blocks: Array = [] # [Transform3D, Color]
 	for w in floors:
 		var lit := Color(1.7, 1.75, 1.95) if cave_doorway(w) else Color(1.15, 1.15, 1.2)
@@ -5579,6 +5623,18 @@ func build_cave() -> void:
 		var pb := box(Vector3(1, 0.1, 1), pool)
 		pb.position = Vector3(t2.x, -0.2, t2.y)
 		add_child(pb)
+	for t2 in deep_tiles: # the deep stream and the ringing pool below the mole's hall, a little lower
+		var db := box(Vector3(1, 0.1, 1), pool)
+		db.position = Vector3(t2.x, -0.3, t2.y)
+		add_child(db)
+	for at in [Vector2(122, 24), Vector2(106, 30)]:
+		var dl := OmniLight3D.new()
+		dl.light_color = Color("#25dce8")
+		dl.light_energy = 1.2
+		dl.omni_range = 4.5
+		dl.position = Vector3(at.x, 0.5, at.y)
+		add_child(dl)
+	build_post_props()
 	if not pool_tiles.is_empty():
 		var c := Vector2.ZERO
 		for t2 in pool_tiles:
@@ -5824,6 +5880,8 @@ func crown_key() -> void:
 	if in_marsh() and near_shop(): # Bori answers to E like every other villager (Space still works)
 		interact()
 		return
+	if in_cave and post_key():
+		return
 	if in_cave and shrine_key():
 		return
 	if in_forest:
@@ -5980,7 +6038,12 @@ func deliver_letter() -> void:
 	crown_pips = 8
 	player.max_hp += 10
 	player.hp = float(player.max_hp)
-	show_story("", STORY.BORI_LETTER)
+	if post_q == 3: # the postcard from the stream's end goes with Hangyeol's letter
+		post_q = 4
+		player.pots += 2
+		show_story("", STORY.BORI_LETTER + STORY.POST_BORI)
+	else:
+		show_story("", STORY.BORI_LETTER)
 	set_quest("마을의 뱃사공 물결에게 가 보자 (E)")
 	save_game()
 
@@ -8679,6 +8742,14 @@ func cave_map_tex() -> ImageTexture:
 				col = Color("#bfe6ff")
 			if c == "K" and not has_key:
 				col = Color("#ff9f5a")
+			if c == "~":
+				col = Color("#2f78b8")
+			if c == "G" and post_q < 2:
+				col = Color("#9fe0ff")
+			if c == "M" and post_q < 3:
+				col = Color("#ff9f5a")
+			if c == "T":
+				col = Color("#7a4a24")
 			img.set_pixel(CAVE_X + x, z, col)
 	return with_up_marks(ImageTexture.create_from_image(img), [cave_marks.S, cave_marks.E])
 var fade_rect: ColorRect
@@ -8805,6 +8876,20 @@ func spawn_crystals() -> void:
 		add_child(root)
 		root.set_meta("body", g)
 		crystals.append({"x": at.x, "z": at.y, "node": root, "crystal": i, "hurt": 0.0})
+	for i in POST_CRYSTALS.size(): # the stream's end: one on each island, the same notes, a set of their own
+		var at: Vector2 = POST_CRYSTALS[i] + Vector2(CAVE_X, 0)
+		var root := Node3D.new()
+		var g := Node3D.new()
+		root.add_child(g)
+		var h: float = 1.8 - CRYSTAL_NOTE[i] * 0.45
+		var c := box(Vector3(0.36, h, 0.36), mat)
+		c.position = Vector3(0, h / 2.0, 0)
+		c.rotation.y = 0.6
+		g.add_child(c)
+		root.position = Vector3(at.x, 0, at.y)
+		add_child(root)
+		root.set_meta("body", g)
+		crystals.append({"x": at.x, "z": at.y, "node": root, "crystal": i, "hurt": 0.0, "set": 1})
 
 func build_crystal_chest() -> void:
 	crystal_chest = Node3D.new()
@@ -8825,6 +8910,9 @@ func crystal_hit(e: Dictionary) -> void:
 	burst(Vector3(e.x, 1.0, e.z), Color("#9fe0ff"), 8, 1.5)
 	(e.node.get_meta("body") as Node3D).scale = Vector3.ONE * 1.12
 	get_tree().create_timer(0.15).timeout.connect(func(): if is_instance_valid(e.node): (e.node.get_meta("body") as Node3D).scale = Vector3.ONE)
+	if e.get("set", 0) == 1:
+		post_crystal(rank)
+		return
 	if crystal_done:
 		return
 	if not crystal_told:
@@ -8873,6 +8961,118 @@ func shrine_key() -> bool:
 			save_game()
 			return true
 	return false
+
+# ---- 물길 끝 굴 (DESIGN.md "옛 우편 굴", chapter 2, reworked: the cave was not a post road, the user kept only
+# Bori's postcard). Below the mole's hall the stream runs on to where it washes things down from the marsh. With the
+# water skip: a bend of deep water, a pool of four islands with ringing crystals (lowest note first, the shrine's
+# rule) that sink a crystal grate, and a dry floor where Bori's "don't go alone" postcard to Hangyeol lies.
+# Eight foes, once; the postcard goes to Bori in chapter 3.
+const POST_CRYSTALS := [Vector2(2, 28), Vector2(9, 28), Vector2(7, 31), Vector2(2, 32)] # cave tiles, on the islands
+const POST_SPAWNS := [[17, 28, false], [22, 30, false], [28, 28, true]] # cave tiles, archer?
+const POST_AMBUSH := [[12, 28, false], [12, 32, false], [16, 30, true]]
+const POST_BATS := [Vector2(120, 29), Vector2(126, 30)]
+var post_q := 0          # 0 not yet, 1 by the stream, 2 grate sunk, 3 postcard taken, 4 given to Bori
+var post_run := 0
+var post_told := false
+var post_spawned := false
+var post_gate: Node3D = null
+var post_pile: Node3D = null
+
+func build_post_props() -> void:
+	post_gate = Node3D.new()
+	var bar: Material = glow_mat(Color("#9fe0ff"), 1.2)
+	for k in 5:
+		var b := box(Vector3(0.12, 1.3, 0.12), bar)
+		b.position = Vector3(-0.85 + k * 0.42, 0.65, 0)
+		post_gate.add_child(b)
+	var top := box(Vector3(2.0, 0.14, 0.16), mat_color(Color("#4a5a6a")))
+	top.position = Vector3(0, 1.32, 0)
+	post_gate.add_child(top)
+	post_gate.position = Vector3(cave_marks.G.x + 0.5, 0, cave_marks.G.y)
+	add_child(post_gate)
+	var crates := Node3D.new()
+	for part in [[Vector3(0.7, 0.5, 0.6), Vector3(0, 0.25, 0), Color("#7a4a24")], [Vector3(0.5, 0.4, 0.5), Vector3(0.45, 0.2, 0.4), Color("#8a5a32")], [Vector3(0.5, 0.3, 0.5), Vector3(-0.1, 0.65, 0.05), Color("#a07a4a")]]:
+		var cb := box(part[0], mat_color(part[2]))
+		cb.position = part[1]
+		crates.add_child(cb)
+	crates.position = Vector3(cave_marks.T.x, 0, cave_marks.T.y)
+	add_child(crates)
+	post_pile = Node3D.new()
+	for part in [[Vector3(0.9, 0.3, 0.7), Vector3(0, 0.15, 0), mat_color(Color("#6a5a4a"))], [Vector3(0.5, 0.25, 0.5), Vector3(0.2, 0.42, 0.1), mat_color(Color("#8a6a4a"))], [Vector3(0.32, 0.03, 0.22), Vector3(-0.1, 0.33, -0.1), glow_mat(Color("#f2ead8"), 1.0)]]:
+		var pb := box(part[0], part[2])
+		pb.position = part[1]
+		post_pile.add_child(pb)
+	post_pile.position = Vector3(cave_marks.M.x, 0, cave_marks.M.y)
+	post_pile.set_meta("card", post_pile.get_child(2))
+	add_child(post_pile)
+
+func post_crystal(rank: int) -> void:
+	if post_q >= 2:
+		return
+	if not post_told:
+		post_told = true
+		toast("섬마다 수정이 하나씩. 여기서도 낮은 소리부터일까?")
+	if rank == post_run:
+		post_run += 1
+		if post_run == NOTES.size():
+			post_gate_open()
+	else:
+		post_run = 1 if rank == 0 else 0
+		get_tree().create_timer(0.2).timeout.connect(func(): sfx(110, 0.25, "square", 0.15))
+
+func post_gate_open() -> void:
+	post_q = 2
+	for k in 4:
+		get_tree().create_timer(0.12 * k).timeout.connect(func(): sfx(NOTES[k] * 2.0, 0.3, "sine", 0.2))
+	var tw := create_tween()
+	tw.tween_property(post_gate, "position:y", -1.5, 1.0)
+	tw.tween_callback(func(): post_gate.visible = false)
+	burst(post_gate.position + Vector3(0, 0.6, 0), Color("#9fe0ff"), 30, 3.0)
+	for f in POST_AMBUSH:
+		spawn_enemy(Vector2(CAVE_X + f[0], f[1]), f[2])
+	show_story("", STORY.POST_GATE)
+	ui.mini.map_tex = cave_map_tex()
+	save_game()
+
+func post_key() -> bool:
+	var me := Vector2(player.x, player.z)
+	if me.y < 20.5:
+		return false
+	if me.distance_to(cave_marks.T) < 1.5:
+		show_story("", STORY.POST_CART)
+		return true
+	if post_q == 2 and me.distance_to(cave_marks.M) < 1.6:
+		post_q = 3
+		player.max_hp += 10
+		player.hp = float(player.max_hp)
+		player.pots += 2
+		(post_pile.get_meta("card") as Node3D).visible = false
+		burst(post_pile.position + Vector3(0, 0.6, 0), Color("#f2ead8"), 24, 2.5)
+		sfx(784, 0.12, "triangle", 0.25)
+		show_story("", STORY.POST_CARD)
+		ui.mini.map_tex = cave_map_tex()
+		save_game()
+		return true
+	return false
+
+func update_post() -> void:
+	var me := Vector2(player.x, player.z)
+	var sub := "물길 끝 굴" if me.y > 20.5 else "벽 그림이 있는 동굴"
+	if ui.zone_sub.text != sub and (ui.zone_sub.text == "물길 끝 굴" or ui.zone_sub.text == "벽 그림이 있는 동굴"):
+		ui.zone_sub.text = sub
+	if story_open:
+		return
+	if has_skip and post_q == 0 and me.distance_to(Vector2(CAVE_X + 26, 20)) < 2.0:
+		post_q = 1
+		show_story("", STORY.POST_STREAM)
+		save_game()
+		return
+	if post_q == 1 and me.y > 26.5 and not post_spawned:
+		post_spawned = true
+		for f in POST_SPAWNS:
+			spawn_enemy(Vector2(CAVE_X + f[0], f[1]), f[2])
+		for b in POST_BATS:
+			spawn_bat(b)
 
 func cave_interact() -> bool:
 	var me := Vector2(player.x, player.z)
@@ -9147,6 +9347,8 @@ func journal_lines() -> Array:
 		var nf: int = forest.freed.filter(func(f): return f).size()
 		side.call("갇힌 다람쥐", tr("끝") if has_acorn else tr("%d/5 구함") % nf)
 		side.call("숲의 달 순서 돌", tr("끝") if forest.chest_open else (tr("상자를 열자") if forest.solved else tr("숲 북서쪽 숲터")))
+	if post_q >= 1:
+		side.call("물길 끝 굴", [tr(""), tr("섬 수정을 낮은 소리부터"), tr("물길 끝의 쓸려 온 더미"), tr("보리 할머니께 엽서를") if doran_q >= 3 else tr("한결이 누구일까"), tr("끝")][post_q])
 	if hill_q >= 3:
 		side.call("참새 방앗간", [tr("언덕 남쪽 담 위의 참새"), tr("큰 풍차를 왕관으로 감자"), tr("깃대에서 바람개비 넷을 돌리자"), tr("물길 어귀의 벽돌"), tr("건너편 나루의 궤짝"), tr("끝")][mill_q])
 	if hill_q >= 1:
@@ -9189,6 +9391,7 @@ func journal_lines() -> Array:
 	if has_ring: keep.append(tr("수정 반지"))
 	if has_shoes: keep.append(tr("바람 신발"))
 	if has_oar_ring: keep.append(tr("삿대 고리"))
+	if post_q == 3: keep.append(tr("보리의 엽서"))
 	if has_armour: keep.append(tr("달지기 갑옷"))
 	if has_tea: keep.append(tr("달꽃 차"))
 	if has_shard: keep.append(tr("구름 조각"))
@@ -9596,6 +9799,7 @@ func _process(dt: float) -> void:
 		fade_then(leave_house)
 	if in_cave:
 		check_painting()
+		update_post()
 	if in_cave and not has_skip and Vector2(player.x, player.z).distance_to(cave_marks.E) < 1.6 and toast_t <= 0.0:
 		toast("바깥 빛이 보인다. 하지만 수레두더지가 길을 막고 있다")
 	if in_cave and has_skip and Vector2(player.x, player.z).distance_to(cave_marks.E) < 1.0 and fade_rect.color.a == 0.0:
