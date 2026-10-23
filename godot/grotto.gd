@@ -63,11 +63,11 @@ func build(m: Node) -> void:
 				foes.append([w, c == "a"])
 			if c == "L":
 				lamp_spots.append(w)
-			var col := Color("#4e5a66") # wet blue-grey stone
+			var col := Color("#7c8996") # wet blue-grey stone (lighter: the first version read as near black)
 			var hgt := 0.4
 			match c:
 				"#":
-					col = Color("#2a3038")
+					col = Color("#4a5462")
 					hgt = 0.9
 				"~":
 					col = Color("#1f4f7a")
@@ -83,9 +83,46 @@ func build(m: Node) -> void:
 	glass.blend_mode = BaseMaterial3D.BLEND_MODE_MIX
 	for w in lamp_spots:
 		m.lantern(w.x - 0.3, w.y, post_mat, glass)
+	# a soft light over each room, and glowing steps up at the way out
+	for at in [Vector2(5, 4), Vector2(16, 4), Vector2(25, 4), Vector2(15, 16)]:
+		var l := OmniLight3D.new()
+		l.light_color = Color("#d8ecff")
+		l.light_energy = 1.6
+		l.omni_range = 9.0
+		l.position = Vector3(GROTTO_X + at.x, 3.0, at.y)
+		m.add_child(l)
+	exit_steps(m, marks.S)
 	chest = chest_node(m, marks.c, Color("#2a4a7a"))
 	chest.visible = false
 	side_chest = chest_node(m, marks.p, Color("#6a4a2a"))
+
+# the way back up to the island: three pale steps rising west, a stone frame and a warm lamp, so it is easy to find
+func exit_steps(m: Node, at: Vector2) -> void:
+	var g := Node3D.new()
+	var stone: Material = m.mat_color(Color("#c8ccd4"))
+	for k in 3:
+		var st: MeshInstance3D = m.box(Vector3(0.3, 0.15 + k * 0.15, 1.0), stone)
+		st.position = Vector3(0.3 - k * 0.3, (0.15 + k * 0.15) / 2.0, 0)
+		g.add_child(st)
+	var frame: Material = m.mat_color(Color("#5a5040"))
+	for side in [-0.6, 0.6]:
+		var post: MeshInstance3D = m.box(Vector3(0.2, 1.4, 0.2), frame)
+		post.position = Vector3(-0.3, 0.7, side)
+		g.add_child(post)
+	var beam: MeshInstance3D = m.box(Vector3(0.2, 0.2, 1.4), frame)
+	beam.position = Vector3(-0.3, 1.45, 0)
+	g.add_child(beam)
+	var sign: MeshInstance3D = m.box(Vector3(0.1, 0.3, 0.5), m.glow_mat(Color("#ffd27a"), 1.2))
+	sign.position = Vector3(-0.2, 1.1, 0)
+	g.add_child(sign)
+	var warm := OmniLight3D.new()
+	warm.light_color = Color("#ffd8a0")
+	warm.light_energy = 2.0
+	warm.omni_range = 5.0
+	warm.position = Vector3(0.3, 1.6, 0)
+	g.add_child(warm)
+	g.position = Vector3(at.x, 0, at.y)
+	m.add_child(g)
 
 func chest_node(m: Node, at: Vector2, body: Color) -> Node3D:
 	var g := Node3D.new()
@@ -115,5 +152,6 @@ func map_tex(width: int) -> ImageTexture:
 				"L": col = Color("#9fd8ff")
 				"c", "p": col = Color("#bfe6ff")
 				"C": col = Color("#c8502a")
+				"S": col = Color("#ffd27a") # the way out
 			img.set_pixel(GROTTO_X + x, z, col)
 	return ImageTexture.create_from_image(img)

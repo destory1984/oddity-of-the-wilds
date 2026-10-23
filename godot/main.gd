@@ -330,6 +330,8 @@ const SCENES := {
 	"grove": {"play": true, "village": true, "forest": true, "grove": true, "hour": 15.0},
 	"flies": {"play": true, "at": Vector2(8, 23), "hour": 22.5, "flies": true},
 	"crab": {"play": true, "village": true, "crab": true, "hour": 14.0},
+	"grotto_in": {"play": true, "village": true, "crab": true, "grotto_in": true, "hour": 21.0},
+	"grotto_steps": {"play": true, "village": true, "turtle": true, "steps": true, "hour": 15.0},
 	"cloud": {"play": true, "village": true, "cloud": true, "hour": 11.0},
 	"scarecrow": {"play": true, "village": true, "cloud": true, "scare": true, "hour": 16.0},
 	"castle": {"play": true, "village": true, "castle": true, "hour": 15.0},
@@ -429,6 +431,15 @@ func apply_test_args(args: PackedStringArray) -> void:
 			player.x = lake.marks.T.x + 2.5
 			player.z = lake.marks.T.y + 1.0
 			snap_mate()
+			if sc.has("steps"):
+				for e in enemies:
+					if e.get("turtle", false):
+						e.dead = true
+						e.node.visible = false
+						e.shadow.visible = false
+				ui.boss.visible = false
+				player.x = lake.marks.G.x + 1.5
+				player.z = lake.marks.G.y - 1.5
 		if sc.get("crab", false): # the brick crab in the grotto under the island, Mulgyeol along
 			night_q = 4
 			lake_q = 4
@@ -442,6 +453,15 @@ func apply_test_args(args: PackedStringArray) -> void:
 			spawn_crab()
 			player.x = grotto.marks.C.x + 4.0
 			player.z = grotto.marks.C.y + 1.5
+			if sc.has("grotto_in"): # the entry room, at night, by the steps up
+				for e in enemies:
+					if e.get("crab", false):
+						e.dead = true
+						e.node.visible = false
+						e.shadow.visible = false
+				ui.boss.visible = false
+				player.x = grotto.marks.S.x + 2.0
+				player.z = grotto.marks.S.y + 1.0
 			snap_mate()
 		if sc.get("hill", false): # the wind hills, one mill turning, Mulgyeol and Noeul along
 			night_q = 4
@@ -3020,6 +3040,19 @@ func skip_time(hours: float) -> void:
 	toast(tr("%02d시") % int(hour))
 
 func update_daylight(dt: float) -> void:
+	if in_grotto(): # underground: the same soft blue light at any hour, a lamp on Sora (the clock waits, as in the cave)
+		sun.light_energy = 0.35
+		env.ambient_light_color = Color("#9ab4d8")
+		env.ambient_light_energy = 1.4
+		env.glow_intensity = 0.6
+		env.glow_bloom = 0.05
+		env.fog_light_color = Color("#0a1a2e")
+		env.background_color = Color("#06101c")
+		cave_light.light_energy = 2.4
+		cave_light.position = Vector3(player.x, 1.8, player.z)
+		motes.emitting = false
+		motes.visible = false
+		return
 	if in_cave:
 		sun.light_energy = 0.0
 		env.ambient_light_color = Color("#4a6aa0")
@@ -5045,18 +5078,28 @@ func update_turtle(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
 func in_grotto() -> bool:
 	return in_lake and player.x >= GROTTO.GROTTO_X - 0.5
 
-# dark steps going down on the island's south shore, at the lake's G
+# steps going down on the island's south shore, at the lake's G: a stone frame over a stair that sinks step by step
+# into a dark opening, with a lamp on top, so it reads as a way down from far off
 func grotto_steps() -> void:
 	var g := Node3D.new()
-	var dark: Material = mat_color(Color("#1a1e24"))
-	var stone: Material = mat_color(Color("#6a7078"))
-	var hole: MeshInstance3D = box(Vector3(1.0, 0.05, 1.0), dark)
-	hole.position = Vector3(0, 0.02, 0)
+	var frame: Material = mat_color(Color("#7a7468"))
+	var hole: MeshInstance3D = box(Vector3(1.1, 0.06, 1.2), mat_color(Color("#101418")))
+	hole.position = Vector3(0, 0.03, 0)
 	g.add_child(hole)
-	for k in 3:
-		var st: MeshInstance3D = box(Vector3(0.9, 0.12, 0.22), stone)
-		st.position = Vector3(0, -0.04 - k * 0.1, -0.3 + k * 0.25)
+	for k in 4: # steps from the near edge going down and away, each darker
+		var st: MeshInstance3D = box(Vector3(0.9, 0.08, 0.26), mat_color(Color("#a8a49a").darkened(k * 0.2)))
+		st.position = Vector3(0, 0.1 - k * 0.025, 0.42 - k * 0.27)
 		g.add_child(st)
+	for side in [-0.62, 0.62]: # low side walls
+		var w: MeshInstance3D = box(Vector3(0.16, 0.4, 1.3), frame)
+		w.position = Vector3(side, 0.2, 0)
+		g.add_child(w)
+	var back: MeshInstance3D = box(Vector3(1.4, 0.9, 0.16), frame) # the head wall at the far end
+	back.position = Vector3(0, 0.45, -0.65)
+	g.add_child(back)
+	var lamp: MeshInstance3D = box(Vector3(0.22, 0.26, 0.22), glow_mat(Color("#9fd8ff"), 1.4))
+	lamp.position = Vector3(0, 1.05, -0.65)
+	g.add_child(lamp)
 	var at: Vector2 = lake.marks.G
 	g.position = Vector3(at.x, 0, at.y)
 	add_child(g)
