@@ -42,9 +42,14 @@ var guard_since := -9.0
 var counter_t := 0.0        # first slash in this window is a guaranteed x2.5 critical
 var last_hit_t := -9.0      # last time a slash connected; momentum drains after 4 s without one
 var fake_keys := {}           # keys held down by the autoplay tests
+# phones (the user asked, 2026-10-24): touch.gd's stick and keys; on Android and iOS browsers, or TOUCH_UI=1
+var touch_ui := false
+var touch_move := Vector2.ZERO # the stick, x right and y down on screen, length 0 to 1
+var touch_keys := {}          # keys held through the touch keys (guard, run)
+var touch_layer: Control
 
 func key_down(k: int) -> bool:
-	return fake_keys.has(k) or Input.is_key_pressed(k)
+	return fake_keys.has(k) or touch_keys.has(k) or Input.is_key_pressed(k)
 
 var camera: Camera3D
 var sun: DirectionalLight3D
@@ -288,6 +293,12 @@ func _ready() -> void:
 	title_font.font_names = PackedStringArray(["Cinzel", "Georgia", "Times New Roman", "serif"])
 	title_font.fallbacks = [ui_font]
 	title_font.font_weight = 700
+	touch_ui = OS.has_feature("web_android") or OS.has_feature("web_ios") or OS.has_feature("android") or OS.has_feature("ios")
+	touch_ui = touch_ui or OS.get_environment("TOUCH_UI") == "1"
+	if touch_ui: # a phone held sideways: a smaller canvas, so keys and text come out about 1.4 times as big
+		get_tree().root.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
+		get_tree().root.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND
+		get_tree().root.content_scale_size = Vector2i(1138, 640)
 	build_environment()
 	build_map()
 	build_terrain()
@@ -904,7 +915,7 @@ func build_environment() -> void:
 	sun = DirectionalLight3D.new()
 	sun.light_color = Color("#ffc06a")
 	sun.light_energy = 1.6
-	sun.shadow_enabled = true
+	sun.shadow_enabled = not touch_ui # phones: no shadows, for speed
 	sun.directional_shadow_max_distance = 40.0
 	add_child(sun)
 
@@ -1136,6 +1147,8 @@ func cross_mesh(w: float, h: float) -> ArrayMesh:
 	return st.commit()
 
 func vegetation(tex: Texture2D, w: float, h: float, spots: Array, strength: float) -> void:
+	if touch_ui: # phones draw half the grass, for speed
+		spots = spots.filter(func(sp): return int(sp.x * 7.0 + sp.z * 13.0) % 2 == 0)
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.use_colors = true
@@ -2818,6 +2831,7 @@ const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 285분 / 목표 300분 (95%)",
 	"",
 	"2026-10-24 아침",
+	"· v0.0.29: 휴대폰 가로 화면에서 놀 수 있다. 화면 왼쪽에 엄지를 대면 이동 막대가 생기고 끝까지 밀면 달린다. 오른쪽에 공격, 구르기, 막기, 왕관(E), 열기(Space) 단추가 있고 기술 그림을 누르면 기술을 쓴다. 손가락 여럿을 따로 읽어 걸으면서 벨 수 있다. 메뉴 단추는 미니맵 왼쪽, 확대·축소는 미니맵 아래로 옮긴다. 세로로 들면 가로로 돌려 달라고 한다. 휴대폰에서는 그림자를 끄고 풀을 절반만 그린다.",
 	"· v0.0.28: 동료 수다를 107개에서 500개로 늘렸다(셋이 하는 대화 224, 곳과 때에 따른 대화 124, 이야기 진행 대화 27, 둘이 주고받는 말 50, 혼잣말 75). 동굴, 정원, 비 오는 때에도 그곳 수다가 나온다. 초안은 GPT가 쓰고 이야기 사실에 어긋나지 않는지 골랐다.",
 	"· v0.0.27: 왼쪽 아래 단추 넷(조작법, 소리, 일지, 설정)을 오른쪽 기술 단추와 같은 금빛 마름모로 바꿨다. GPT가 그린 시안 다섯 가운데 4번(겹금테에 금빛 선 그림)이다. 단추는 56 → 64 px이고 8 px 간격은 그대로다.",
 	"· v0.0.26: 동굴 밖에서 저장하고 다시 켜면 동굴에 내려갈 때마다 노을을 처음 만나는 벽화 장면이 다시 뜨던 잘못을 고쳤다. 열쇠와 연 문이 잊히던 것도 함께 고쳤다.",
@@ -3563,6 +3577,31 @@ func update_mate_hud() -> void:
 			r.act.text = tr("쉬는 중 %d초") % int(ceil(mate_down[id]))
 		else:
 			r.act.text = tr("싸우는 중") if fighting else tr("따라가는 중")
+
+# ---- phones: the touch layer over the HUD, and the four menu keys in a column left of the minimap (the stick takes
+# the bottom left); the zoom keys sit under the minimap
+func enable_touch() -> void:
+	touch_ui = true
+	if touch_layer == null:
+		touch_layer = Control.new()
+		touch_layer.set_script(load("res://touch.gd"))
+		touch_layer.main = self
+		ui.root.add_child(touch_layer)
+	var col := [ui.hint, ui.sound_btn, ui.journal_btn, ui.settings_btn]
+	for i in col.size():
+		place(col[i], Control.PRESET_TOP_RIGHT, Vector2(-194 - 8 - 64, 8 + i * 72), Vector2(64, 64))
+
+# the autoplay test turns the touch layer off again, and the menu keys go back to the bottom left
+func disable_touch() -> void:
+	touch_ui = false
+	touch_move = Vector2.ZERO
+	touch_keys.clear()
+	if touch_layer != null:
+		touch_layer.queue_free()
+		touch_layer = null
+	var col := [ui.hint, ui.sound_btn, ui.journal_btn, ui.settings_btn]
+	for i in col.size():
+		place(col[i], Control.PRESET_BOTTOM_LEFT, Vector2(8 + i * 72, -72), Vector2(64, 64))
 
 # ---- the bottom-left buttons: gold diamond keys in the skills' family (draft 4 of five, double gold rim with a thin
 # line symbol, the user's pick 2026-10-24), 64 px, 8 px apart and 8 px from the edges; the key is in the tooltip
@@ -4893,6 +4932,8 @@ func build_hud() -> void:
 	ui.journal_btn = icon_button(root, "journal", "Q", "일지", 152, func(): toggle_journal(not ui.journal.visible))
 	ui.settings_btn = icon_button(root, "gear", "Esc", "설정", 224, func(): toggle_settings(not settings_open))
 	build_settings(root)
+	if touch_ui:
+		enable_touch()
 
 	ui.toast = label(root, "", Vector2(0, 0), 20)
 	place(ui.toast, Control.PRESET_CENTER_BOTTOM, Vector2(-300, -220), Vector2(600, 30))
@@ -9828,8 +9869,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton and event.pressed:
 		match event.button_index:
-			MOUSE_BUTTON_LEFT: attack()
-			MOUSE_BUTTON_RIGHT: dodge()
+			MOUSE_BUTTON_LEFT: if not touch_ui: attack() # on a phone a tap on the world is the browser's mouse; the keys act
+			MOUSE_BUTTON_RIGHT: if not touch_ui: dodge()
 			MOUSE_BUTTON_WHEEL_UP: cam_dist = clampf(cam_dist - 1.2, 8, 26)
 			MOUSE_BUTTON_WHEEL_DOWN: cam_dist = clampf(cam_dist + 1.2, 8, 26)
 	if settings_open:
@@ -9920,6 +9961,8 @@ func _process(dt: float) -> void:
 		if key_down(KEY_S) or key_down(KEY_DOWN): mv -= fwd
 		if key_down(KEY_D) or key_down(KEY_RIGHT): mv += right
 		if key_down(KEY_A) or key_down(KEY_LEFT): mv -= right
+		if touch_move != Vector2.ZERO: # the touch stick, screen up is the camera's forward
+			mv += fwd * -touch_move.y + right * touch_move.x
 	var running: bool = key_down(KEY_SHIFT) and player.sp > 0 and mv.length() > 0
 	var on_water: bool = tile_at(player.x, player.z) == WATER and (player.x < CAVE_X - 0.5 or skip_water(player.x, player.z))
 	skip_grace = 0.6 if has_skip and running else skip_grace - dt
@@ -9927,7 +9970,7 @@ func _process(dt: float) -> void:
 	if has_skip and not running and mv.length() > 0 and not on_water and toast_t <= 0.0:
 		var ahead := Vector2(player.x, player.z) + mv.normalized() * 0.7
 		if skip_water(ahead.x, ahead.y):
-			toast("Shift를 누른 채 달리면 물 위를 건넌다")
+			toast("막대를 끝까지 밀어 달리면 물 위를 건넌다" if touch_ui else "Shift를 누른 채 달리면 물 위를 건넌다")
 	if skipping and on_water:
 		player.sp = maxf(1.0, player.sp - 6.0 * dt) # costs a little extra, but never runs dry mid-river
 		if int(t * 8.0) != int((t - dt) * 8.0):

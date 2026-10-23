@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "painting_once", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "esc_sheets", "news_more", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "mill", "post", "lake_south", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "painting_once", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "esc_sheets", "news_more", "touch_controls", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "mill", "post", "lake_south", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -1637,6 +1637,77 @@ func run() -> void:
 		var after: int = main.ui.news.text.split("\n").size()
 		check("news_more", first == mini(n, main.CHANGES_PAGE) and btn_ok and after == mini(n, 2 * main.CHANGES_PAGE),
 			"lines %d of %d at first, button only past %d=%s, after 더 읽기 %d" % [first, n, main.CHANGES_PAGE, btn_ok, after])
+	if want.call("touch_controls"):
+		# phones: a finger on the left grabs the stick and walks her (pushed to the rim she runs), another finger on the
+		# sword key swings at the same time, the shield key guards while held; taps on the world do not swing
+		if main.intro:
+			main.start_game(false)
+		main.close_story()
+		calm_enemies(true)
+		main.enable_touch()
+		await wait(0.2)
+		var vs: Vector2 = main.get_viewport().get_visible_rect().size
+		reset_to(main.START)
+		await wait(0.2)
+		var at0 := Vector2(main.player.x, main.player.z)
+		var down := InputEventScreenTouch.new()
+		down.index = 0
+		down.pressed = true
+		down.position = Vector2(vs.x * 0.1, vs.y * 0.8) # the test window is small: the left part of it
+		Input.parse_input_event(down)
+		var drag := InputEventScreenDrag.new()
+		drag.index = 0
+		drag.position = down.position - Vector2(0, 90)
+		Input.parse_input_event(drag)
+		await wait(0.1)
+		var runs: bool = main.key_down(KEY_SHIFT)
+		var sword := InputEventScreenTouch.new() # a second finger on the sword key while walking
+		sword.index = 1
+		sword.pressed = true
+		sword.position = main.touch_layer.keys()["attack"][0]
+		main.player.atk_cd = 0.0
+		var combo0: int = main.player.combo
+		Input.parse_input_event(sword)
+		await wait(0.05)
+		var swung: bool = main.player.combo != combo0 or main.player.atk_cd > 0.0
+		var up := sword.duplicate()
+		up.pressed = false
+		Input.parse_input_event(up)
+		await wait(0.6)
+		var moved: float = Vector2(main.player.x, main.player.z).distance_to(at0)
+		var lift := down.duplicate()
+		lift.pressed = false
+		Input.parse_input_event(lift)
+		await wait(0.1)
+		var stopped: bool = main.touch_move == Vector2.ZERO and not main.key_down(KEY_SHIFT)
+		var shield := InputEventScreenTouch.new()
+		shield.index = 2
+		shield.pressed = true
+		shield.position = main.touch_layer.keys()["guard"][0]
+		Input.parse_input_event(shield)
+		await wait(0.05)
+		var guards: bool = main.key_down(KEY_L)
+		var off := shield.duplicate()
+		off.pressed = false
+		Input.parse_input_event(off)
+		await wait(0.05)
+		var unguards: bool = not main.key_down(KEY_L)
+		main.player.atk_cd = 0.0
+		var combo1: int = main.player.combo
+		var click := InputEventMouseButton.new() # the browser's mouse made from a tap on the world
+		click.button_index = MOUSE_BUTTON_LEFT
+		click.pressed = true
+		click.position = vs / 2.0
+		Input.parse_input_event(click)
+		var click_up := click.duplicate()
+		click_up.pressed = false
+		Input.parse_input_event(click_up)
+		await wait(0.05)
+		var no_swing: bool = main.player.combo == combo1 and main.player.atk_cd <= 0.0
+		main.disable_touch()
+		calm_enemies(false)
+		check("touch_controls", moved > 1.5 and runs and swung and stopped and guards and unguards and no_swing,
+			"stick walked %.1f tiles, runs at the rim=%s sword while walking=%s let go stops=%s shield held/let go=%s/%s a tap on the world does not swing=%s" % [moved, runs, swung, stopped, guards, unguards, no_swing])
 	if want.call("race"):
 		main.story_step = maxi(main.story_step, 10)
 		if main.intro:
