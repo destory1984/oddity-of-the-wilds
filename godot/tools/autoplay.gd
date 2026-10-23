@@ -262,6 +262,7 @@ func run() -> void:
 		await wait(2.2)
 	if want.call("late_dodge"):
 		reset_to(Vector2(30, 30))
+		main.slowmo = 0.0 # the slow-mo of the flash dodge just before can still be running on a slow machine
 		main.flash_cd = 0.0
 		main.dodge()
 		await wait(0.25) # past the 0.15 s window but still rolling: i-frames, no slow-mo
@@ -2134,8 +2135,20 @@ func run() -> void:
 			chat_gob.dead = true
 			chat_gob.node.queue_free()
 			chat_gob.shadow.queue_free()
+		# a talk about where the story stands comes first, once
+		main.talks_heard = {}
+		var fq0: int = main.forest_q
+		var hq0: int = main.hill_q
+		main.forest_q = 3
+		main.hill_q = 0
+		main.chat_t = 9.5
+		main.chat_cd = 0.0
+		await wait(0.3)
+		var story_first: bool = main.talks_heard.has("noeul_new")
+		main.forest_q = fq0
+		main.hill_q = hq0
 		calm_enemies(false)
-		check("mate_chat", talked and three and hushed and main.chat_cd > 10.0, "a balloon after standing still=%s a four-line talk among all three=%s (%d balloons) a monster stops it=%s" % [talked, three, said, hushed])
+		check("mate_chat", talked and three and hushed and story_first and main.chat_cd > 10.0, "a balloon after standing still=%s a four-line talk among all three=%s (%d balloons) a monster stops it=%s story talk first=%s" % [talked, three, said, hushed, story_first])
 	if want.call("east_bridge"):
 		main.in_village = false
 		main.in_hill = false
@@ -2175,8 +2188,13 @@ func run() -> void:
 		await wait(1.0)
 		var lying: bool = main.down_t > 0.0 and absf(main.hero.rotation.z) > 1.2 and Vector2(main.player.x, main.player.z).distance_to(Vector2(30, 30)) < 0.2
 		await wait(2.4)
-		main.close_story()
-		var woke: bool = main.down_t == 0.0 and Vector2(main.player.x, main.player.z).distance_to(main.START) < 0.5 and main.hero.rotation.z == 0.0 and main.player.hp > 0.0
+		var woke := false
+		for i in 20: # a slow machine runs the game clock behind the wall clock: give it up to 4 s more
+			main.close_story()
+			woke = main.down_t == 0.0 and Vector2(main.player.x, main.player.z).distance_to(main.START) < 0.5 and main.hero.rotation.z == 0.0 and main.player.hp > 0.0
+			if woke:
+				break
+			await wait(0.2)
 		calm_enemies(false)
 		check("fall_down", lying and woke, "falls where she stands=%s wakes at the start after 3 s=%s" % [lying, woke])
 	if want.call("mate_hp"):

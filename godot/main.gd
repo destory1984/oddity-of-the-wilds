@@ -1048,8 +1048,9 @@ func with_stair_marks(tex: ImageTexture, spots: Array) -> ImageTexture:
 	return ImageTexture.create_from_image(img)
 
 # ---- five grass drafts for the user to choose from (python tools/dev.py shot with GRASS_STYLE=1..5)
+# the user picked draft 5 (a low lawn with tall clumps) on 2026-10-23; GRASS_STYLE=0 shows the old tufts
 func grass_style() -> int:
-	return int(OS.get_environment("GRASS_STYLE")) if OS.get_environment("GRASS_STYLE") != "" else 0
+	return int(OS.get_environment("GRASS_STYLE")) if OS.get_environment("GRASS_STYLE") != "" else 5
 
 # returns [texture, width, height, spots, sway]
 func grass_draft(k: int, base: Array) -> Array:
@@ -2599,6 +2600,25 @@ func travel(i: int) -> void:
 		save_game())
 
 const CHANGES := [
+	"개발 상황: 놀 수 있는 분량 약 244분 / 목표 300분 (81%)",
+	"",
+	"2026-10-23 저녁",
+	"· 마을을 32x24 → 48x36으로 넓혔다. 장터(정직 상자 가판대 3곳, 과녁 마당), 여관(금화 10, 하룻밤 회복), 낚시하는 부두.",
+	"· 마을 이야기: 밤마다 장터 금화를 물어 가는 벽돌 까치를 쫓아 연못 둥지까지. 연못의 유리병 편지 셋(콩알, 도란, 한결).",
+	"· 마을 집을 물가 기둥집으로, 풀을 짧은 잔디와 키 큰 무더기로 바꿨다(시안 5개 중 5번씩).",
+	"· 쉬는 동안의 수다가 약 100가지가 됐다. 소라까지 셋이 말하고, 진행에 따라 새 대화 20가지가 한 번씩 나온다. 괴물이 오면 바로 멈춘다.",
+	"· 설정을 화면 가운데의 팝업으로 바꿨다. 바깥을 누르면 닫힌다.",
+	"· 돌아가기 단추를 우주 한량의 모양으로, 일지 글자를 13 → 15px, 왼쪽 아래 단추를 44 → 56px로 키웠다.",
+	"· 밤을 더 밝게 했다(주변광 3.8배, 노출 0.9 → 1.4).",
+	"· 지도에 땅 밑으로 내려가는 곳(동굴 입구, 물빛 동굴 계단, 성의 잠긴 층 계단)을 보라색으로 표시했다.",
+	"· 낮은 수풀은 지나갈 수 있다. 물결이 뒤로 걷던 것을 고쳤다.",
+	"",
+	"2026-10-23 오후",
+	"· 8장 달의 계단: 성 동문에서 정원까지 층계참 4곳(벽돌 벽, 물길, 무너진 틈, 등불 셋과 달 문).",
+	"· 7장 곁지역 성 아래 잠긴 층: 물 빼기, 8초 안에 등불 넷, 큰 수호자 둘, 한결의 넷째 일기와 등잔.",
+	"· Codex 시험 놀이꾼이 찾은 것: 동굴의 잠긴 문을 옆으로 돌아가던 길을 막고, 통로 바닥을 밝히고, 미니맵에 들어온 곳과 열쇠를 표시했다.",
+	"· 물수제비로 다리 너머 빈 곳을 달리던 것, 동굴에서 동료가 사라지던 것, 동굴을 나오면 이야기가 되돌아가던 것을 고쳤다.",
+	"",
 	"2026-10-23 낮",
 	"· 설정 창을 더했다 (Esc 또는 왼쪽 아래 설정 단추).",
 	"· 밤이 여름처럼 짧아졌다: 21시에 어두워지고 4시면 밝아온다.",
@@ -2882,8 +2902,12 @@ func build_settings(root: Control) -> void:
 		hd.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		scale_text(hd)
 	# 바뀐 것
-	var news := label(ui.set_pages[2], "\n".join(CHANGES), Vector2(0, 0), 13, ODD_MUTED)
-	news.size = Vector2(640, 400)
+	var scroll := ScrollContainer.new() # the list grows with every ship: it scrolls
+	scroll.size = Vector2(640, 396)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	ui.set_pages[2].add_child(scroll)
+	var news := label(scroll, "\n".join(CHANGES), Vector2(0, 0), 13, ODD_MUTED)
+	news.custom_minimum_size = Vector2(620, 0)
 	news.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	scale_text(news)
 	# 만든 이
@@ -3037,7 +3061,21 @@ func update_chat(dt: float) -> void:
 	var here: Array = ["sora"]
 	for pair in who:
 		here.append(pair[0])
-	var talks: Array = STORY.REST_TALK.filter(func(tk): return tk.all(func(ln): return ln[0] in here))
+	# a talk about where the story stands comes first, once each (the user asked for talk that follows the game)
+	for st in STORY.REST_TALK_STORY:
+		var key: String = st[0]
+		var talk: Array = st[1]
+		if not talks_heard.has(key) and story_talk_ok(key) and talk.all(func(ln): return ln[0] in here):
+			talks_heard[key] = true
+			rest_talk(talk)
+			return
+	var pool: Array = STORY.REST_TALK.duplicate()
+	var place := "night" if is_night() and rng.randf() < 0.5 else ("village" if in_village else ("lake" if in_lake else ("forest" if in_forest else ("castle" if in_castle() else ("hill" if in_hill else ("marsh" if in_marsh() else ""))))))
+	for w in STORY.REST_TALK_WHERE:
+		if w[0] == place:
+			pool.append(w[1])
+			pool.append(w[1]) # a talk for the place is twice as likely
+	var talks: Array = pool.filter(func(tk): return tk.all(func(ln): return ln[0] in here))
 	if not talks.is_empty() and rng.randf() < 0.65:
 		rest_talk(talks[rng.randi() % talks.size()])
 		return
@@ -3054,6 +3092,32 @@ func update_chat(dt: float) -> void:
 
 # a short talk at rest: each line in its speaker's balloon, 2.4 s apart; Sora's balloon stands where she rests
 var talk_id := 0          # bumped to cut a rest talk short
+var talks_heard := {}     # story rest talks already told (saved)
+
+# when a story rest talk may come: each names a point in the game
+func story_talk_ok(key: String) -> bool:
+	match key:
+		"mul_new": return lake_q >= 4 and forest_q < 3
+		"noeul_new": return forest_q >= 3 and hill_q < 3
+		"hawk": return hill_q >= 3 and cloud_q < 3
+		"scare": return cloud_q >= 3
+		"pearl": return grotto_q >= 4
+		"jar": return fly_q >= 3 and mate2 != null
+		"castle_in": return castle_q >= 1 and castle_q < 3 and castle.pages_read() < 3
+		"pages": return castle.pages_read() == 3 and castle_q < 3
+		"knight": return castle_q >= 3 and garden_q == 0
+		"lamp": return under_chest_open
+		"magpie": return magpie_q >= 3
+		"letters": return village.bottles_got() == village.bottles.size()
+		"festival": return fest_gift
+		"inn": return inn_nights >= 1
+		"medal": return has_medal
+		"trial": return trial_best > 0.0
+		"tired": return crown_pips <= 1
+		"hurt": return player.hp < player.max_hp * 0.4
+		"end": return garden_q >= 5
+		"round": return ng > 0
+	return false
 var talk_bubbles: Array = [] # balloons of the talk now running
 
 func rest_talk(talk: Array) -> void:
@@ -3953,6 +4017,7 @@ func skip_time(hours: float) -> void:
 	toast(tr("%02d시") % int(hour))
 
 func update_daylight(dt: float) -> void:
+	env.tonemap_exposure = 0.9
 	if in_grotto() or in_under(): # underground: the same soft blue light at any hour, a lamp on Sora (the clock waits, as in the cave)
 		sun.light_energy = 0.35
 		env.ambient_light_color = Color("#9ab4d8")
@@ -3994,10 +4059,11 @@ func update_daylight(dt: float) -> void:
 	var k := smoothstep(0.0, 1.0, (hour - a.h) / (b.h - a.h))
 	sun.light_color = Color(a.sun).lerp(Color(b.sun), k)
 	night = lerpf(a.night, b.night, k)
-	# night is brighter than it was (the user asked twice): more moonlight and about 2.8x the ambient at full night
-	sun.light_energy = lerpf(a.si, b.si, k) * 1.1 * lerpf(1.0, 1.1 + 0.9 * moon_phase().x, night) # fuller moon, brighter night
+	# night is brighter than it was (the user asked twice): more moonlight and about 3.8x the ambient at full night (asked three times)
+	sun.light_energy = lerpf(a.si, b.si, k) * 1.1 * lerpf(1.0, 1.4 + 1.0 * moon_phase().x, night) # fuller moon, brighter night
 	env.ambient_light_color = Color(a.amb).lerp(Color(b.amb), k)
-	env.ambient_light_energy = lerpf(a.ai, b.ai, k) * 0.4 * lerpf(1.0, 2.8, night)
+	env.ambient_light_energy = lerpf(a.ai, b.ai, k) * 0.4 * lerpf(1.0, 3.8, night)
+	env.tonemap_exposure = lerpf(0.9, 1.4, night) # and the eye opens up a little in the dark
 	var fog := Color(a.fog).lerp(Color(b.fog), k)
 	env.fog_light_color = fog
 	env.background_color = fog
@@ -4621,7 +4687,7 @@ func save_game() -> void:
 		"fly_q": fly_q, "flies": marsh.flies.map(func(f): return f.caught),
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
-		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "books": castle.books.map(func(b): return b.read), "has_bookmark": has_bookmark, "has_shard": has_shard, "shop_bought": shop_bought, "play_secs": play_secs, "ng": ng, "fest_gift": fest_gift, "mail_q": mail_q, "mail_got": mail_got, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes, "target_best": target_best, "has_medal": has_medal, "bottles": village.bottles.map(func(b): return b.got), "inn_nights": inn_nights, "magpie_q": magpie_q,
+		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "books": castle.books.map(func(b): return b.read), "has_bookmark": has_bookmark, "has_shard": has_shard, "shop_bought": shop_bought, "play_secs": play_secs, "ng": ng, "fest_gift": fest_gift, "mail_q": mail_q, "mail_got": mail_got, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes, "target_best": target_best, "has_medal": has_medal, "bottles": village.bottles.map(func(b): return b.got), "inn_nights": inn_nights, "magpie_q": magpie_q, "talks_heard": talks_heard.keys(),
 		"seals": garden.seals.map(func(sl): return sl.open),
 		"stairs_wall": stairs.wall_open, "stairs_lamps": stairs.lamps.map(func(l): return l.lit),
 		"castle_q": castle_q, "bars": castle.bars, "levers": castle.levers.map(func(lv): return lv.up), "vault": castle.vault_open, "has_armour": has_armour, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read),
@@ -4795,6 +4861,8 @@ func load_game() -> void:
 	has_medal = bool(d.get("has_medal", false))
 	inn_nights = int(d.get("inn_nights", 0))
 	magpie_q = int(d.get("magpie_q", 0))
+	for k in d.get("talks_heard", []):
+		talks_heard[String(k)] = true
 	if magpie_q >= 3:
 		light_moon_lamp()
 	var bts: Array = d.get("bottles", [])

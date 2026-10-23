@@ -239,26 +239,9 @@ func kid_goblin(m: Node) -> Node3D:
 	m.add_child(g)
 	return g
 
+# the village houses: the stilt house the user picked from five drafts (2026-10-23, draft 5)
 func house(m: Node, at: Vector3) -> void:
-	var g := Node3D.new()
-	g.position = at
-	m.add_child(g)
-	var wall: Material = m.mat_color(Color("#e4dccc"))
-	var roof: Material = m.mat_color(Color("#7a3a2a"))
-	var b: MeshInstance3D = m.box(Vector3(2.8, 1.4, 1.8), wall)
-	b.position = Vector3(0, 0.7, 0)
-	g.add_child(b)
-	for side in [-1.0, 1.0]:
-		var r: MeshInstance3D = m.box(Vector3(3.1, 0.12, 1.25), roof)
-		r.position = Vector3(0, 1.75, side * 0.45)
-		r.rotation.x = side * 0.6
-		g.add_child(r)
-	var door: MeshInstance3D = m.box(Vector3(0.5, 0.9, 0.06), m.mat_color(Color("#5a3a26")))
-	door.position = Vector3(-0.6, 0.45, 0.92)
-	g.add_child(door)
-	var win: MeshInstance3D = m.box(Vector3(0.6, 0.4, 0.06), m.glow_mat(Color("#ffc46a"), 1.5))
-	win.position = Vector3(0.6, 0.85, 0.92)
-	g.add_child(win)
+	house_draft(m, at, 4, false)
 
 # the tall old lamplighter: GPT pixel sprite (two idle frames) and the glow of his own lamp
 func simji(m: Node) -> Node3D:
@@ -430,7 +413,7 @@ func bottles_got() -> int:
 # ---- five house drafts for the user to pick from (scene "house_designs"); door faces south (+z) like house()
 const HOUSE_DRAFTS := ["동화 초가집", "레고 벽돌집", "등불 목조집", "버섯 집", "물가 기둥집"]
 
-func house_draft(m: Node, at: Vector3, k: int) -> void:
+func house_draft(m: Node, at: Vector3, k: int, labelled := true) -> void:
 	var g := Node3D.new()
 	g.position = at
 	m.add_child(g)
@@ -496,6 +479,8 @@ func house_draft(m: Node, at: Vector3, k: int) -> void:
 			add.call(Vector3(0.4, 0.45, 0.06), Vector3(0.65, 1.35, 0.71), Color("#ffc46a"), Vector3.ZERO, true)
 			for st in 3:
 				add.call(Vector3(0.6, 0.08, 0.25), Vector3(-0.5, 0.48 - st * 0.18, 1.5 + st * 0.25), Color("#9a7448"))
+	if not labelled:
+		return
 	var t := Label3D.new()
 	t.text = "%d  %s" % [k + 1, tr(HOUSE_DRAFTS[k])]
 	t.font = m.ui_font
