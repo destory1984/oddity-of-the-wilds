@@ -2820,10 +2820,12 @@ func travel(i: int) -> void:
 		snap_mates()
 		save_game())
 
+const CHANGES_PAGE := 100 # lines of 바뀐 것 shown before the 더 읽기 button
 const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 285분 / 목표 300분 (95%)",
 	"",
 	"2026-10-24 아침",
+	"· v0.0.22: 바뀐 것 목록이 100줄을 넘으면 최근 100줄만 보이고, 더 읽기 단추로 100줄씩 더 불러온다.",
 	"· v0.0.21: 일지(Q)와 조작법(H) 창에서 Esc를 누르면 창이 닫히고 놀이로 돌아간다. 전에는 아무 일도 없었다.",
 	"· v0.0.20: 설정 창의 버전 글자를 제목 아래에서 제목 오른쪽 같은 줄로 옮겼다.",
 	"· v0.0.19: 소라가 2시와 10시 쪽(오른쪽 위, 왼쪽 위)으로 걸을 때 머리가 흔들리고 안짱다리로 보이던 그림을 GPT에 다시 그리게 했다. 칸마다 머리 가운데를 맞춰 머리가 좌우로 1 px 넘게 움직이지 않는다.",
@@ -3222,10 +3224,25 @@ func build_settings(root: Control) -> void:
 	scroll.size = Vector2(640, 396)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	ui.set_pages[2].add_child(scroll)
-	var news := label(scroll, "\n".join(CHANGES), Vector2(0, 0), 16, ODD_MUTED)
+	# past CHANGES_PAGE lines the older ones wait behind a "더 읽기" button that brings the next CHANGES_PAGE (the user asked)
+	var stack := VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 8)
+	scroll.add_child(stack)
+	var news := label(stack, "\n".join(CHANGES.slice(0, CHANGES_PAGE)), Vector2(0, 0), 16, ODD_MUTED)
 	news.custom_minimum_size = Vector2(620, 0)
 	news.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	scale_text(news)
+	var more := set_button(stack, "더 읽기", Vector2.ZERO, Vector2(160, 36), func(): pass)
+	more.custom_minimum_size = Vector2(160, 36)
+	more.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	more.visible = CHANGES.size() > CHANGES_PAGE
+	more.pressed.connect(func():
+		var shown: int = mini(int(news.get_meta("shown", CHANGES_PAGE)) + CHANGES_PAGE, CHANGES.size())
+		news.set_meta("shown", shown)
+		news.text = "\n".join(CHANGES.slice(0, shown))
+		more.visible = shown < CHANGES.size())
+	ui.news = news
+	ui.news_more = more
 	# About
 	var about_rows := [["만든 사람", "destory1984 (기획, 그림 주문), Claude (코드)"], ["그림", "GPT 이미지 생성. 소라의 쉬는 몸짓과 이 창의 모양은 같은 작가의 우주 한량에서 가져왔다"],
 		["글꼴", "Pretendard (SIL 오픈 폰트 라이선스 1.1)"], ["라이선스", "코드는 MIT. 소라 캐릭터와 제목 그림은 destory1984의 것이다"]]
