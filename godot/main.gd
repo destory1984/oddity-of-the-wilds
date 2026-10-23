@@ -295,10 +295,18 @@ func _ready() -> void:
 	title_font.font_weight = 700
 	touch_ui = OS.has_feature("web_android") or OS.has_feature("web_ios") or OS.has_feature("android") or OS.has_feature("ios")
 	touch_ui = touch_ui or OS.get_environment("TOUCH_UI") == "1"
-	if touch_ui: # a phone held sideways: a smaller canvas, so keys and text come out about 1.4 times as big
+	var short_side := 400.0 # the screen's short side in CSS px, a phone's unless the browser says otherwise
+	if OS.has_feature("web"):
+		# iPadOS Safari calls itself a Mac: a touch screen with a coarse pointer is a phone or a tablet all the same
+		if bool(JavaScriptBridge.eval("navigator.maxTouchPoints > 1 && matchMedia('(pointer: coarse)').matches", true)):
+			touch_ui = true
+		short_side = float(JavaScriptBridge.eval("Math.min(screen.width, screen.height)", true))
+	if touch_ui: # a smaller canvas than 1600x900, so keys and text come out bigger: 540 tall on phones, 640 on tablets
+		# (the user found 640 too small on an iPhone, 2026-10-24)
+		var ch := 640 if short_side >= 600.0 else 540
 		get_tree().root.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
 		get_tree().root.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND
-		get_tree().root.content_scale_size = Vector2i(1138, 640)
+		get_tree().root.content_scale_size = Vector2i(ch * 16 / 9, ch)
 	build_environment()
 	build_map()
 	build_terrain()
@@ -2831,6 +2839,7 @@ const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 285분 / 목표 300분 (95%)",
 	"",
 	"2026-10-24 아침",
+	"· v0.0.31: 아이폰과 아이패드에서 글자와 단추가 너무 작던 것을 키웠다. 휴대폰은 기준 화면을 640 → 540으로 줄여 모든 것이 약 1.2배 커지고 글자도 한 단계 커진다. 아이패드도 터치 화면으로 알아본다(전에는 사파리가 맥이라고 해서 데스크톱 화면이 나왔다). 메뉴 단추 넷은 미니맵 왼쪽에 2x2로 모이고, 설정과 일지 같은 큰 창은 화면에 맞게 줄어든다.",
 	"· v0.0.30: 아이폰에서 미니맵은 움직이는데 화면 속 세상은 멈춰 있던 잘못을 고쳤다. 미니어처 흐림이 흐리게 하려고 복사한 화면이 아이폰 브라우저에서 첫 장면에 멈춰 있었다. 아이폰과 아이패드에서는 미니어처 흐림을 끄고, 다른 기기에서도 화면 복사에 밉맵을 쓰지 않는다.",
 	"· v0.0.29: 휴대폰 가로 화면에서 놀 수 있다. 화면 왼쪽에 엄지를 대면 이동 막대가 생기고 끝까지 밀면 달린다. 오른쪽에 공격, 구르기, 막기, 왕관(E), 열기(Space) 단추가 있고 기술 그림을 누르면 기술을 쓴다. 손가락 여럿을 따로 읽어 걸으면서 벨 수 있다. 메뉴 단추는 미니맵 왼쪽, 확대·축소는 미니맵 아래로 옮긴다. 세로로 들면 가로로 돌려 달라고 한다. 휴대폰에서는 그림자를 끄고 풀을 절반만 그린다.",
 	"· v0.0.28: 동료 수다를 107개에서 500개로 늘렸다(셋이 하는 대화 224, 곳과 때에 따른 대화 124, 이야기 진행 대화 27, 둘이 주고받는 말 50, 혼잣말 75). 동굴, 정원, 비 오는 때에도 그곳 수다가 나온다. 초안은 GPT가 쓰고 이야기 사실에 어긋나지 않는지 골랐다.",
@@ -3071,6 +3080,8 @@ func layout_help() -> void:
 	var w: float = maxf(340.0, 14 + kw + 24 + dw + 22)
 	var h: float = 60 + ui.help_rows.size() * step + 18
 	place(ui.help, Control.PRESET_BOTTOM_LEFT, Vector2(8, -80 - h), Vector2(w, h)) # 8 px over the keys
+	if touch_ui:
+		fit_sheet(ui.help)
 
 # the settings pages stack their rows by the height the text wraps to, so a longer line or a bigger text size
 # pushes the button and the next row down instead of running into them (waits a frame for the wrap)
@@ -3139,6 +3150,7 @@ func build_settings(root: Control) -> void:
 			toggle_settings(false))
 	root.add_child(sp)
 	var card := Panel.new()
+	ui.set_card = card
 	card.set_anchors_preset(Control.PRESET_CENTER)
 	card.offset_left = -344
 	card.offset_right = 344
@@ -3589,9 +3601,24 @@ func enable_touch() -> void:
 		touch_layer.set_script(load("res://touch.gd"))
 		touch_layer.main = self
 		ui.root.add_child(touch_layer)
-	var col := [ui.hint, ui.sound_btn, ui.journal_btn, ui.settings_btn]
+	var col := [ui.hint, ui.sound_btn, ui.journal_btn, ui.settings_btn] # two by two, 56 px, left of the minimap
 	for i in col.size():
-		place(col[i], Control.PRESET_TOP_RIGHT, Vector2(-194 - 8 - 64, 8 + i * 72), Vector2(64, 64))
+		place(col[i], Control.PRESET_TOP_RIGHT, Vector2(-194 - 8 - 56 - (1 - i % 2) * 64, 8 + (i / 2) * 64), Vector2(56, 56))
+	cfg.text = maxi(int(cfg.text), 2) # text a size up on a small screen
+	apply_settings()
+	await get_tree().process_frame # the sheets know their size a frame later
+	for sheet in [ui.journal, ui.ways, ui.help]:
+		fit_sheet(sheet)
+	ui.set_card.pivot_offset = ui.set_card.size / 2.0
+	ui.set_card.scale = Vector2.ONE * minf(1.0, (get_viewport().get_visible_rect().size.y - 16.0) / ui.set_card.size.y)
+
+# a sheet in the middle of a small screen, shrunk to fit its height
+func fit_sheet(c: Control) -> void:
+	var vs := get_viewport().get_visible_rect().size
+	var sz := c.size
+	place(c, Control.PRESET_CENTER, -sz / 2.0, sz)
+	c.pivot_offset = sz / 2.0
+	c.scale = Vector2.ONE * minf(1.0, minf((vs.y - 16.0) / sz.y, (vs.x - 16.0) / sz.x))
 
 # the autoplay test turns the touch layer off again, and the menu keys go back to the bottom left
 func disable_touch() -> void:
@@ -3604,6 +3631,11 @@ func disable_touch() -> void:
 	var col := [ui.hint, ui.sound_btn, ui.journal_btn, ui.settings_btn]
 	for i in col.size():
 		place(col[i], Control.PRESET_BOTTOM_LEFT, Vector2(8 + i * 72, -72), Vector2(64, 64))
+	for sheet in [ui.journal, ui.ways, ui.help, ui.set_card]:
+		sheet.scale = Vector2.ONE
+	place(ui.journal, Control.PRESET_BOTTOM_LEFT, Vector2(8, -647), Vector2(800, 567))
+	place(ui.ways, Control.PRESET_BOTTOM_LEFT, Vector2(8, -300), Vector2(330, 220))
+	layout_help()
 
 # ---- the bottom-left buttons: gold diamond keys in the skills' family (draft 4 of five, double gold rim with a thin
 # line symbol, the user's pick 2026-10-24), 64 px, 8 px apart and 8 px from the edges; the key is in the tooltip

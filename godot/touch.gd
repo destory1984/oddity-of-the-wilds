@@ -30,8 +30,8 @@ func keys() -> Dictionary:
 		"guard": [Vector2(vs.x - 176, vs.y - 270), 42.0],
 		"crown": [Vector2(vs.x - 64, vs.y - 300), 38.0],
 		"open": [Vector2(vs.x - 290, vs.y - 226), 38.0],
-		"zoom_in": [Vector2(vs.x - 160, 228), 26.0],
-		"zoom_out": [Vector2(vs.x - 96, 228), 26.0],
+		"zoom_in": [Vector2(vs.x - 290, 162), 26.0], # under the menu keys, left of the minimap
+		"zoom_out": [Vector2(vs.x - 226, 162), 26.0],
 	}
 	for i in 4: # the skill icons hud.gd draws (U I O and the potion)
 		k["skill%d" % i] = [Vector2(vs.x - 264 + i * 74, vs.y - 59), 36.0]
