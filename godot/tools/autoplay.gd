@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -1435,6 +1435,40 @@ func run() -> void:
 		var cleared: bool = main.trial_best > 0.0 and main.player.gold >= g0 + 300 and main.player.max_hp == hp0 + 20 + 12 * (main.player.lv - lv0) # kills level her up too
 		calm_enemies(false)
 		check("trial", began and waves == 5 and cleared, "began=%s waves seen=%d cleared=%s best %.1f s" % [began, waves, cleared, main.trial_best])
+	if want.call("squirrels"):
+		if main.intro:
+			main.start_game(false)
+		main.close_story()
+		main.in_village = false
+		main.in_forest = true
+		main.forest_q = maxi(main.forest_q, 1)
+		main.forest.freed = [false, false, false, false, false]
+		main.has_acorn = false
+		main.cages_spawned = false
+		main.spawn_cages()
+		var cages: Array = main.enemies.filter(func(e): return e.has("cage") and not e.dead)
+		var spots := true
+		for c in cages:
+			spots = spots and main.walkable(c.x + 1.0, c.z) or main.walkable(c.x - 1.0, c.z) or main.walkable(c.x, c.z + 1.0)
+		var first: Dictionary = cages[0] if cages.size() > 0 else {}
+		var two_hits := false
+		if not first.is_empty():
+			main.damage_enemy(first, 10.0, Vector2(first.x - 1.0, first.z))
+			main.damage_enemy(first, 10.0, Vector2(first.x - 1.0, first.z))
+			two_hits = not first.dead
+		for c in cages:
+			for k in 3:
+				main.damage_enemy(c, 10.0, Vector2(c.x - 1.0, c.z))
+		await wait(0.2)
+		main.close_story()
+		main.player.hp = 10.0
+		main.player.pots = 1
+		main.player.cds[3] = 0.0
+		tap(KEY_4)
+		await wait(0.1)
+		var acorn: bool = main.has_acorn and main.player.hp >= 75.0 - 0.5
+		main.in_forest = false
+		check("squirrels", cages.size() == 5 and spots and two_hits and acorn, "cages=%d reachable=%s still shut after 2 hits=%s acorn heals 65=%s (hp %.0f)" % [cages.size(), spots, two_hits, acorn, main.player.hp])
 	calm_enemies(false)
 	var failed := results.count(false)
 	print("TESTS %d passed, %d failed" % [results.size() - failed, failed])

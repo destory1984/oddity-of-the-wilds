@@ -331,6 +331,7 @@ const SCENES := {
 	"journal": {"play": true, "journal": true},
 	"wolves": {"play": true, "village": true, "forest": true, "wolves": true, "hour": 16.5},
 	"trial": {"play": true, "village": true, "trial": true, "hour": 21.0},
+	"cage": {"play": true, "village": true, "forest": true, "cage": true, "hour": 14.0},
 	"scrap": {"play": true, "at": Vector2(42.5, 5.5), "hour": 17.0},
 }
 
@@ -385,6 +386,10 @@ func apply_test_args(args: PackedStringArray) -> void:
 				close_story()
 				spawn_wolf(Vector2(player.x + 2.5, player.z + 0.5))
 				spawn_wolf(Vector2(player.x + 1.0, player.z + 2.0))
+			if sc.has("cage"):
+				player.x = FOREST.FOREST_X + 13.5
+				player.z = 5.0
+				close_story()
 			if sc.has("grove"):
 				player.x = forest.marks.t.x + 2.0
 				player.z = forest.marks.t.y
@@ -1895,6 +1900,9 @@ func damage_enemy(e: Dictionary, amt: float, from: Vector2, kb := 4.0, force_cri
 		return
 	if e.dead or e.get("roar", 0.0) > 0.0:
 		return
+	if e.has("cage"):
+		cage_hit(e)
+		return
 	if e.get("knight", false) and e.stun <= 0.0 and e.tired <= 0.0 and e.dash <= 0.0:
 		var from_dir := (from - Vector2(e.x, e.z)).normalized()
 		if from_dir.dot(e.face) > 0.34: # within about 70 degrees either side of where the shield points
@@ -2197,7 +2205,7 @@ func drink_potion() -> void:
 		return
 	player.pots -= 1
 	player.cds[3] = 2.0
-	var h := minf(player.max_hp - player.hp, 45.0)
+	var h := minf(player.max_hp - player.hp, 65.0 if has_acorn else 45.0)
 	player.hp += h
 	var y := height_at(player.x, player.z)
 	pop_num(Vector3(player.x, y + 1.9, player.z), "+%d" % int(h), Color("#8dff9a"))
@@ -2964,7 +2972,7 @@ func save_game() -> void:
 		"fly_q": fly_q, "flies": marsh.flies.map(func(f): return f.caught),
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
-		"skill_up": skill_up, "shrine_seen": shrine_seen, "trial_best": trial_best,
+		"skill_up": skill_up, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best,
 		"castle_q": castle_q, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -3082,6 +3090,10 @@ func load_game() -> void:
 		cloud.opened_look()
 	has_feather = bool(d.get("has_feather", false))
 	skill_up = int(d.get("skill_up", -1))
+	var fr: Array = d.get("freed", [])
+	for i in mini(fr.size(), forest.freed.size()):
+		forest.freed[i] = bool(fr[i])
+	has_acorn = bool(d.get("has_acorn", false))
 	trial_best = float(d.get("trial_best", 0.0))
 	shrine_seen = bool(d.get("shrine_seen", false))
 	castle_q = int(d.get("castle_q", 0))
@@ -3866,6 +3878,7 @@ func enter_forest() -> void:
 		for w in forest.wolves:
 			spawn_wolf(w)
 		show_story("", STORY.FOREST_IN)
+	spawn_cages()
 	if forest_q < 3:
 		set_quest("벽돌 벽을 왕관으로 풀며 숲 동쪽 끝의 노을에게 가자 (E)")
 	save_game()
@@ -3940,6 +3953,62 @@ func open_grove_chest() -> void:
 	sfx(784, 0.12, "triangle", 0.25)
 	show_story("", STORY.GROVE_CHEST)
 	toast("최대 체력 +15, 회복약 2개, 금화 120")
+	save_game()
+
+# ---- five squirrels shut in brick cages around the forest: three sword hits break a cage.
+# Freeing all five gets the acorn: potions heal 65 instead of 45. Companions leave the cages to Sora.
+var cages_spawned := false
+var has_acorn := false
+
+func spawn_cages() -> void:
+	if cages_spawned:
+		return
+	cages_spawned = true
+	for i in FOREST.CAGES.size():
+		if forest.freed[i]:
+			continue
+		var at: Vector2 = FOREST.CAGES[i] + Vector2(FOREST.FOREST_X, 0)
+		var root := Node3D.new()
+		var g := Node3D.new()
+		root.add_child(g)
+		var mats: Array = []
+		brick(g, mats, Vector3(0.8, 0.1, 0.8), Vector3(0, 0.05, 0), Color("#8a8a90"))
+		brick(g, mats, Vector3(0.8, 0.1, 0.8), Vector3(0, 0.85, 0), Color("#a8322a"))
+		for k in 4: # bars at the corners
+			brick(g, mats, Vector3(0.1, 0.7, 0.1), Vector3(-0.35 + (k % 2) * 0.7, 0.45, -0.35 + (k / 2) * 0.7), Color("#8a8a90"), false)
+		var fur := mat_color(Color("#c8783a")) # the squirrel inside, sitting up with its tail curled
+		for part in [[Vector3(0.22, 0.26, 0.2), Vector3(0, 0.25, 0)], [Vector3(0.18, 0.16, 0.18), Vector3(0, 0.45, 0.04)], [Vector3(0.14, 0.34, 0.12), Vector3(0, 0.36, -0.18)]]:
+			var b := box(part[0], fur)
+			b.position = part[1]
+			g.add_child(b)
+		add_child(root)
+		root.position = Vector3(at.x, 0, at.y)
+		enemies.append({"x": at.x, "z": at.y, "hp": 3.0, "max_hp": 3, "node": root, "shadow": blob(0.6), "t": 0.0,
+			"atk_cd": 99.0, "hurt": 0.0, "kx": 0.0, "kz": 0.0, "wx": at.x, "wz": at.y, "dead": false, "respawn": 0.0,
+			"cage": i, "cave": true})
+		root.set_meta("mats", mats)
+		root.set_meta("body", g)
+
+func cage_hit(e: Dictionary) -> void:
+	e.hp -= 1.0
+	e.hurt = 0.12
+	burst(Vector3(e.x, 0.6, e.z), Color("#a8322a"), 8, 2.0)
+	sfx(500, 0.06, "square", 0.15, -200)
+	(e.node.get_meta("body") as Node3D).rotation.y = rnd(-0.2, 0.2)
+	if e.hp > 0.0:
+		return
+	e.dead = true
+	e.node.queue_free()
+	e.shadow.queue_free()
+	forest.freed[int(e.cage)] = true
+	burst(Vector3(e.x, 0.6, e.z), Color("#c8783a"), 20, 2.5)
+	sfx(880, 0.15, "triangle", 0.2)
+	var n: int = forest.freed.filter(func(f): return f).size()
+	if n >= forest.freed.size():
+		has_acorn = true
+		show_story("", STORY.SQUIRRELS_DONE)
+	else:
+		toast(tr("다람쥐를 구했다 %d/5") % n)
 	save_game()
 
 func update_forest() -> void:
@@ -4790,7 +4859,7 @@ func update_mate2(dt: float) -> void:
 	var best := 4.0
 	for e in enemies:
 		var dd := Vector2(e.x, e.z).distance_to(Vector2(mate2.position.x, mate2.position.z))
-		if not e.dead and dd < best and not e.get("air", false):
+		if not e.dead and dd < best and not e.get("air", false) and not e.has("cage"):
 			best = dd
 			target = e
 	if target != null and mate2_cd <= 0.0 and not story_open:
@@ -4811,7 +4880,7 @@ func update_mate(dt: float) -> void:
 	var target = null
 	var best := 5.0
 	for e in enemies:
-		if not e.dead and Vector2(e.x, e.z).distance_to(Vector2(mate.position.x, mate.position.z)) < best:
+		if not e.dead and not e.has("cage") and Vector2(e.x, e.z).distance_to(Vector2(mate.position.x, mate.position.z)) < best:
 			best = Vector2(e.x, e.z).distance_to(Vector2(mate.position.x, mate.position.z))
 			target = e
 	var goal := me + Vector3(-1.3, 0, -0.6)
@@ -5695,6 +5764,8 @@ func journal_lines() -> Array:
 	if lake_q >= 4:
 		side.call("섬 밑 물빛 동굴", tr("끝") if grotto_q >= 4 else (tr("상자를 열자") if grotto_q == 3 else tr("섬 남쪽 계단으로")))
 	if forest_q >= 1:
+		var nf: int = forest.freed.filter(func(f): return f).size()
+		side.call("갇힌 다람쥐", tr("끝") if has_acorn else tr("%d/5 구함") % nf)
 		side.call("숲의 달 순서 돌", tr("끝") if forest.chest_open else (tr("상자를 열자") if forest.solved else tr("숲 북서쪽 숲터")))
 	if hill_q >= 3:
 		side.call("구름 둔덕", tr("끝") if cloud_q >= 3 else tr("언덕 북쪽 바람구멍으로"))
@@ -5710,6 +5781,7 @@ func journal_lines() -> Array:
 	if fly_q >= 3: keep.append(tr("반딧불 병"))
 	if has_pearl: keep.append(tr("물빛 진주"))
 	if has_feather: keep.append(tr("바람 깃털"))
+	if has_acorn: keep.append(tr("다람쥐 도토리"))
 	out.append("  " + (", ".join(keep) if not keep.is_empty() else tr("왕관 하나")))
 	return out
 
@@ -6164,6 +6236,10 @@ func update_enemies(dt: float, gy: float) -> void:
 			continue
 		if e.get("wolf", false):
 			update_wolf(e, dt, d, to)
+			continue
+		if e.has("cage"):
+			e.hurt -= dt
+			e.shadow.position = Vector3(e.x, 0.02, e.z)
 			continue
 		if e.get("hawk", false):
 			update_hawk(e, dt, d, to)
