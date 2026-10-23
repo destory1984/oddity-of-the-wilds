@@ -318,14 +318,7 @@ func build_market(m: Node) -> void:
 		var box: MeshInstance3D = m.box(Vector3(0.26, 0.22, 0.2), m.mat_color(Color("#4a3a2a")))
 		box.position = Vector3(0.7, 0.81, 0.36)
 		g.add_child(box)
-		var sign := Label3D.new()
-		sign.text = tr(stall_names[key])
-		sign.font = m.ui_font
-		sign.font_size = 34
-		sign.pixel_size = 0.006
-		sign.modulate = Color("#3a2414")
-		sign.outline_size = 8
-		sign.outline_modulate = Color("#f2ead8")
+		var sign: Sprite3D = m.sign_icon({"1": "apple", "2": "moon", "3": "tea"}[key], 0.6)
 		sign.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
 		sign.position = Vector3(0, 2.0, 0.3)
 		g.add_child(sign)
@@ -365,14 +358,7 @@ func build_inn(m: Node) -> void:
 			var win: MeshInstance3D = m.box(Vector3(0.6, 0.45, 0.06), m.glow_mat(Color("#ffc46a"), 1.5))
 			win.position = Vector3(wx, wy, 1.42)
 			g.add_child(win)
-	var sign := Label3D.new()
-	sign.text = tr("여관 · 하룻밤 금화 10")
-	sign.font = m.ui_font
-	sign.font_size = 34
-	sign.pixel_size = 0.006
-	sign.modulate = Color("#3a2414")
-	sign.outline_size = 8
-	sign.outline_modulate = Color("#f2ead8")
+	var sign: Sprite3D = m.sign_icon("inn", 0.9)
 	sign.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
 	sign.position = Vector3(0, 3.4, 1.4)
 	g.add_child(sign)

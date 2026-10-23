@@ -1429,13 +1429,7 @@ func build_cottage() -> void:
 	shop_pos = g.transform * Vector3(-0.6, 0, 1.9)
 	# hanging sign over the door
 	add.call(Vector3(0.7, 0.32, 0.06), Vector3(-0.6, 1.55, 1.32), mat_color(Color("#8a5a32")))
-	var sign := Label3D.new()
-	sign.text = "상점"
-	sign.font = ui_font_for_sign()
-	sign.font_size = 48
-	sign.pixel_size = 0.005
-	sign.modulate = Color("#ffe6a0")
-	sign.outline_size = 8
+	var sign := sign_icon("shop", 0.4)
 	sign.position = Vector3(-0.6, 1.55, 1.37)
 	g.add_child(sign)
 	# block the footprint
@@ -1446,6 +1440,32 @@ func build_cottage() -> void:
 
 func ui_font_for_sign() -> Font:
 	return ui_font
+
+# Signs in the world are pictures, not words: Korean drawn by Label3D in the world broke up at a distance (the user,
+# 2026-10-23: "한글 다 깨진다. 이런건 다 아이콘으로 해"). A round paper plaque with a brown line picture.
+const SIGN_SVG := {
+	"shop": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><circle cx="24" cy="24" r="21" fill="#f2ead8" stroke="#3a2414" stroke-width="2"/><g fill="none" stroke="#3a2414" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11h8M21.5 11v7l-7 9a8 8 0 0 0 6.5 12h6a8 8 0 0 0 6.5-12l-7-9v-7"/><path d="M17 30h14"/></g></svg>',
+	"village": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><circle cx="24" cy="24" r="21" fill="#f2ead8" stroke="#3a2414" stroke-width="2"/><g fill="none" stroke="#3a2414" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 12v3M11 15h8v13h-8zM11 28l1 3h6l1-3"/><path d="M15 19v5"/><path d="M25 24h13M33 19l5 5-5 5"/></g></svg>',
+	"apple": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><circle cx="24" cy="24" r="21" fill="#f2ead8" stroke="#3a2414" stroke-width="2"/><g fill="none" stroke="#3a2414" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M24 17c-5-4-13-1-13 8 0 7 5 14 9 14 2 0 3-1 4-1s2 1 4 1c4 0 9-7 9-14 0-9-8-12-13-8z"/><path d="M24 17c0-3 1-5 3-7"/><path d="M27 12c3-1 6 0 7 2-3 1-6 0-7-2z"/></g></svg>',
+	"moon": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><circle cx="24" cy="24" r="21" fill="#f2ead8" stroke="#3a2414" stroke-width="2"/><g fill="none" stroke="#3a2414" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M27 11a13 13 0 1 0 9 22 11 11 0 1 1-9-22z"/><path d="M35 13v4M33 15h4M14 33v3M12.5 34.5h3"/></g></svg>',
+	"tea": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><circle cx="24" cy="24" r="21" fill="#f2ead8" stroke="#3a2414" stroke-width="2"/><g fill="none" stroke="#3a2414" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M11 22h21v6a8 8 0 0 1-8 8h-5a8 8 0 0 1-8-8z"/><path d="M32 24h2a4 4 0 0 1 0 8h-3"/><path d="M17 11c-2 2 2 4 0 7M24 11c-2 2 2 4 0 7"/><path d="M9 40h25"/></g></svg>',
+	"inn": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><circle cx="24" cy="24" r="21" fill="#f2ead8" stroke="#3a2414" stroke-width="2"/><g fill="none" stroke="#3a2414" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 35V14M9 29h30v6M39 35v-9a3 3 0 0 0-3-3H20v6"/><circle cx="14.5" cy="24.5" r="3"/></g></svg>',
+}
+var sign_cache := {}
+
+func sign_icon(kind: String, size := 0.5) -> Sprite3D:
+	if not sign_cache.has(kind):
+		var img := Image.new()
+		img.load_svg_from_string(SIGN_SVG[kind], 4.0) # 192 px
+		img.generate_mipmaps()
+		sign_cache[kind] = ImageTexture.create_from_image(img)
+	var sp := Sprite3D.new()
+	sp.texture = sign_cache[kind]
+	sp.pixel_size = size / 192.0
+	sp.shaded = false
+	sp.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	sp.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
+	return sp
 
 # ---------------------------------------------------------------- shop
 const SHOP := [
@@ -2669,6 +2689,7 @@ const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 256분 / 목표 300분 (85%)",
 	"",
 	"2026-10-23 저녁",
+	"· v0.0.11: 멀리서 깨지던 한글 간판을 그림으로 바꿨다(상점 물약병, 마을 표지판 등불과 화살표, 가판대 사과, 초승달, 찻잔, 여관 침대). 가판대와 여관 앞에 서면 무엇을 얼마에 파는지 알려 준다.",
 	"· v0.0.10: 달빛 시련을 마을에서 바람 언덕 동쪽 선돌(옛 달지기들이 솜씨를 겨루던 돌)로 옮겼다. 벽돌 매를 물리친 뒤 열리고, 선돌에서 9칸 넘게 멀어지면 끝난다. 처음 깬 뒤에는 시련 괴물이 금화와 경험치를 주지 않는다.",
 	"· v0.0.9: 달빛 눈금이 하룻밤에 다 차도록 빨라졌다. 등불 곁 10 → 6초, 반딧불 병 20 → 12초마다 한 칸. 밤은 105초라 등불 곁에서는 밤의 절반이면 8칸이 찬다.",
 	"· v0.0.8: 칼 휘두르는 효과를 금빛 별가루로 바꿨다(시안 5개 중 3번). 가는 금빛 호가 칼끝을 따라 쓸고, 바깥으로 마름모 불티가 튄다.",
@@ -3313,14 +3334,7 @@ func village_sign() -> void:
 	var board: MeshInstance3D = box(Vector3(1.9, 0.42, 0.08), mat_color(Color("#c8a46a")))
 	board.position = Vector3(0, 1.3, 0.08)
 	g.add_child(board)
-	var t := Label3D.new()
-	t.text = tr("등불 마을 →")
-	t.font = ui_font
-	t.font_size = 36
-	t.pixel_size = 0.006
-	t.modulate = Color("#3a2414")
-	t.outline_size = 0
-	t.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+	var t := sign_icon("village", 0.5)
 	t.position = Vector3(0, 1.3, 0.14)
 	g.add_child(t)
 	var glow := box(Vector3(0.2, 0.26, 0.2), glow_mat(Color("#ffc46a"), 1.6))
@@ -10095,7 +10109,29 @@ func start_targets() -> void:
 	sfx(660, 0.2, "triangle", 0.2)
 	toast(tr("과녁 맞히기! %d초 동안 일어서는 과녁을 베자") % int(TARGET_TIME))
 
+# what a stall or the inn is, said once when Sora steps up to it (the signs are only pictures)
+const STALL_DOES := {"1": "체력 40", "2": "왕관 눈금 2칸", "3": "기력 가득, 기세 +50"}
+var stall_seen := ""
+
+func market_hint() -> void:
+	var me := Vector2(player.x, player.z)
+	var near := ""
+	for key in STALLS:
+		if me.distance_to(village.marks[key]) < 1.3:
+			near = key
+	if near == "" and me.distance_to(village.marks.N) < 1.4:
+		near = "inn"
+	if near == stall_seen:
+		return
+	stall_seen = near
+	if near == "inn":
+		toast("여관: 하룻밤 금화 10, 모두 회복 (E)")
+	elif near != "":
+		var price: int = 25 if near == "2" and magpie_q >= 3 else int(STALLS[near].price)
+		toast(tr("%s(%s): 금화 %d를 정직 상자에 넣고 가져간다 (E)") % [tr(STALLS[near].what), tr(STALL_DOES[near]), price])
+
 func update_market(dt: float) -> void:
+	market_hint()
 	for b in village.bottles: # the bottles bob on the pond; she picks one up running over it on the water skip
 		if b.got:
 			continue
