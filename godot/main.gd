@@ -2824,6 +2824,7 @@ const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 285분 / 목표 300분 (95%)",
 	"",
 	"2026-10-24 아침",
+	"· v0.0.21: 일지(Q)와 조작법(H) 창에서 Esc를 누르면 창이 닫히고 놀이로 돌아간다. 전에는 아무 일도 없었다.",
 	"· v0.0.20: 설정 창의 버전 글자를 제목 아래에서 제목 오른쪽 같은 줄로 옮겼다.",
 	"· v0.0.19: 소라가 2시와 10시 쪽(오른쪽 위, 왼쪽 위)으로 걸을 때 머리가 흔들리고 안짱다리로 보이던 그림을 GPT에 다시 그리게 했다. 칸마다 머리 가운데를 맞춰 머리가 좌우로 1 px 넘게 움직이지 않는다.",
 	"2026-10-24 새벽",
@@ -9820,8 +9821,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
 			toggle_settings(false)
 		return
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE and not way_open \
-			and not ui.journal.visible and not ui.help.visible:
+	# Esc on the journal or the controls sheet closes it and goes back to the game (the user asked for this)
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE and (ui.journal.visible or ui.help.visible):
+		toggle_journal(false)
+		toggle_help(false)
+		return
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE and not way_open:
 		toggle_settings(true)
 		return
 	if way_open and event is InputEventKey and event.pressed and not event.echo:
