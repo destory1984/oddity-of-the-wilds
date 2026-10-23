@@ -4541,6 +4541,11 @@ func update_oar() -> void:
 		save_game()
 
 # ---- the lantern night (story step 9)
+# companions and Noeul are drawn facing screen-right; the camera is turned, so "left" must be judged on screen,
+# not by world x (walking toward the bottom of the screen has a leftward screen component)
+func screen_left(v: Vector2) -> bool:
+	return v.dot(Vector2(cos(cam_yaw), -sin(cam_yaw))) < 0.0
+
 func noeul_sprite() -> Sprite3D:
 	var spr := Sprite3D.new() # GPT pixel sprite: 0 arms crossed, 1 running, 2 casting
 	spr.texture = load("res://art/folk/noeul.png")
@@ -4604,7 +4609,7 @@ func update_night(dt: float) -> void:
 		else:
 			at += step.normalized() * minf(step.length(), dt * 4.8)
 		spr.frame = 1
-		spr.flip_h = step.x < 0.0
+		spr.flip_h = screen_left(Vector2(step.x, step.y))
 	else:
 		spr.frame = 0
 	noeul_node.position = Vector3(at.x, 0, at.y)
@@ -4710,7 +4715,7 @@ func update_noeul(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
 			var nz: float = e.z - to.y / d * 2.0 * dt
 			if walkable(nx, e.z): e.x = nx
 			if walkable(e.x, nz): e.z = nz
-	spr.flip_h = (e.dir.x if e.dash > 0.0 else to.x) < 0.0
+	spr.flip_h = screen_left(e.dir if e.dash > 0.0 else to)
 	node.position = Vector3(e.x, 0, e.z)
 	e.shadow.position = Vector3(e.x, 0.02, e.z)
 
@@ -5796,7 +5801,7 @@ func update_mate2(dt: float) -> void:
 	if to.length() > 0.3:
 		mate2.position += to.normalized() * minf(to.length() - 0.3, dt * 5.5)
 		spr.frame = 1
-		spr.flip_h = to.x < 0.0
+		spr.flip_h = screen_left(Vector2(to.x, to.z))
 	else:
 		spr.frame = 0
 	var target = null
@@ -5835,7 +5840,7 @@ func update_mate(dt: float) -> void:
 	if to.length() > stop:
 		mate.position += to.normalized() * minf(to.length() - stop, dt * 5.5)
 		mate.position.y = absf(sin(t * 11.0)) * 0.06
-		spr.flip_h = to.x < 0.0
+		spr.flip_h = screen_left(Vector2(to.x, to.z))
 	else:
 		mate.position.y = 0.0
 	spr.frame = 1 if fmod(t, 3.0) < 0.3 else 0
