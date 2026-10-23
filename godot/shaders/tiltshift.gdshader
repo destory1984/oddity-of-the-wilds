@@ -2,7 +2,7 @@
 // a warm grade, a little extra saturation and a soft vignette.
 shader_type canvas_item;
 
-uniform sampler2D screen_tex : hint_screen_texture, filter_linear_mipmap;
+uniform sampler2D screen_tex : hint_screen_texture, filter_linear; // no mipmaps: cheaper, and mobile WebGL is happier
 uniform float focus = 0.45;
 uniform float amount = 6.0;
 
