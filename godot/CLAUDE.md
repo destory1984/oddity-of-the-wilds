@@ -5,7 +5,7 @@
 - 게임 전부를 `main.gd` 가 코드로 짓는다. `main.tscn` 은 거의 비어 있다.
 - `minimap.gd` 둥근 미니맵, `sky.gd` 왼쪽 위 해와 달 창, `shaders/` 지형, 풀, 물, 틸트시프트.
 - 기획은 `DESIGN.md`. 무엇을 만들지, 밸런스를 정할 때는 기획자 에이전트(`designer`)를 먼저 부른다.
-- 웹 사이트 저장소는 `../rpg_demo` (GitHub `destory1984/oddity-of-the-wilds`). 맨 위에 웹 실행 파일, `godot/` 에 이 프로젝트 원본 사본이 들어간다.
+- 웹 사이트 저장소는 `../rpg_demo` (GitHub `destory1984/the-crown-oddity`). 맨 위에 웹 실행 파일, `godot/` 에 이 프로젝트 원본 사본이 들어간다.
 
 ## 지역 좌표 (x로 구분한다)
 

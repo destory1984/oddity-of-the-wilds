@@ -22,6 +22,7 @@ import sys
 import tarfile
 import io
 import time
+import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -170,10 +171,29 @@ def git(args, cwd):
     return r.stdout
 
 
+# Every ship is one feature: raise the last number of application/config/version by one (the user,
+# 2026-10-23: "한 가지 기능 추가할 때마다 하나씩 올려", starting at v0.0.1) and stamp the day in Korean time.
+def bump_version():
+    p = ROOT / "project.godot"
+    s = p.read_bytes().decode("utf-8")
+    m = re.search(r'config/version="(\d+)\.(\d+)\.(\d+)"', s)
+    if not m:
+        raise SystemExit("project.godot has no config/version")
+    v = f"{m[1]}.{m[2]}.{int(m[3]) + 1}"
+    day = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=9)).strftime("%Y-%m-%d")
+    s = s[:m.start()] + f'config/version="{v}"' + s[m.end():]
+    s = re.sub(r'config/updated="[^"]*"', f'config/updated="{day}"', s, count=1)
+    p.write_bytes(s.encode("utf-8"))
+    print(f"version v{v} ({day})")
+    return v
+
+
 def ship(message):
     if check() or test(None):
         print("SHIP STOPPED: fix the failures above first")
         return 1
+    v = bump_version()
+    message = f"v{v}: {message}"
     if git(["status", "--porcelain"], ROOT).strip():
         git(["add", "-A"], ROOT)
         git(["commit", "-qm", message + "\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"], ROOT)

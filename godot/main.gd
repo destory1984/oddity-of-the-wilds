@@ -2603,6 +2603,8 @@ const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 244분 / 목표 300분 (81%)",
 	"",
 	"2026-10-23 저녁",
+	"· v0.0.1: 설정 창 제목 아래에 버전과 날짜를 작게 띄운다. 기능을 하나 더할 때마다 끝 숫자가 1씩 오른다. 넷째 칸 이름을 만든 이 → About으로 바꿨다.",
+	"· v0.0.1: 설정 창 제목 아래에 버전과 날짜를 작게 띄운다. 기능을 하나 더할 때마다 끝 숫자가 1씩 오른다. 넷째 칸 이름을 만든 이 → About으로 바꿨다.",
 	"· 마을을 32x24 → 48x36으로 넓혔다. 장터(정직 상자 가판대 3곳, 과녁 마당), 여관(금화 10, 하룻밤 회복), 낚시하는 부두.",
 	"· 마을 이야기: 밤마다 장터 금화를 물어 가는 벽돌 까치를 쫓아 연못 둥지까지. 연못의 유리병 편지 셋(콩알, 도란, 한결).",
 	"· 마을 집을 물가 기둥집으로, 풀을 짧은 잔디와 키 큰 무더기로 바꿨다(시안 5개 중 5번씩).",
@@ -2634,7 +2636,7 @@ const CHANGES := [
 ]
 
 # ---- settings (modelled on Space Oddity's 설정): opened by the 설정 button or Esc, the world waits while it is open.
-# Head: sound on/off and text size 가- / 가+. Tabs: 설정 (comfort and display), 도움말 (controls), 바뀐 것, 만든 이.
+# Head: sound on/off and text size 가- / 가+. Tabs: 설정 (comfort and display), 도움말 (controls), 바뀐 것, About.
 # Saved apart from the game in user://settings.json, so F9 (start over) keeps them.
 const SETTINGS_PATH := "user://settings.json"
 const TEXT_SIZES := [0.85, 1.0, 1.15, 1.3]
@@ -2807,6 +2809,12 @@ func set_button(parent: Control, text: String, pos: Vector2, size: Vector2, fn: 
 # when clicked, and a centred 688 x 584 card in Space Oddity's dialog look (#091627, #53718b line, 14 px corners) holding
 # the corner back key and the 640 px column: the head (title at left, sound and 가- 가+ at right), four equal tabs,
 # the page as label rows with the description beside and a small button under it, and the way back at the foot
+# "v0.0.1 · 2026-10-23" from project.godot (application/config/version and .../updated, written by dev.py ship)
+func version_text() -> String:
+	var v := str(ProjectSettings.get_setting("application/config/version", "0.0.0"))
+	var d := str(ProjectSettings.get_setting("application/config/updated", ""))
+	return "v" + v + (" · " + d if d != "" else "")
+
 func build_settings(root: Control) -> void:
 	var sp := Panel.new() # the backdrop
 	sp.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -2838,6 +2846,9 @@ func build_settings(root: Control) -> void:
 	card.add_child(col)
 	var h1 := label(col, "설정", Vector2(48, 2), 24, ODD_INK)
 	h1.size = Vector2(300, 40)
+	# the version and the day it shipped, small under the title as in Space Oddity (dev.py ship raises it by one per feature)
+	var ver := label(col, version_text(), Vector2(48, 36), 11, Color(ODD_MUTED, 0.6))
+	ver.size = Vector2(300, 16)
 	ui.set_sound = Button.new()
 	ui.set_sound.icon = odd_icon("sound")
 	ui.set_sound.expand_icon = true
@@ -2849,7 +2860,7 @@ func build_settings(root: Control) -> void:
 	col.add_child(ui.set_sound)
 	ui.set_minus = set_button(col, "가−", Vector2(640 - 44 * 2 - 8, 0), Vector2(44, 40), func(): cfg.text = maxi(0, int(cfg.text) - 1); save_settings(); apply_settings())
 	ui.set_plus = set_button(col, "가+", Vector2(640 - 44, 0), Vector2(44, 40), func(): cfg.text = mini(TEXT_SIZES.size() - 1, int(cfg.text) + 1); save_settings(); apply_settings())
-	var tabs := ["설정", "도움말", "바뀐 것", "만든 이"]
+	var tabs := ["설정", "도움말", "바뀐 것", "About"]
 	ui.set_tabs = []
 	ui.set_pages = []
 	var tw := (640.0 - 8 * 3) / 4.0
@@ -2910,7 +2921,7 @@ func build_settings(root: Control) -> void:
 	news.custom_minimum_size = Vector2(620, 0)
 	news.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	scale_text(news)
-	# 만든 이
+	# About
 	var about_rows := [["만든 사람", "destory1984 (기획, 그림 주문), Claude (코드)"], ["그림", "GPT 이미지 생성. 소라의 쉬는 몸짓과 이 창의 모양은 같은 작가의 우주 한량에서 가져왔다"],
 		["글꼴", "Pretendard (SIL 오픈 폰트 라이선스 1.1)"], ["라이선스", "코드는 MIT. 소라 캐릭터와 제목 그림은 destory1984의 것이다"]]
 	for i in about_rows.size():
@@ -2922,7 +2933,7 @@ func build_settings(root: Control) -> void:
 		scale_text(ad)
 	var ct := label(ui.set_pages[3], "만든 코드", Vector2(0, 4 * 48), 13, Color("#eef3ff"))
 	ct.size = Vector2(90, 20)
-	set_button(ui.set_pages[3], "깃허브에서 보기", Vector2(106, 4 * 48 - 6), Vector2(150, 36), func(): OS.shell_open("https://github.com/destory1984/oddity-of-the-wilds"))
+	set_button(ui.set_pages[3], "깃허브에서 보기", Vector2(106, 4 * 48 - 6), Vector2(150, 36), func(): OS.shell_open("https://github.com/destory1984/the-crown-oddity"))
 	var foot := set_button(col, "놀이로 돌아가기", Vector2(0, 512), Vector2(640, 44), func(): toggle_settings(false))
 	foot.add_theme_font_size_override("font_size", 15)
 	foot.add_theme_color_override("font_color", Color("#eef3ff"))
