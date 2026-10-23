@@ -81,9 +81,9 @@ const CAVE_ROWS := """################################
 #......###........###.......K..#
 #......###........###..........#
 #......###........###..........#
-###.############################
-###.############################
-###.############################
+###..###########################
+###..###########################
+###..###########################
 #........###........##.........#
 #........###........##.........#
 #........###..wwww..##.........#
@@ -91,7 +91,7 @@ const CAVE_ROWS := """################################
 #........###..wwww..##.........#
 #........###........##....B....#
 #........###........##.........#
-####.#################.........#
+####..################.........#
 #.............########.........E
 #.............########.........#
 #...1...2...3.########.........#
@@ -189,7 +189,7 @@ func skip_water(x: float, z: float) -> bool:
 		return castle.char_at(x, z) == "~"
 	if x >= GROTTO.GROTTO_X - 0.5:
 		return grotto.char_at(x, z) == "~"
-	return x < CAVE_X - 0.5 and tile_at(x, z) == WATER and x > 1.0 and z > 1.0 and z < N - 2.0 and (x < N - 2.0 or (z > 17.5 and z < 23.5))
+	return x < CAVE_X - 0.5 and tile_at(x, z) == WATER and x > 1.0 and z > 1.0 and z < N - 2.0 and (x < N - 2.0 or (z > 17.5 and z < 23.5 and x < N - 0.5))
 
 func player_can(x: float, z: float) -> bool:
 	if not walkable(x, z):
@@ -6538,7 +6538,7 @@ func mate_tick(id: String, dt: float) -> bool:
 func update_mate2(dt: float) -> void:
 	if mate2 == null:
 		return
-	mate2.visible = not in_cave
+	mate2.visible = true
 	var me := Vector3(player.x, 0, player.z)
 	if mate2.position.distance_to(me) > 8.0:
 		mate2.position = me + Vector3(1.3, 0, -0.6)
@@ -6572,7 +6572,7 @@ func update_mate2(dt: float) -> void:
 func update_mate(dt: float) -> void:
 	if mate == null:
 		return
-	mate.visible = not in_cave
+	mate.visible = true
 	var me := Vector3(player.x, 0, player.z)
 	if mate.position.distance_to(me) > 8.0:
 		snap_mate()
@@ -7463,20 +7463,26 @@ func enter_cave() -> void:
 	player.x = sp.x
 	player.z = sp.y
 	ground_y = 0.0
-	set_quest("동굴 깊은 곳으로")
+	snap_mates() # companions come down with her
+	quest_before_cave = ui.quest.text if story_step > 7 else ""
+	set_quest("동굴 깊은 곳으로" if story_step <= 7 else "")
 	ui.outside_map = ui.mini.map_tex
 	ui.mini.map_tex = cave_map_tex()
 	ui.zone_name.text = "지하 동굴"
 	ui.zone_sub.text = "벽 그림이 있는 동굴"
 	save_game()
 
+var quest_before_cave := ""
+
 func leave_cave() -> void:
 	in_cave = false
-	story_step = 7
+	var first_time := story_step <= 7
+	story_step = maxi(story_step, 7) # a later visit must not wind the story back
 	player.x = 36.0 # east marsh shore
 	player.z = 20.0
 	ground_y = height_at(player.x, player.z)
-	set_quest("동쪽 강을 물수제비 걸음으로 건너, 마을 불빛을 찾아라")
+	snap_mates()
+	set_quest("동쪽 강을 물수제비 걸음으로 건너, 마을 불빛을 찾아라" if first_time else quest_before_cave)
 	if ui.has("outside_map"):
 		ui.mini.map_tex = ui.outside_map
 	ui.zone_name.text = "갈대늪"
