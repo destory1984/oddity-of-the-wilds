@@ -341,6 +341,7 @@ const SCENES := {
 	"race": {"play": true, "village": true, "hill": true, "race": true, "hour": 10.0},
 	"moonflower": {"play": true, "at": Vector2(37.0, 24.5), "hour": 22.5, "day": 4},
 	"house": {"play": true, "village": true, "house": true, "hour": 15.0},
+	"festival": {"play": true, "village": true, "festival": true, "hour": 22.0, "day": 4},
 	"scrap": {"play": true, "at": Vector2(42.5, 5.5), "hour": 17.0},
 }
 
@@ -510,6 +511,9 @@ func apply_test_args(args: PackedStringArray) -> void:
 			enter_house(4)
 			player.x = HOUSE_X + 5.5
 			player.z = 2.5
+		if sc.get("festival", false): # the lantern festival on a full-moon night
+			mail_got = [true, true, true]
+			errand = 3
 		if sc.get("kid", false): # Kongal's kid goblin trotting after Sora in the south field
 			errand = 3
 			player.x = VILLAGE.VILLAGE_X + 9.0
@@ -2133,6 +2137,45 @@ func deliver(i: int, lines: Array) -> bool:
 	save_game()
 	return true
 
+# ---- the lantern festival: once Simji has his letter, on full-moon nights (moon at least 95% full) sky lanterns
+# drift up over the village; Simji hands out festival rice cakes once (three potions)
+var fest_gift := false
+var fest_seen := false
+var fest_t := 0.0
+
+func festival_now() -> bool:
+	return mail_got[1] and in_village and in_house < 0 and (hour >= 19.0 or hour < 5.0) and moon_phase().x >= 0.95
+
+func update_festival(dt: float) -> void:
+	if not festival_now() or story_open:
+		return
+	if not fest_seen:
+		fest_seen = true
+		toast("보름달 아래 등불 축제가 열렸다")
+	fest_t -= dt
+	if fest_t > 0.0:
+		return
+	fest_t = 0.5
+	var at := Vector3(VILLAGE.VILLAGE_X + rnd(3, 29), rnd(0.5, 1.5), rnd(3, 21))
+	var lamp := box(Vector3(0.24, 0.32, 0.24), glow_mat(Color("#ff9a3a"), 0.7)) # low glow keeps the orange under bloom
+	lamp.position = at
+	add_fx(lamp, 9.0, func(n: Node3D, k: float, d: float):
+		n.position.y += d * 0.7
+		n.position.x += sin(k * 9.0) * d * 0.2
+		n.scale = Vector3.ONE * (1.0 - k * 0.6))
+
+func festival_key() -> bool:
+	if not festival_now() or Vector2(player.x, player.z).distance_to(village.marks.M) > 1.8:
+		return false
+	if fest_gift:
+		show_story("", STORY.FEST_AGAIN)
+		return true
+	fest_gift = true
+	player.pots += 3
+	show_story("", STORY.FESTIVAL)
+	save_game()
+	return true
+
 func spawn_boss() -> void:
 	var spot := Vector2(16, 4)
 	for tries in 40:
@@ -3468,7 +3511,7 @@ func save_game() -> void:
 		"fly_q": fly_q, "flies": marsh.flies.map(func(f): return f.caught),
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
-		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "mail_q": mail_q, "mail_got": mail_got, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes,
+		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "fest_gift": fest_gift, "mail_q": mail_q, "mail_got": mail_got, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes,
 		"castle_q": castle_q, "bars": castle.bars, "levers": castle.levers.map(func(lv): return lv.up), "vault": castle.vault_open, "has_armour": has_armour, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -3598,6 +3641,7 @@ func load_game() -> void:
 	has_acorn = bool(d.get("has_acorn", false))
 	trial_best = float(d.get("trial_best", 0.0))
 	race_best = float(d.get("race_best", 0.0))
+	fest_gift = bool(d.get("fest_gift", false))
 	mail_q = int(d.get("mail_q", 0))
 	var mg: Array = d.get("mail_got", [])
 	for i in mini(mg.size(), mail_got.size()):
@@ -4064,6 +4108,8 @@ func crown_key() -> void:
 		if trial_key():
 			return
 		if me.distance_to(village.marks.M) < 1.8 and deliver(1, STORY.MAIL_SIMJI):
+			return
+		if festival_key():
 			return
 		if me.distance_to(village.marks.M) < 1.8:
 			if errand == 0:
@@ -6434,6 +6480,8 @@ func journal_lines() -> Array:
 		side.call("마을 집 찬장", tr("%d/5 열어 봄") % house_seen.count(true))
 		var done := int(errand >= 3) + int(kid_q >= 3) + int(doran_q >= 3) + int(mul_q >= 3) + int(fly_q >= 3)
 		side.call("마을 심부름", tr("%d/5 마침") % done)
+	if mail_got[1]:
+		side.call("등불 축제", tr("끝") if fest_gift else tr("보름달 밤, 마을 광장의 심지에게"))
 	if mail_q >= 1:
 		side.call("도란의 편지 세 통", tr("끝") if mail_q >= 2 else (tr("도란에게 알리자") if mail_got.count(true) == 3 else tr("%d/3 전함 · 보리 할머니, 심지, 섬 오두막") % mail_got.count(true)))
 	if fly_q >= 1:
@@ -6803,6 +6851,7 @@ func _process(dt: float) -> void:
 	update_trial(dt)
 	update_race(dt)
 	update_fishing(dt)
+	update_festival(dt)
 	feat_t -= dt
 	if feat_t <= 0.0 and not intro:
 		feat_t = 1.0
