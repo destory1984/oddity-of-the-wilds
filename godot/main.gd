@@ -2077,6 +2077,11 @@ func cupboard_key() -> bool:
 const FEATS := [["섬광 피하기 10번", "dodges", 10], ["섬광 막기 10번", "guards", 10], ["치명타 50번", "crits", 50],
 	["괴물 100마리 물리치기", "kills", 100], ["보스 10마리 모두 물리치기", "bosses", 10], ["레벨 15", "level", 15]]
 var stats := {"dodges": 0, "guards": 0, "crits": 0, "kills": 0}
+var play_secs := 0.0         # time spent playing (not on the title, not in shops or talk scenes)
+
+func play_time_text() -> String:
+	var m := int(play_secs) / 60
+	return tr("%d시간 %d분") % [m / 60, m % 60]
 var feats_done := [false, false, false, false, false, false]
 var feat_t := 0.0
 
@@ -3549,7 +3554,7 @@ func save_game() -> void:
 		"fly_q": fly_q, "flies": marsh.flies.map(func(f): return f.caught),
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
-		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "ng": ng, "fest_gift": fest_gift, "mail_q": mail_q, "mail_got": mail_got, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes,
+		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "play_secs": play_secs, "ng": ng, "fest_gift": fest_gift, "mail_q": mail_q, "mail_got": mail_got, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes,
 		"castle_q": castle_q, "bars": castle.bars, "levers": castle.levers.map(func(lv): return lv.up), "vault": castle.vault_open, "has_armour": has_armour, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -3679,6 +3684,7 @@ func load_game() -> void:
 	has_acorn = bool(d.get("has_acorn", false))
 	trial_best = float(d.get("trial_best", 0.0))
 	race_best = float(d.get("race_best", 0.0))
+	play_secs = float(d.get("play_secs", 0.0))
 	ng = int(d.get("ng", 0))
 	fest_gift = bool(d.get("fest_gift", false))
 	mail_q = int(d.get("mail_q", 0))
@@ -6015,7 +6021,8 @@ func mold_breaks() -> void:
 	player.gold += 500
 	gain_xp(400)
 	story_step = 12
-	show_story("res://art/story/12_festival.jpg", STORY.ENDING)
+	var record: String = tr("||여기까지 걸린 시간 %s, 물리친 괴물 %d마리, 이룬 도전 과제 %d/6.") % [play_time_text(), stats.kills, feats_done.count(true)]
+	show_story("res://art/story/12_festival.jpg", STORY.ENDING + [record])
 	set_quest("끝. 다시 돌기 시작한 정원을 거닐자 (정원 한가운데서 E 두 번: 새 바퀴)")
 	save_game()
 
@@ -6555,6 +6562,8 @@ func journal_lines() -> Array:
 		var v := mini(feat_value(FEATS[i][1]), FEATS[i][2])
 		out.append("  · " + tr(FEATS[i][0]) + "  —  " + (tr("완료") if feats_done[i] else "%d/%d" % [v, FEATS[i][2]]))
 	out.append("")
+	out.append(tr("놀이 시간 %s · 물리친 괴물 %d마리") % [play_time_text(), stats.kills])
+	out.append("")
 	out.append(tr("지닌 것"))
 	var keep: Array = []
 	if has_skip: keep.append(tr("물수제비 걸음"))
@@ -6897,6 +6906,8 @@ func _process(dt: float) -> void:
 	update_trial(dt)
 	update_race(dt)
 	update_fishing(dt)
+	if not intro:
+		play_secs += dt
 	ng_armed -= dt
 	update_festival(dt)
 	feat_t -= dt
