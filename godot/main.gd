@@ -2630,6 +2630,7 @@ const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 256분 / 목표 300분 (85%)",
 	"",
 	"2026-10-23 저녁",
+	"· v0.0.5: 상점의 보리 할머니 그림을 440x600 → 220x300(넓이 1/4)으로 줄였다.",
 	"· v0.0.4: 설정 창 글자를 13 → 16px, 단추 글자를 13 → 15px로 키웠다. 긴 설명은 줄을 바꾸고, 글자를 키워 넘치면 굴려 본다. 조작법 창(H)이 글자 크기에 맞춰 넓어진다.",
 	"· v0.0.3: 소리를 끄면 소라가 손가락을 입에 대고 \"쉬잇~\" 한다. 우주 한량의 그림을 가져왔다.",
 	"· v0.0.2: 5장 숲 남쪽 잠든 골짜기(약 12분). 노을이 동료가 된 뒤 빈터 남쪽 회색 문으로 내려간다. 개울을 물수제비로 건너고, 기억 등불 셋으로 노을의 옛 기억을 찾고, 빈 망토(체력 1000)와 싸우고, 그림 문 셋 가운데 해 지는 그림 문에서 한결의 편지와 열셋째 등불을 찾는다. 심지에게 건네면 최대 체력 +15, 금화 150, 노을의 공격 간격 1.4 → 1.1초. 새 괴물 벽돌 고슴도치: 몸을 말면 모든 공격을 막고, 가시를 터뜨린 뒤 1.4초 어지러워 피해를 1.3배 받는다.",
@@ -4296,7 +4297,7 @@ func build_hud() -> void:
 	keeper.flip_h = true # she faces the board
 	keeper.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	shop.add_child(keeper)
-	place(keeper, Control.PRESET_CENTER_LEFT, Vector2(30, -330), Vector2(440, 600))
+	place(keeper, Control.PRESET_CENTER_LEFT, Vector2(30, -30), Vector2(220, 300)) # a quarter of the old 440x600 (the user found it too big, 2026-10-23), feet where they were
 	ui.shop_keeper = keeper
 	var board := Control.new()
 	board.set_script(load("res://frame.gd"))
