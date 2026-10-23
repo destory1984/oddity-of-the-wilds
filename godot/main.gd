@@ -2465,6 +2465,90 @@ var set_tab := 0
 var tilt_rect: ColorRect
 var text_bases: Array = [] # [Label, base size] scaled by the text size setting
 
+# ---- the look shared by the menus, taken from Space Oddity's style.css (the user asked for its menus):
+# navy glass buttons with a thin pale line that brighten under the mouse, gold for what is chosen,
+# dialogs in #091627 with a #53718b line, 14 px corners and a deep shadow. Icons are its line drawings.
+const MENU_GOLD := Color("#f6b951")
+const ODD_INK := Color("#e3efff")
+const ODD_MUTED := Color("#b6cbe0")
+const ICON_SVG := {
+	"help": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#eef3ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke-width="2.4" d="M8.5 9a3.5 3.5 0 1 1 5.3 3c-1.1.7-1.8 1.4-1.8 2.8"/><circle cx="12" cy="18.6" r="0.6" stroke-width="1.6"/></svg>',
+	"journal": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#eef3ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h11a1.5 1.5 0 0 1 1.5 1.5V20H7a2 2 0 0 1 0-4h11.5"/><path d="M5 18V6a2 2 0 0 1 2-2"/><path d="M13 4v6l-1.8-1.3L9.4 10V4"/></svg>',
+	"gear": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#eef3ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5.6"/><circle cx="12" cy="12" r="1.9"/><path d="M12 3.2v3.2M12 17.6v3.2M3.2 12h3.2M17.6 12h3.2M5.8 5.8L8 8M16 16l2.2 2.2M5.8 18.2L8 16M16 8l2.2-2.2"/></svg>',
+	"sound": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#eef3ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3l4.5-3.8v12.6L7 14.5H4z"/><path d="M15 9.2a4 4 0 0 1 0 5.6"/><path d="M17.6 6.6a7.6 7.6 0 0 1 0 10.8"/></svg>',
+	"mute": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#eef3ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3l4.5-3.8v12.6L7 14.5H4z"/><path d="M15.5 9.5l5 5M20.5 9.5l-5 5"/></svg>',
+	"back": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#eef3ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5L8 12l6.5 6.5"/></svg>',
+}
+var menu_theme: Theme
+var icon_cache := {}
+
+func flat(bg: Color, rim: Color, rim_w := 1, radius := 8, pad := 6.0) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	sb.border_color = rim
+	sb.set_border_width_all(rim_w)
+	sb.set_corner_radius_all(radius)
+	sb.content_margin_left = pad + 6
+	sb.content_margin_right = pad + 6
+	sb.content_margin_top = pad
+	sb.content_margin_bottom = pad
+	sb.anti_aliasing = true
+	return sb
+
+func glass_normal() -> StyleBoxFlat:
+	return flat(Color("#0d1a3acc"), Color("#9fb4ff66"))
+
+func glass_hover() -> StyleBoxFlat:
+	return flat(Color("#26456199"), Color("#93d2ff88"))
+
+func glass_chosen() -> StyleBoxFlat:
+	return flat(Color("#0d1a3acc"), MENU_GOLD)
+
+func get_menu_theme() -> Theme:
+	if menu_theme != null:
+		return menu_theme
+	menu_theme = Theme.new()
+	menu_theme.set_stylebox("normal", "Button", glass_normal())
+	menu_theme.set_stylebox("hover", "Button", glass_hover())
+	menu_theme.set_stylebox("pressed", "Button", glass_hover())
+	menu_theme.set_stylebox("disabled", "Button", flat(Color("#0d1a3a73"), Color("#9fb4ff2a")))
+	menu_theme.set_stylebox("focus", "Button", StyleBoxEmpty.new())
+	menu_theme.set_color("font_color", "Button", ODD_INK)
+	menu_theme.set_color("font_hover_color", "Button", Color.WHITE)
+	menu_theme.set_color("font_pressed_color", "Button", Color.WHITE)
+	menu_theme.set_color("font_disabled_color", "Button", Color(0.89, 0.94, 1.0, 0.45))
+	menu_theme.set_font("font", "Button", ui_font)
+	menu_theme.set_font_size("font_size", "Button", 13)
+	return menu_theme
+
+func odd_icon(kind: String) -> ImageTexture:
+	if icon_cache.has(kind):
+		return icon_cache[kind]
+	var img := Image.new()
+	img.load_svg_from_string(ICON_SVG[kind], 2.0) # 48 px, drawn at 22 - 24 px on screen like Space Oddity's
+	var tex := ImageTexture.create_from_image(img)
+	icon_cache[kind] = tex
+	return tex
+
+func menu_panel(root: Control, pos: Vector2, size: Vector2, anchor: int) -> Panel:
+	var p := panel(root, pos, size, anchor)
+	var sb := flat(Color("#091627"), Color("#53718b"), 1, 14, 0.0)
+	sb.shadow_color = Color(0, 0, 0, 0.53)
+	sb.shadow_size = 24
+	sb.shadow_offset = Vector2(0, 12)
+	p.add_theme_stylebox_override("panel", sb)
+	p.theme = get_menu_theme()
+	return p
+
+# a thin pale rule
+func menu_rule(parent: Control, pos: Vector2, width: float) -> void:
+	var r := ColorRect.new()
+	r.color = Color("#9fb4ff33")
+	r.position = pos
+	r.size = Vector2(width, 1)
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(r)
+
 func load_settings() -> void:
 	if not FileAccess.file_exists(SETTINGS_PATH):
 		return
@@ -2489,25 +2573,28 @@ func apply_settings() -> void:
 		tilt_rect.visible = bool(cfg.tilt)
 	var k: float = TEXT_SIZES[int(cfg.text)]
 	for tb in text_bases:
-		(tb[0] as Label).add_theme_font_size_override("font_size", int(round(tb[1] * k)))
+		var c: Control = tb[0]
+		c.add_theme_font_size_override("normal_font_size" if c is RichTextLabel else "font_size", int(round(tb[1] * k)))
 	refresh_sound_btn()
 	if ui.has("set_rows"):
 		for key in ui.set_rows:
 			var b: Button = ui.set_rows[key]
 			var on: bool = (not muted) if key == "sound" else bool(cfg[key])
 			b.text = tr("켜짐") if on else tr("꺼짐")
-			b.modulate = Color.WHITE if on else Color(0.6, 0.6, 0.65)
+			# Space Oddity: a pressed button gets a gold rim and gold text
+			b.add_theme_stylebox_override("normal", glass_chosen() if on else glass_normal())
+			b.add_theme_color_override("font_color", MENU_GOLD if on else ODD_INK)
 		ui.set_minus.disabled = int(cfg.text) <= 0
 		ui.set_plus.disabled = int(cfg.text) >= TEXT_SIZES.size() - 1
 
-func scale_text(l: Label) -> void:
-	text_bases.append([l, l.get_theme_font_size("font_size")])
+func scale_text(l: Control) -> void:
+	text_bases.append([l, l.get_theme_font_size("normal_font_size" if l is RichTextLabel else "font_size")])
 
 func set_button(parent: Control, text: String, pos: Vector2, size: Vector2, fn: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.add_theme_font_override("font", ui_font)
-	b.add_theme_font_size_override("font_size", 15)
+	b.add_theme_font_size_override("font_size", 13)
 	b.position = pos
 	b.size = size
 	b.focus_mode = Control.FOCUS_NONE
@@ -2515,74 +2602,116 @@ func set_button(parent: Control, text: String, pos: Vector2, size: Vector2, fn: 
 	parent.add_child(b)
 	return b
 
+# Space Oddity's settings sheet: the whole screen in #0d1a3a, a back arrow 8 px from the corner, and a column at most
+# 640 px wide: the head (title at left, sound and 가- 가+ at right), four equal tabs, the page as label rows with the
+# description beside and a small button under it, and the way back at the foot
 func build_settings(root: Control) -> void:
-	var sp := panel(root, Vector2(-330, -260), Vector2(660, 520), Control.PRESET_CENTER)
+	var sp := Panel.new()
+	sp.set_anchors_preset(Control.PRESET_FULL_RECT)
+	sp.add_theme_stylebox_override("panel", flat(Color("#0d1a3a"), Color(0, 0, 0, 0), 0, 0))
+	sp.theme = get_menu_theme()
 	sp.mouse_filter = Control.MOUSE_FILTER_STOP
-	(sp.get_theme_stylebox("panel") as StyleBoxFlat).bg_color = Color("#0d1a3a")
-	label(sp, "설정", Vector2(20, 14), 22, Color("#f6d27a"))
-	ui.set_sound = set_button(sp, "효과음", Vector2(330, 14), Vector2(90, 30), func(): toggle_sound(); save_settings(); apply_settings())
-	ui.set_minus = set_button(sp, "가−", Vector2(430, 14), Vector2(56, 30), func(): cfg.text = maxi(0, int(cfg.text) - 1); save_settings(); apply_settings())
-	ui.set_plus = set_button(sp, "가+", Vector2(492, 14), Vector2(56, 30), func(): cfg.text = mini(TEXT_SIZES.size() - 1, int(cfg.text) + 1); save_settings(); apply_settings())
-	set_button(sp, "X", Vector2(616, 14), Vector2(30, 30), func(): toggle_settings(false))
+	root.add_child(sp)
+	var back := Button.new()
+	back.icon = odd_icon("back")
+	back.expand_icon = true
+	back.focus_mode = Control.FOCUS_NONE
+	back.position = Vector2(8, 8)
+	back.size = Vector2(44, 44)
+	back.pressed.connect(func(): toggle_settings(false))
+	sp.add_child(back)
+	var col := Control.new() # the 640 px column, centred
+	col.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	col.offset_left = -320
+	col.offset_right = 320
+	col.offset_top = 54
+	col.offset_bottom = 54 + 560
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	sp.add_child(col)
+	var h1 := label(col, "설정", Vector2(0, 2), 24, ODD_INK)
+	h1.size = Vector2(300, 40)
+	ui.set_sound = Button.new()
+	ui.set_sound.icon = odd_icon("sound")
+	ui.set_sound.expand_icon = true
+	ui.set_sound.focus_mode = Control.FOCUS_NONE
+	ui.set_sound.tooltip_text = tr("효과음") + " (M)"
+	ui.set_sound.position = Vector2(640 - 44 * 3 - 16, 0)
+	ui.set_sound.size = Vector2(44, 40)
+	ui.set_sound.pressed.connect(func(): toggle_sound(); apply_settings())
+	col.add_child(ui.set_sound)
+	ui.set_minus = set_button(col, "가−", Vector2(640 - 44 * 2 - 8, 0), Vector2(44, 40), func(): cfg.text = maxi(0, int(cfg.text) - 1); save_settings(); apply_settings())
+	ui.set_plus = set_button(col, "가+", Vector2(640 - 44, 0), Vector2(44, 40), func(): cfg.text = mini(TEXT_SIZES.size() - 1, int(cfg.text) + 1); save_settings(); apply_settings())
 	var tabs := ["설정", "도움말", "바뀐 것", "만든 이"]
 	ui.set_tabs = []
 	ui.set_pages = []
+	var tw := (640.0 - 8 * 3) / 4.0
 	for i in tabs.size():
-		var tb := set_button(sp, tabs[i], Vector2(20 + i * 156, 58), Vector2(150, 32), func(): show_set_tab(i))
+		var tb := set_button(col, tabs[i], Vector2(i * (tw + 8), 54), Vector2(tw, 38), func(): show_set_tab(i))
 		ui.set_tabs.append(tb)
 		var page := Control.new()
-		page.position = Vector2(20, 104)
-		page.size = Vector2(620, 360)
+		page.position = Vector2(0, 106)
+		page.size = Vector2(640, 400)
 		page.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		sp.add_child(page)
+		col.add_child(page)
 		ui.set_pages.append(page)
-	# 설정: comfort and display
+	# 설정: rows of label (90 px) and description with a small button under it
 	ui.set_rows = {}
 	var rows := [["shake", "화면 흔들림", "벨 때와 보스가 내려찍을 때 화면이 흔들린다. 어지러우면 끄세요."],
 		["tilt", "미니어처 흐림", "화면 위아래를 흐리게 하고 색을 입혀 작은 정원처럼 보이게 한다. 흐린 게 불편하면 끄세요."],
 		["nums", "피해 숫자", "때리고 맞을 때 숫자를 띄운다. 공격 직전의 \"!\" 표시는 늘 보인다."],
-		["sound", "효과음", "M 키나 화면 왼쪽 아래 단추로도 켜고 끈다."]]
+		["sound", "효과음", "위의 스피커 단추, M 키, 화면 왼쪽 아래 단추로도 켜고 끈다."]]
 	for i in rows.size():
 		var r: Array = rows[i]
-		var y := i * 74
-		var t := label(ui.set_pages[0], r[1], Vector2(0, y), 17, Color("#f6d27a"))
-		scale_text(t)
-		var dsc := label(ui.set_pages[0], r[2], Vector2(0, y + 26), 13, Color("#c9bfa6"))
-		dsc.size = Vector2(500, 40)
+		var y := i * 92
+		var t := label(ui.set_pages[0], r[1], Vector2(0, y), 13, Color("#eef3ff"))
+		t.add_theme_font_override("font", ui_font)
+		t.size = Vector2(90, 20)
+		var dsc := label(ui.set_pages[0], r[2], Vector2(106, y), 13, ODD_MUTED)
+		dsc.size = Vector2(534, 36)
 		dsc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		scale_text(dsc)
 		var key: String = r[0]
-		ui.set_rows[key] = set_button(ui.set_pages[0], "켜짐", Vector2(530, y + 4), Vector2(86, 30), func():
+		ui.set_rows[key] = set_button(ui.set_pages[0], "켜짐", Vector2(106, y + 42), Vector2(74, 34), func():
 			if key == "sound":
 				toggle_sound()
 			else:
 				cfg[key] = not bool(cfg[key])
 			save_settings()
 			apply_settings())
-	var lang := label(ui.set_pages[0], "언어 · 한국어 (다른 언어는 번역 표만 준비되어 있다)", Vector2(0, 4 * 74 + 6), 13, Color("#a99d84"))
-	lang.size = Vector2(600, 20)
-	# 도움말: controls
-	var help_lines := ["WASD / 방향키 — 이동, Shift — 달리기 (물수제비 걸음을 얻으면 물 위도)", "J / 왼쪽 클릭 — 베기,  K / 오른쪽 클릭 — 구르기,  L — 막기",
-		"U I O / 1 2 3 — 기술,  4 — 회복약", "E — 왕관: 말 걸기, 등불, 벽돌 풀기, 길돌, 낚시",
-		"Space — 상자 열기, 집 들어가기", "Q — 일지,  H — 조작법,  M — 소리,  T — 3시간 보내기", "Z X / 휠 — 확대·축소,  F8 — 처음 자리로,  F9 — 처음부터",
-		"Esc — 이 설정 창 열고 닫기", "", "맞기 직전에 구르면 섬광 피하기, 막으면 섬광 막기. 괴물은 때리기 전에 빨갛게 부풀고 \"!\"가 뜬다."]
-	var hl := label(ui.set_pages[1], "\n".join(help_lines), Vector2(0, 0), 14, Color("#e9dfc4"))
-	hl.size = Vector2(620, 350)
-	hl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	scale_text(hl)
+	var lt := label(ui.set_pages[0], "언어", Vector2(0, 4 * 92), 13, Color("#eef3ff"))
+	lt.size = Vector2(90, 20)
+	var lang := label(ui.set_pages[0], "한국어. 영어, 일본어, 중국어는 번역 표만 준비되어 있다.", Vector2(106, 4 * 92), 13, ODD_MUTED)
+	lang.size = Vector2(534, 20)
+	# 도움말
+	var help_rows := [["이동", "WASD, 방향키. Shift로 달린다 (물수제비 걸음을 얻으면 물 위도)"], ["싸움", "J 또는 왼쪽 클릭 베기, K 또는 오른쪽 클릭 구르기, L 막기"],
+		["기술", "U I O 또는 1 2 3, 회복약은 4"], ["왕관", "E: 말 걸기, 등불, 벽돌 풀기, 길돌, 낚시"], ["열기", "Space: 상자, 집. Q 일지, H 조작법, M 소리, T 3시간 보내기"],
+		["화면", "Z X 또는 휠로 확대·축소. F8 처음 자리로, F9 처음부터. Esc 이 창"], ["요령", "맞기 직전에 구르면 섬광 피하기, 막으면 섬광 막기. 괴물은 때리기 전에 빨갛게 부풀고 \"!\"가 뜬다"]]
+	for i in help_rows.size():
+		var ht := label(ui.set_pages[1], help_rows[i][0], Vector2(0, i * 48), 13, Color("#eef3ff"))
+		ht.size = Vector2(90, 20)
+		var hd := label(ui.set_pages[1], help_rows[i][1], Vector2(106, i * 48), 13, ODD_MUTED)
+		hd.size = Vector2(534, 40)
+		hd.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		scale_text(hd)
 	# 바뀐 것
-	var news := label(ui.set_pages[2], "\n".join(CHANGES), Vector2(0, 0), 13, Color("#e9dfc4"))
-	news.size = Vector2(620, 350)
+	var news := label(ui.set_pages[2], "\n".join(CHANGES), Vector2(0, 0), 13, ODD_MUTED)
+	news.size = Vector2(640, 400)
 	news.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	scale_text(news)
 	# 만든 이
-	var about := label(ui.set_pages[3], "\n".join(["The Crown Oddity", "",
-		"만든 사람 · destory1984 (그림 주문, 기획), Claude (코드)", "그림 · GPT 이미지 생성. 소라의 쉬는 몸짓은 같은 작가의 우주 한량에서 가져왔다.",
-		"글꼴 · Pretendard (SIL 오픈 폰트 라이선스 1.1)", "코드 · MIT 라이선스. 소라 캐릭터와 제목 그림은 destory1984의 것이다."]), Vector2(0, 0), 14, Color("#e9dfc4"))
-	about.size = Vector2(620, 220)
-	about.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	scale_text(about)
-	set_button(ui.set_pages[3], "깃허브에서 보기", Vector2(0, 230), Vector2(170, 32), func(): OS.shell_open("https://github.com/destory1984/oddity-of-the-wilds"))
-	set_button(sp, "놀이로 돌아가기", Vector2(230, 472), Vector2(200, 34), func(): toggle_settings(false))
+	var about_rows := [["만든 사람", "destory1984 (기획, 그림 주문), Claude (코드)"], ["그림", "GPT 이미지 생성. 소라의 쉬는 몸짓과 이 창의 모양은 같은 작가의 우주 한량에서 가져왔다"],
+		["글꼴", "Pretendard (SIL 오픈 폰트 라이선스 1.1)"], ["라이선스", "코드는 MIT. 소라 캐릭터와 제목 그림은 destory1984의 것이다"]]
+	for i in about_rows.size():
+		var at := label(ui.set_pages[3], about_rows[i][0], Vector2(0, i * 48), 13, Color("#eef3ff"))
+		at.size = Vector2(90, 20)
+		var ad := label(ui.set_pages[3], about_rows[i][1], Vector2(106, i * 48), 13, ODD_MUTED)
+		ad.size = Vector2(534, 40)
+		ad.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		scale_text(ad)
+	var ct := label(ui.set_pages[3], "만든 코드", Vector2(0, 4 * 48), 13, Color("#eef3ff"))
+	ct.size = Vector2(90, 20)
+	set_button(ui.set_pages[3], "깃허브에서 보기", Vector2(106, 4 * 48 - 6), Vector2(150, 36), func(): OS.shell_open("https://github.com/destory1984/oddity-of-the-wilds"))
+	set_button(col, "놀이로 돌아가기", Vector2(0, 514), Vector2(640, 42), func(): toggle_settings(false))
 	sp.visible = false
 	ui.settings = sp
 	show_set_tab(0)
@@ -2592,8 +2721,8 @@ func show_set_tab(i: int) -> void:
 	for k in ui.set_pages.size():
 		ui.set_pages[k].visible = k == i
 		var tb: Button = ui.set_tabs[k]
-		tb.add_theme_color_override("font_color", Color("#f6d27a") if k == i else Color("#c9bfa6"))
-		tb.modulate = Color.WHITE if k == i else Color(0.8, 0.8, 0.85)
+		tb.add_theme_color_override("font_color", MENU_GOLD if k == i else ODD_INK) # aria-selected: gold rim, gold text
+		tb.add_theme_stylebox_override("normal", glass_chosen() if k == i else glass_normal())
 
 func toggle_settings(show: bool) -> void:
 	settings_open = show
@@ -2804,79 +2933,25 @@ func update_mate_hud() -> void:
 		else:
 			r.act.text = tr("싸우는 중") if fighting else tr("따라가는 중")
 
-# ---- round icon buttons for the bottom-left row (the font has no icon glyphs, so the icons are drawn here)
-const ICON_GOLD := Color("#f2d27a")
-
-func icon_tex(kind: String) -> ImageTexture:
-	var n := 24
-	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
-	img.fill(Color(0, 0, 0, 0))
-	var dot := func(x: int, y: int, col := ICON_GOLD): if x >= 0 and y >= 0 and x < n and y < n: img.set_pixel(x, y, col)
-	var rect := func(x0: int, y0: int, w: int, h: int, col := ICON_GOLD): # lambdas copy outer vars, so colour is an argument
-		for y in range(y0, y0 + h):
-			for x in range(x0, x0 + w):
-				dot.call(x, y, col)
-	match kind:
-		"help": # a question mark
-			rect.call(8, 4, 8, 2)
-			rect.call(15, 5, 2, 5)
-			rect.call(7, 5, 2, 3)
-			rect.call(12, 10, 4, 2)
-			rect.call(11, 12, 2, 4)
-			rect.call(11, 18, 2, 2)
-		"sound", "mute": # a speaker, with waves or a cross
-			rect.call(4, 9, 4, 6)
-			for k in 6:
-				rect.call(8 + k, 9 - k, 1, 6 + k * 2)
-			if kind == "sound":
-				rect.call(16, 10, 1, 4)
-				rect.call(18, 8, 1, 8)
-				rect.call(20, 6, 1, 12)
-			else:
-				for k in 7:
-					dot.call(15 + k, 9 + k)
-					dot.call(21 - k, 9 + k)
-		"journal": # a closed book with a ribbon
-			rect.call(6, 4, 13, 16)
-			rect.call(8, 6, 9, 1, Color("#10142a"))
-			rect.call(8, 9, 9, 1, Color("#10142a"))
-			rect.call(8, 12, 6, 1, Color("#10142a"))
-			rect.call(7, 4, 1, 16, Color("#b89a50"))
-			rect.call(14, 16, 2, 6, Color("#d8607a"))
-		"gear": # a cog: ring, eight teeth, a hole
-			var ctr := Vector2(11.5, 11.5)
-			for y in n:
-				for x in n:
-					var d := Vector2(x, y).distance_to(ctr)
-					var a := atan2(y - ctr.y, x - ctr.x)
-					var tooth := fmod(a + TAU + PI / 8.0, PI / 4.0) < PI / 8.0
-					if (d <= 7.5 and d >= 3.2) or (tooth and d <= 10.0 and d > 7.0):
-						dot.call(x, y)
-	return ImageTexture.create_from_image(img)
-
+# ---- the bottom-left buttons: Space Oddity's 44 px glass squares with its line icons; the key is in the tooltip
 func icon_button(root: Control, kind: String, key: String, tip: String, x: float, fn: Callable) -> Button:
 	var b := Button.new()
-	b.icon = icon_tex(kind)
+	b.icon = odd_icon(kind)
 	b.expand_icon = true
 	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	b.tooltip_text = tr(tip)
+	b.tooltip_text = tr(tip) + " (" + key + ")"
 	b.focus_mode = Control.FOCUS_NONE
+	b.theme = get_menu_theme()
 	for st in ["normal", "hover", "pressed"]:
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color(0.063, 0.078, 0.165, 0.9) if st != "hover" else Color(0.12, 0.14, 0.26, 0.95)
-		sb.border_color = Color(0.86, 0.72, 0.38, 0.9)
-		sb.set_border_width_all(2)
-		sb.set_corner_radius_all(22)
-		sb.content_margin_left = 10
-		sb.content_margin_right = 10
-		sb.content_margin_top = 10
-		sb.content_margin_bottom = 10
+		var sb: StyleBoxFlat = glass_hover() if st != "normal" else glass_normal()
+		sb.content_margin_left = 11
+		sb.content_margin_right = 11
+		sb.content_margin_top = 11
+		sb.content_margin_bottom = 11
 		b.add_theme_stylebox_override(st, sb)
-	place(b, Control.PRESET_BOTTOM_LEFT, Vector2(x, -62), Vector2(44, 44))
+	place(b, Control.PRESET_BOTTOM_LEFT, Vector2(x, -58), Vector2(44, 44))
 	b.pressed.connect(fn)
 	root.add_child(b)
-	var k := label(b, key, Vector2(31, 30), 10, Color("#c9bfa6")) # the key, small in the corner
-	k.size = Vector2(20, 14)
 	return b
 
 func spawn_boss() -> void:
@@ -3887,7 +3962,7 @@ func build_hud() -> void:
 	ui.gold = label(gold, "◆ 0", Vector2(10, 4), 14, Color("#ffd84a"))
 
 	# controls help, starts hidden; H or the button toggles it
-	var help := panel(root, Vector2(14, -513), Vector2(340, 461), Control.PRESET_BOTTOM_LEFT) # ends above the buttons
+	var help := menu_panel(root, Vector2(14, -530), Vector2(340, 461), Control.PRESET_BOTTOM_LEFT) # ends above the buttons
 	help.mouse_filter = Control.MOUSE_FILTER_STOP
 	label(help, "조작법", Vector2(14, 8), 12, Color("#a99d84"))
 	var rows := [["WASD / 방향키", "이동"], ["Shift", "달리기"], ["J / 왼쪽 클릭", "공격 (연속기)"], ["K / 오른쪽 클릭", "구르기 (때맞추면 섬광)"], ["L / 가운데 클릭", "막기 (때맞추면 반격, Lv4부터 1초 모아 J)"],
@@ -3905,19 +3980,12 @@ func build_hud() -> void:
 	help.visible = false
 	ui.help = help
 	# the journal (Q): what to do now, the side stories found so far and the keepsakes Sora carries
-	var journal := panel(root, Vector2(14, -513), Vector2(740, 461), Control.PRESET_BOTTOM_LEFT)
+	var journal := menu_panel(root, Vector2(14, -530), Vector2(740, 461), Control.PRESET_BOTTOM_LEFT)
 	journal.mouse_filter = Control.MOUSE_FILTER_STOP
 	label(journal, "일지", Vector2(14, 8), 12, Color("#a99d84"))
-	var jt := label(journal, "", Vector2(14, 34), 13, Color("#e9dfc4"))
-	jt.size = Vector2(380, 420)
-	jt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	jt.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED # each line is translated as it is built
-	ui.journal_text = jt
-	var jt2 := label(journal, "", Vector2(410, 34), 13, Color("#e9dfc4")) # the right column: feats and keepsakes
-	jt2.size = Vector2(316, 420)
-	jt2.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	jt2.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
-	ui.journal_text2 = jt2
+	menu_rule(journal, Vector2(14, 28), 712)
+	ui.journal_text = journal_column(journal, Vector2(14, 36), Vector2(380, 415))
+	ui.journal_text2 = journal_column(journal, Vector2(410, 36), Vector2(316, 415)) # the right column: feats and keepsakes
 	var jclose := Button.new()
 	jclose.text = "X"
 	jclose.add_theme_font_override("font", ui_font)
@@ -3927,7 +3995,7 @@ func build_hud() -> void:
 	journal.add_child(jclose)
 	journal.visible = false
 	ui.journal = journal
-	var ways := panel(root, Vector2(14, -333), Vector2(330, 220), Control.PRESET_BOTTOM_LEFT)
+	var ways := menu_panel(root, Vector2(14, -350), Vector2(330, 220), Control.PRESET_BOTTOM_LEFT)
 	var wt := label(ways, "", Vector2(16, 12), 15, Color("#e9dfc4"))
 	wt.size = Vector2(300, 200)
 	wt.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
@@ -3935,7 +4003,7 @@ func build_hud() -> void:
 	ways.visible = false
 	ui.ways = ways
 	ui.hint = icon_button(root, "help", "H", "조작법", 14, func(): toggle_help(true))
-	ui.sound_btn = icon_button(root, "sound", "M", "소리 켜고 끄기", 66, toggle_sound)
+	ui.sound_btn = icon_button(root, "sound", "M", "효과음", 66, toggle_sound)
 	refresh_sound_btn()
 	ui.journal_btn = icon_button(root, "journal", "Q", "일지", 118, func(): toggle_journal(not ui.journal.visible))
 	ui.settings_btn = icon_button(root, "gear", "Esc", "설정", 170, func(): toggle_settings(not settings_open))
@@ -7376,8 +7444,11 @@ func toggle_sound() -> void:
 	refresh_sound_btn()
 
 func refresh_sound_btn() -> void:
-	ui.sound_btn.icon = icon_tex("mute" if muted else "sound")
-	ui.sound_btn.modulate = Color(0.75, 0.75, 0.8) if muted else Color.WHITE
+	ui.sound_btn.icon = odd_icon("mute" if muted else "sound")
+	ui.sound_btn.modulate = Color(1, 1, 1, 0.6) if muted else Color.WHITE # .soundKeys button.off { opacity:.6 }
+	if ui.has("set_sound"):
+		ui.set_sound.icon = odd_icon("mute" if muted else "sound")
+		ui.set_sound.modulate = Color(1, 1, 1, 0.6) if muted else Color.WHITE
 
 func toggle_help(show: bool) -> void:
 	if show:
@@ -7385,13 +7456,43 @@ func toggle_help(show: bool) -> void:
 	ui.help.visible = show
 	ui.hint.visible = not show
 
+# one journal column: rich text so headings can be gold; each line is translated as it is built
+func journal_column(parent: Control, pos: Vector2, size: Vector2) -> RichTextLabel:
+	var r := RichTextLabel.new()
+	r.bbcode_enabled = true
+	r.position = pos
+	r.size = size
+	r.scroll_active = false
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	r.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	r.add_theme_font_override("normal_font", ui_font)
+	r.add_theme_font_size_override("normal_font_size", 13)
+	r.add_theme_color_override("default_color", Color("#e9dfc4"))
+	parent.add_child(r)
+	return r
+
+const JOURNAL_HEADS := ["지금 할 일", "곁이야기", "도전 과제", "지닌 것"]
+
+func journal_bbcode(lines: Array) -> String:
+	var heads := JOURNAL_HEADS.map(func(h): return tr(h))
+	var out: Array = []
+	for l in lines:
+		var line: String = String(l).replace("[", "[lb]")
+		if l in heads:
+			out.append("[color=#f6d27a][font_size=15]%s[/font_size][/color]" % line)
+		elif String(l).ends_with(tr("완료")) or String(l).ends_with(tr("끝")):
+			out.append("[color=#9fd8a0]%s[/color]" % line)
+		else:
+			out.append(line)
+	return "\n".join(out)
+
 func toggle_journal(show: bool) -> void:
 	if show:
 		ui.help.visible = false
 		var lines: Array = journal_lines()
 		var cut: int = lines.find(tr("도전 과제"))
-		ui.journal_text.text = "\n".join(lines.slice(0, cut))
-		ui.journal_text2.text = "\n".join(lines.slice(cut))
+		ui.journal_text.text = journal_bbcode(lines.slice(0, cut))
+		ui.journal_text2.text = journal_bbcode(lines.slice(cut))
 	ui.journal.visible = show
 
 # one line per thing: the current quest, each side story once it has been found, and the keepsakes
