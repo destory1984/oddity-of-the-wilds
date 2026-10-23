@@ -340,6 +340,7 @@ const SCENES := {
 	"cage": {"play": true, "village": true, "forest": true, "cage": true, "hour": 14.0},
 	"race": {"play": true, "village": true, "hill": true, "race": true, "hour": 10.0},
 	"moonflower": {"play": true, "at": Vector2(37.0, 24.5), "hour": 22.5, "day": 4},
+	"house": {"play": true, "village": true, "house": true, "hour": 15.0},
 	"scrap": {"play": true, "at": Vector2(42.5, 5.5), "hour": 17.0},
 }
 
@@ -505,6 +506,10 @@ func apply_test_args(args: PackedStringArray) -> void:
 			trial_wave = 3
 			trial_start = t
 			spawn_trial_wave()
+		if sc.get("house", false): # inside the last village house
+			enter_house(4)
+			player.x = HOUSE_X + 5.5
+			player.z = 2.5
 		if sc.get("kid", false): # Kongal's kid goblin trotting after Sora in the south field
 			errand = 3
 			player.x = VILLAGE.VILLAGE_X + 9.0
@@ -2064,6 +2069,35 @@ func cupboard_key() -> bool:
 	save_game()
 	return true
 
+# ---- feats: six long goals listed in the journal; each gives 50 gold the moment it is reached
+const FEATS := [["섬광 피하기 10번", "dodges", 10], ["섬광 막기 10번", "guards", 10], ["치명타 50번", "crits", 50],
+	["괴물 100마리 물리치기", "kills", 100], ["보스 10마리 모두 물리치기", "bosses", 10], ["레벨 15", "level", 15]]
+var stats := {"dodges": 0, "guards": 0, "crits": 0, "kills": 0}
+var feats_done := [false, false, false, false, false, false]
+var feat_t := 0.0
+
+func bosses_beaten() -> int:
+	var king := story_step >= 5
+	return int(king) + int(has_skip) + int(night_q >= 4) + int(forest_q >= 3) + int(lake_q >= 4) + int(grotto_q >= 3) \
+		+ int(hill_q >= 3) + int(cloud_q >= 3) + int(castle_q >= 3) + int(garden_q >= 5)
+
+func feat_value(key: String) -> int:
+	match key:
+		"bosses": return bosses_beaten()
+		"level": return player.lv
+	return int(stats.get(key, 0))
+
+func check_feats() -> void:
+	for i in FEATS.size():
+		if not feats_done[i] and feat_value(FEATS[i][1]) >= FEATS[i][2]:
+			feats_done[i] = true
+			player.gold += 50
+			toast(tr("도전 과제: %s (금화 +50)") % tr(FEATS[i][0]))
+			sfx(784, 0.15, "triangle", 0.22)
+			get_tree().create_timer(0.15).timeout.connect(func(): sfx(1046, 0.25, "triangle", 0.22))
+			save_game()
+			return # one at a time, so each toast is seen
+
 func spawn_boss() -> void:
 	var spot := Vector2(16, 4)
 	for tries in 40:
@@ -2312,6 +2346,8 @@ func damage_enemy(e: Dictionary, amt: float, from: Vector2, kb := 4.0, force_cri
 			sfx(700, 0.06, "square", 0.15, -300)
 			return
 	var crit := force_crit or rng.randf() < (0.25 if has_ring else 0.15)
+	if crit:
+		stats.crits += 1
 	if (e.get("boss", false) or e.get("mole", false)) and e.get("stun", 0.0) > 0.0:
 		amt *= 1.5
 	var dmg := int(round(amt * rnd(0.85, 1.15) * (1.0 if force_crit else (1.8 if crit else 1.0))))
@@ -2335,6 +2371,7 @@ func damage_enemy(e: Dictionary, amt: float, from: Vector2, kb := 4.0, force_cri
 	if e.hp <= 0:
 		e.dead = true
 		e.respawn = 8.0
+		stats.kills += 1
 		e.node.queue_free()
 		e.shadow.queue_free()
 		burst(Vector3(e.x, y + 0.4, e.z), Color("#ff9a4a"), 26, 3.5)
@@ -3064,18 +3101,23 @@ func build_hud() -> void:
 	help.visible = false
 	ui.help = help
 	# the journal (Q): what to do now, the side stories found so far and the keepsakes Sora carries
-	var journal := panel(root, Vector2(14, -513), Vector2(400, 461), Control.PRESET_BOTTOM_LEFT)
+	var journal := panel(root, Vector2(14, -513), Vector2(740, 461), Control.PRESET_BOTTOM_LEFT)
 	journal.mouse_filter = Control.MOUSE_FILTER_STOP
 	label(journal, "일지", Vector2(14, 8), 12, Color("#a99d84"))
-	var jt := label(journal, "", Vector2(14, 34), 14, Color("#e9dfc4"))
-	jt.size = Vector2(372, 420)
+	var jt := label(journal, "", Vector2(14, 34), 13, Color("#e9dfc4"))
+	jt.size = Vector2(380, 420)
 	jt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	jt.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED # each line is translated as it is built
 	ui.journal_text = jt
+	var jt2 := label(journal, "", Vector2(410, 34), 13, Color("#e9dfc4")) # the right column: feats and keepsakes
+	jt2.size = Vector2(316, 420)
+	jt2.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	jt2.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	ui.journal_text2 = jt2
 	var jclose := Button.new()
 	jclose.text = "X"
 	jclose.add_theme_font_override("font", ui_font)
-	jclose.position = Vector2(370, 6)
+	jclose.position = Vector2(710, 6)
 	jclose.size = Vector2(24, 24)
 	jclose.pressed.connect(func(): toggle_journal(false))
 	journal.add_child(jclose)
@@ -3389,7 +3431,7 @@ func save_game() -> void:
 		"fly_q": fly_q, "flies": marsh.flies.map(func(f): return f.caught),
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
-		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes,
+		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes,
 		"castle_q": castle_q, "bars": castle.bars, "levers": castle.levers.map(func(lv): return lv.up), "vault": castle.vault_open, "has_armour": has_armour, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -3519,6 +3561,12 @@ func load_game() -> void:
 	has_acorn = bool(d.get("has_acorn", false))
 	trial_best = float(d.get("trial_best", 0.0))
 	race_best = float(d.get("race_best", 0.0))
+	var st: Dictionary = d.get("stats", {})
+	for k in stats:
+		stats[k] = int(st.get(k, 0))
+	var fd: Array = d.get("feats", [])
+	for i in mini(fd.size(), feats_done.size()):
+		feats_done[i] = bool(fd[i])
 	var hs: Array = d.get("houses", [])
 	for i in mini(hs.size(), house_seen.size()):
 		house_seen[i] = bool(hs[i])
@@ -6311,7 +6359,10 @@ func toggle_help(show: bool) -> void:
 func toggle_journal(show: bool) -> void:
 	if show:
 		ui.help.visible = false
-		ui.journal_text.text = "\n".join(journal_lines())
+		var lines: Array = journal_lines()
+		var cut: int = lines.find(tr("도전 과제"))
+		ui.journal_text.text = "\n".join(lines.slice(0, cut))
+		ui.journal_text2.text = "\n".join(lines.slice(cut))
 	ui.journal.visible = show
 
 # one line per thing: the current quest, each side story once it has been found, and the keepsakes
@@ -6354,6 +6405,11 @@ func journal_lines() -> Array:
 		side.call("성의 보물고", tr("끝") if castle.vault_open else (tr("상자를 열자") if castle.vault_solved() else tr("경비실의 지렛대 셋")))
 	if night_q >= 4:
 		side.call("달빛 시련", tr("최고 기록 %d분 %02d초") % [int(trial_best) / 60, int(trial_best) % 60] if trial_best > 0.0 else tr("마을 남서쪽 돌 둘레에서"))
+	out.append("")
+	out.append(tr("도전 과제"))
+	for i in FEATS.size():
+		var v := mini(feat_value(FEATS[i][1]), FEATS[i][2])
+		out.append("  · " + tr(FEATS[i][0]) + "  —  " + (tr("완료") if feats_done[i] else "%d/%d" % [v, FEATS[i][2]]))
 	out.append("")
 	out.append(tr("지닌 것"))
 	var keep: Array = []
@@ -6697,6 +6753,10 @@ func _process(dt: float) -> void:
 	update_trial(dt)
 	update_race(dt)
 	update_fishing(dt)
+	feat_t -= dt
+	if feat_t <= 0.0 and not intro:
+		feat_t = 1.0
+		check_feats()
 	if in_house >= 0 and Vector2(player.x, player.z).distance_to(Vector2(HOUSE_X + 4, 6)) < 0.7 and fade_rect.color.a == 0.0:
 		fade_then(leave_house)
 	if in_cave:
@@ -7051,6 +7111,7 @@ func player_hit(dmg: int, src: Vector2, attacker: Dictionary) -> String:
 		burst(here + Vector3(0, 0.8, 0), Color("#9fe0ff"), 20, 2.5)
 		sfx(880, 0.3, "sine", 0.3)
 		toast("섬광 피하기!")
+		stats.dodges += 1
 		return "flash_dodge"
 	if player.inv > 0.0:
 		return "none"
@@ -7073,6 +7134,7 @@ func player_hit(dmg: int, src: Vector2, attacker: Dictionary) -> String:
 			sfx(1200, 0.15, "square", 0.2)
 			shake = maxf(shake, 0.15)
 			toast("섬광 막기! 반격하라")
+			stats.guards += 1
 			return "flash_guard"
 		player.sp = maxf(0.0, player.sp - 15.0)
 		sfx(520, 0.05, "triangle", 0.1, -80) # blocked: a light tick
