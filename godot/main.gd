@@ -328,6 +328,7 @@ const SCENES := {
 	"knight": {"play": true, "village": true, "castle": true, "knight": true, "hour": 15.0},
 	"shrine": {"play": true, "shrine": true},
 	"journal": {"play": true, "journal": true},
+	"wolves": {"play": true, "village": true, "forest": true, "wolves": true, "hour": 16.5},
 	"scrap": {"play": true, "at": Vector2(42.5, 5.5), "hour": 17.0},
 }
 
@@ -376,6 +377,12 @@ func apply_test_args(args: PackedStringArray) -> void:
 			enter_forest()
 			player.x = forest.walls[0].pos.x - 2.5
 			player.z = forest.walls[0].pos.y
+			if sc.has("wolves"):
+				player.x = FOREST.FOREST_X + 25.0
+				player.z = 18.0
+				close_story()
+				spawn_wolf(Vector2(player.x + 2.5, player.z + 0.5))
+				spawn_wolf(Vector2(player.x + 1.0, player.z + 2.0))
 			if sc.has("grove"):
 				player.x = forest.marks.t.x + 2.0
 				player.z = forest.marks.t.y
@@ -1406,6 +1413,104 @@ func spawn_enemy(at := Vector2(-1, -1), archer := false) -> void:
 		"archer": archer, "cave": at.x >= CAVE_X - 0.5})
 
 # the Brick King waits at the northern edge of the map; he does not respawn
+# ---- brick wolves: quick pack hunters in the forest and on the hill. A wolf circles Sora about 3 tiles out,
+# then a 0.35 s crouch ("!") and a straight lunge (7 tiles/s for 0.35 s); after it, 0.8 s to catch its breath.
+func make_wolf() -> Node3D:
+	var root := Node3D.new()
+	var g := Node3D.new()
+	root.add_child(g)
+	var mats: Array = []
+	var fur := Color("#7a6a5a")
+	var dark := Color("#3a3230")
+	brick(g, mats, Vector3(0.36, 0.3, 0.8), Vector3(0, 0.38, 0), fur)          # body
+	brick(g, mats, Vector3(0.32, 0.3, 0.34), Vector3(0, 0.55, 0.5), fur)       # head
+	brick(g, mats, Vector3(0.2, 0.14, 0.2), Vector3(0, 0.48, 0.74), dark, false) # snout
+	brick(g, mats, Vector3(0.08, 0.14, 0.06), Vector3(-0.1, 0.76, 0.46), dark, false) # ears
+	brick(g, mats, Vector3(0.08, 0.14, 0.06), Vector3(0.1, 0.76, 0.46), dark, false)
+	brick(g, mats, Vector3(0.07, 0.07, 0.03), Vector3(-0.08, 0.6, 0.67), Color("#ffc23a"), false, true) # eyes
+	brick(g, mats, Vector3(0.07, 0.07, 0.03), Vector3(0.08, 0.6, 0.67), Color("#ffc23a"), false, true)
+	for leg in [Vector3(-0.12, 0.12, 0.28), Vector3(0.12, 0.12, 0.28), Vector3(-0.12, 0.12, -0.28), Vector3(0.12, 0.12, -0.28)]:
+		brick(g, mats, Vector3(0.1, 0.24, 0.1), leg, dark, false)
+	brick(g, mats, Vector3(0.08, 0.08, 0.36), Vector3(0, 0.48, -0.52), fur, false) # tail
+	root.scale = Vector3.ONE * 1.3
+	root.set_meta("mats", mats)
+	root.set_meta("body", g)
+	return root
+
+func spawn_wolf(at: Vector2) -> void:
+	var node := make_wolf()
+	add_child(node)
+	var hp: int = 25 + player.lv * 7
+	enemies.append({"x": at.x, "z": at.y, "hp": float(hp), "max_hp": hp, "node": node, "shadow": blob(0.7), "t": rnd(0, 5),
+		"atk_cd": rnd(1.0, 2.5), "hurt": 0.0, "kx": 0.0, "kz": 0.0, "wx": at.x, "wz": at.y, "dead": false, "respawn": 0.0,
+		"wolf": true, "cave": true, "wind": 0.0, "stun": 0.0, "dash": 0.0, "dir": Vector2.ZERO, "rest": 0.0, "hit_done": false,
+		"side": 1.0 if rng.randf() < 0.5 else -1.0})
+
+func update_wolf(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
+	e.t += dt
+	e.atk_cd -= dt
+	e.hurt -= dt
+	e.rest -= dt
+	e.stun = e.get("stun", 0.0) - dt
+	var dirn: Vector2 = to / maxf(d, 0.01)
+	var v := Vector2.ZERO
+	if e.hurt > 0.0 or e.stun > 0.0:
+		e.dash = 0.0
+		e.wind = 0.0
+		v = Vector2(e.kx, e.kz)
+	elif e.dash > 0.0:
+		e.dash -= dt
+		v = e.dir * 7.0
+		if not e.hit_done and d < 1.0:
+			e.hit_done = true
+			player_hit(int(round(rnd(7, 10) + player.lv)), Vector2(e.x, e.z), e)
+		if e.dash <= 0.0:
+			e.rest = 0.8
+	elif e.wind > 0.0:
+		e.wind -= dt
+		if e.wind <= 0.0:
+			e.dash = 0.35
+			e.dir = dirn
+			e.hit_done = false
+			e.atk_cd = rnd(1.6, 2.4)
+	elif e.rest > 0.0:
+		pass
+	elif d < 9.0 and not intro:
+		if e.atk_cd <= 0.0 and d < 4.0:
+			e.wind = 0.35
+			pop_num(Vector3(e.x, height_at(e.x, e.z) + 1.1, e.z), "!", Color("#ff5a4a"))
+		else: # circle her about 3 tiles out, sliding in or out to keep the ring
+			v = dirn.rotated(PI / 2.0 * e.side) * 3.2 + dirn * clampf(d - 3.0, -1.0, 1.0) * 2.5
+	else:
+		if Vector2(e.wx - e.x, e.wz - e.z).length() < 0.3 or rng.randf() < 0.005:
+			e.wx = e.x + rnd(-3, 3)
+			e.wz = e.z + rnd(-3, 3)
+		var w := Vector2(e.wx - e.x, e.wz - e.z)
+		if w.length() > 0.01:
+			v = w.normalized() * 1.2
+	e.kx *= pow(0.002, dt)
+	e.kz *= pow(0.002, dt)
+	var nx: float = e.x + v.x * dt
+	var nz: float = e.z + v.y * dt
+	if walkable(nx, e.z): e.x = nx
+	else: e.side = -e.side # a wall: circle the other way
+	if walkable(e.x, nz): e.z = nz
+	var node: Node3D = e.node
+	var y := height_at(e.x, e.z)
+	var run := absf(sin(e.t * 14.0)) if v.length() > 0.5 else 0.0
+	node.position = Vector3(e.x, y + run * 0.08, e.z)
+	if e.wind > 0.0 or e.dash > 0.0:
+		node.rotation.y = atan2(dirn.x, dirn.y)
+	elif v.length() > 0.1:
+		node.rotation.y = lerp_angle(node.rotation.y, atan2(v.x, v.y), minf(1.0, dt * 10.0))
+	var body: Node3D = node.get_meta("body")
+	body.scale = Vector3(1.0, 0.85 if e.wind > 0.0 else 1.0, 1.0) # crouches before the lunge
+	for m in node.get_meta("mats"):
+		m.emission_enabled = e.hurt > 0 or e.wind > 0.0
+		m.emission = Color("#ff3a2a") if e.wind > 0.0 and e.hurt <= 0 else Color.WHITE
+		m.emission_energy_multiplier = 0.9
+	e.shadow.position = Vector3(e.x, y + 0.02, e.z)
+
 func spawn_boss() -> void:
 	var spot := Vector2(16, 4)
 	for tries in 40:
@@ -3608,6 +3713,8 @@ func enter_forest() -> void:
 		for g in forest.goblins:
 			spawn_enemy(g)
 			enemies[enemies.size() - 1].cave = true
+		for w in forest.wolves:
+			spawn_wolf(w)
 		show_story("", STORY.FOREST_IN)
 	if forest_q < 3:
 		set_quest("벽돌 벽을 왕관으로 풀며 숲 동쪽 끝의 노을에게 가자 (E)")
@@ -4588,6 +4695,9 @@ func enter_hill() -> void:
 	if hill_q == 0:
 		hill_q = 1
 		for f in hill.foes:
+			if f[1] == "w":
+				spawn_wolf(f[0])
+				continue
 			spawn_enemy(f[0], f[1] == "a")
 			var e: Dictionary = enemies[enemies.size() - 1]
 			e.cave = true
@@ -5898,6 +6008,9 @@ func update_enemies(dt: float, gy: float) -> void:
 			continue
 		if e.get("shard", false):
 			update_shard(e, dt)
+			continue
+		if e.get("wolf", false):
+			update_wolf(e, dt, d, to)
 			continue
 		if e.get("hawk", false):
 			update_hawk(e, dt, d, to)

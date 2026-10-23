@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -1371,6 +1371,35 @@ func run() -> void:
 		var swapped: bool = main.ui.help.visible and not main.ui.journal.visible
 		main.toggle_help(false)
 		check("journal", shown and has and swapped, "opens with Q=%s lists quest, side stories, keepsakes=%s help swaps it out=%s" % [shown, has, swapped])
+	if want.call("wolf"):
+		if main.intro:
+			main.start_game(false)
+		main.close_story()
+		calm_enemies(true)
+		reset_to(Vector2(20, 30))
+		main.spawn_wolf(Vector2(24, 30))
+		var w: Dictionary = main.enemies[main.enemies.size() - 1]
+		w.atk_cd = 2.0
+		w.hp = 99999.0 # companions join in during the full run; keep it alive long enough to watch
+		var hp0: float = main.player.hp
+		var circled := false
+		var lunged := false
+		var start_ang := atan2(w.z - 30.0, w.x - 20.0)
+		for i in 60:
+			reset_to(Vector2(20, 30))
+			main.player.hp = hp0
+			await wait(0.1)
+			if absf(wrapf(atan2(w.z - 30.0, w.x - 20.0) - start_ang, -PI, PI)) > 0.4:
+				circled = true
+			if w.dash > 0.0:
+				lunged = true
+		var spawned_forest: bool = main.forest.wolves.size() == 3
+		if not w.dead:
+			w.dead = true
+			w.node.queue_free()
+			w.shadow.queue_free()
+		calm_enemies(false)
+		check("wolf", circled and lunged and spawned_forest, "circles=%s lunges=%s forest pack=%d" % [circled, lunged, main.forest.wolves.size()])
 	calm_enemies(false)
 	var failed := results.count(false)
 	print("TESTS %d passed, %d failed" % [results.size() - failed, failed])

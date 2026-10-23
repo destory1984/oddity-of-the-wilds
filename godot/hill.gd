@@ -11,7 +11,7 @@ const ROWS := """##################################
 #...................__.......U...#
 #..........r......L.__...........#
 #...r.........a.....__..r........#
-#................r..__...........#
+#................r..__.....w.....#
 #.....M.............__...........#
 #..........s........__.........r.#
 #.................a.__...........#
@@ -23,19 +23,19 @@ S========...L..M....__.L...B.....X
 #...................__...........#
 #............g......__...........#
 #.........r.........__........L..#
-#...L...............__...........#
+#...L...............__.......w...#
 #...................__...........#
 #.....M.....s.......__...r.......#
 #................r..__...........#
 #..r...........a....__........r..#
-#...........r.....L.__...........#
+#...........r.....L.__..w........#
 #...................__...........#
 ##################################"""
 
 var grid: Array = []
 var marks := {}          # S entry, X exit east, B the hawk's perch, U the updraft up to the cloud mound -> world Vector2
 var mills: Array = []    # [{"pos": Vector2, "blades": Node3D, "turning": bool}]
-var foes: Array = []     # [world Vector2, kind] with kind "s" shield goblin, "a" archer, "g" goblin
+var foes: Array = []     # [world Vector2, kind] with kind "s" shield goblin, "a" archer, "g" goblin, "w" wolf
 var bridge: Node3D
 var bridged := false
 
@@ -66,7 +66,7 @@ func build(m: Node) -> void:
 			var w := Vector2(HILL_X + x, z)
 			if c in "SXBU":
 				marks[c] = w
-			if c in "sag":
+			if c in "sagw":
 				foes.append([w, c])
 			if c == "L":
 				lamp_spots.append(w)

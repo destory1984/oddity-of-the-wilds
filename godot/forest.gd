@@ -24,10 +24,10 @@ S=======W....g..TTTTTTTTTTT...TTTTT#
 #TTTTTTTT.....L.TTTTTTTTTTT...TTTTT#
 #TTTTTTTT.......TTTTTTTTTTT...TTTTT#
 #TTTTTTTTT...TTTTTTTTTTTTTTTWTTTTTT#
-#TTTTTTTTT...TTTTTTTTTTT..........T#
-#TTTTTTTTT.g.TTTTTTTTTTT..g.......T#
+#TTTTTTTTT...TTTTTTTTTTT.....w....T#
+#TTTTTTTTT.g.TTTTTTTTTTT..gw......T#
 #TTTTTTTTT.L.TTTTTTTTTTT.......N...E
-#TTTTTTTTT...TTTTTTTTTTT.L........T#
+#TTTTTTTTT...TTTTTTTTTTT.L.....w..T#
 #TTTTTTTTTTTTTTTTTTTTTTT........g.T#
 ####################################"""
 
@@ -35,6 +35,7 @@ var grid: Array = []
 var marks := {}          # S (entry from the village), N (Noeul's clearing) -> world Vector2
 var walls: Array = []    # [{"pos": Vector2, "node": Node3D, "open": bool}]
 var goblins: Array = []  # world Vector2 where brick goblins stand guard
+var wolves: Array = []   # world Vector2 where brick wolves prowl (w)
 var stones: Array = []   # [{"pos": Vector2, "phase": int, "top": MeshInstance3D}], west to east
 const STONE_START := [1, 3, 0, 2] # phases as found; solved reads 3, 2, 1, 0 (full in the west, crescent in the east)
 var solved := false
@@ -80,6 +81,8 @@ func build(m: Node) -> void:
 				marks[c] = w
 			if c == "g":
 				goblins.append(w)
+			if c == "w":
+				wolves.append(w)
 			if c == "L":
 				lamp_spots.append(w)
 			var col := Color("#6f7a62") # moss gone dull, half turned to stone
