@@ -2662,6 +2662,7 @@ const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 256분 / 목표 300분 (85%)",
 	"",
 	"2026-10-23 저녁",
+	"· v0.0.9: 달빛 눈금이 하룻밤에 다 차도록 빨라졌다. 등불 곁 10 → 6초, 반딧불 병 20 → 12초마다 한 칸. 밤은 105초라 등불 곁에서는 밤의 절반이면 8칸이 찬다.",
 	"· v0.0.8: 칼 휘두르는 효과를 금빛 별가루로 바꿨다(시안 5개 중 3번). 가는 금빛 호가 칼끝을 따라 쓸고, 바깥으로 마름모 불티가 튄다.",
 	"· v0.0.7: 심지가 열셋째 등불을 마을 동쪽 문에 거는 장면에 삽화를 붙였다.",
 	"· v0.0.6: 벽돌왕을 쓰러뜨린 뒤의 저장을 불러오면 이야기가 동굴이 열린 때로 되돌아가고 할 일 줄이 \"땅 아래로 가는 동굴이 열렸다\"로 바뀌던 것을 고쳤다. 이미 되돌아간 저장은 한 일을 보고 제 단계로 되살린다.",
@@ -8108,8 +8109,10 @@ func light_village_lamp(d: Dictionary) -> void:
 		pop_num(Vector3(at.x, 1.3, at.y), "!", Color("#ff5a4a")))
 	save_game()
 
-# rest beside a lit lantern at night with no monster near: one pip every 10 s
-var rest_need := 10.0        # seconds of rest for the next pip (lantern 10, jar 20, both x0.6 with the tea)
+# rest beside a lit lantern at night with no monster near: one pip every 6 s. A night is 105 s (21 -> 4 at 15 s an
+# hour), so a full crown takes about half a night by a lantern and most of one with the jar alone (the user found
+# 10 s and 20 s never filled it in one night, 2026-10-23)
+var rest_need := 6.0         # seconds of rest for the next pip (lantern 6, jar 12, both x0.6 with the tea)
 
 func update_pips(dt: float) -> void:
 	pip_flash -= dt
@@ -8127,7 +8130,7 @@ func update_pips(dt: float) -> void:
 		if not e.dead and Vector2(e.x - me.x, e.z - me.z).length() < 6.0:
 			calm = false
 	var jar := fly_q >= 3
-	rest_need = (10.0 if near_lamp else 20.0) * (0.6 if has_tea else 1.0)
+	rest_need = (6.0 if near_lamp else 12.0) * (0.6 if has_tea else 1.0)
 	if (near_lamp or jar) and calm and Vector2(player.vx, player.vz).length() < 0.3:
 		rest_t += dt
 		if rest_t >= rest_need:

@@ -698,8 +698,8 @@ func run() -> void:
 		main.crown_pips = 0
 		var lit_lamp = main.lanterns.filter(func(l): return l.position.x > 130.0 and not l.get_meta("dark", false))[0]
 		reset_to(Vector2(lit_lamp.position.x + 0.4, lit_lamp.position.z + 1.0))
-		await wait(23.0)
-		check("pip_rest", main.crown_pips == 2, "23 s resting by a lit lantern at night: pips 0->%d" % main.crown_pips)
+		await wait(15.0)
+		check("pip_rest", main.crown_pips == 2, "15 s resting by a lit lantern at night (6 s a pip): pips 0->%d" % main.crown_pips)
 	if want.call("errand_done"):
 		main.crown_pips = 3
 		main.hour = 23.0
