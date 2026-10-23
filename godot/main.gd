@@ -390,6 +390,7 @@ const SCENES := {
 	"stairs_foot": {"play": true, "village": true, "castle": true, "stairs": true, "stairs_at": 0, "hour": 16.0},
 	"stairs_drop": {"play": true, "village": true, "castle": true, "stairs": true, "stairs_at": 2, "hour": 16.0},
 	"under": {"play": true, "village": true, "castle": true, "under": true, "hour": 16.0},
+	"under_in": {"play": true, "village": true, "castle": true, "under_in": true, "hour": 16.0},
 	"stairs_top": {"play": true, "village": true, "castle": true, "stairs": true, "stairs_at": 3, "hour": 16.0},
 	"scrap": {"play": true, "at": Vector2(42.5, 5.5), "hour": 17.0},
 }
@@ -619,6 +620,10 @@ func apply_test_args(args: PackedStringArray) -> void:
 				player.x = castle.marks.K.x - 3.5
 				player.z = castle.marks.K.y + 1.0
 			set_quest(castle_quest())
+			if sc.has("under_in"): # just down the stair: the way back up beside her
+				castle_q = 3
+				enter_under()
+				close_story()
 			if sc.has("under"): # the lamp hall below the castle, the plug pulled
 				castle_q = 3
 				has_unbrick = true
@@ -1113,6 +1118,22 @@ func with_stair_marks(tex: ImageTexture, spots: Array) -> ImageTexture:
 				if x >= 0 and z >= 0 and x < img.get_width() and z < img.get_height():
 					img.set_pixel(x, z, Color("#f2e6ff") if dx == 0 and dz == 0 else Color("#b45cff"))
 	return ImageTexture.create_from_image(img)
+
+# the ways up out of an underground place, as gold squares (the ways down are violet): the user could not find the
+# stair up in the undercroft (2026-10-23)
+func with_up_marks(tex: ImageTexture, spots: Array) -> ImageTexture:
+	var img := tex.get_image()
+	for sp: Vector2 in spots:
+		for dz in range(-1, 2):
+			for dx in range(-1, 2):
+				var x := int(round(sp.x)) + dx
+				var z := int(round(sp.y)) + dz
+				if x >= 0 and z >= 0 and x < img.get_width() and z < img.get_height():
+					img.set_pixel(x, z, Color("#fff4c8") if dx == 0 and dz == 0 else Color("#ffc23a"))
+	return ImageTexture.create_from_image(img)
+
+func under_map() -> ImageTexture:
+	return with_up_marks(under.map_tex(UNDER.UNDER_X + UNDER.W), [under.marks.S])
 
 # ---- five grass drafts for the user to choose from (python tools/dev.py shot with GRASS_STYLE=1..5)
 # the user picked draft 5 (a low lawn with tall clumps) on 2026-10-23; GRASS_STYLE=0 shows the old tufts
@@ -2692,6 +2713,7 @@ const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 256분 / 목표 300분 (85%)",
 	"",
 	"2026-10-24 새벽",
+	"· v0.0.13: 땅 밑에서 올라가는 곳을 지도에 금빛 네모로 표시한다(성 아래 잠긴 층, 물빛 동굴, 지하 동굴). 내려가는 곳은 보라색 그대로. 잠긴 층의 올라가는 계단에 틀과 등을 달았다.",
 	"· v0.0.12: 멀리 보기(Z X, 휠)로 카메라를 물리면 땅이 뿌옇게 덮이던 안개를 약하게 했다. 안개가 카메라 거리만큼 뒤로 물러난다.",
 	"",
 	"2026-10-23 저녁",
@@ -6742,7 +6764,7 @@ func enter_grotto() -> void:
 	player.x = grotto.marks.S.x + 1.2
 	player.z = grotto.marks.S.y
 	ground_y = 0.0
-	ui.mini.map_tex = grotto.map_tex(GROTTO.GROTTO_X + GROTTO.W)
+	ui.mini.map_tex = with_up_marks(grotto.map_tex(GROTTO.GROTTO_X + GROTTO.W), [grotto.marks.S])
 	ui.zone_name.text = "물빛 동굴"
 	ui.zone_sub.text = "섬 밑 물길"
 	snap_mate()
@@ -8188,7 +8210,7 @@ func cave_map_tex() -> ImageTexture:
 			if c == "K" and not has_key:
 				col = Color("#ff9f5a")
 			img.set_pixel(CAVE_X + x, z, col)
-	return ImageTexture.create_from_image(img)
+	return with_up_marks(ImageTexture.create_from_image(img), [cave_marks.S, cave_marks.E])
 var fade_rect: ColorRect
 
 func fade_then(fn: Callable) -> void:
@@ -9868,7 +9890,7 @@ func enter_under() -> void:
 	player.z = under.marks.S.y + 0.6
 	ground_y = 0.0
 	gust_dir = Vector2.ZERO
-	ui.mini.map_tex = under.map_tex(UNDER.UNDER_X + UNDER.W)
+	ui.mini.map_tex = under_map()
 	ui.zone_name.text = "성 아래 잠긴 층"
 	ui.zone_sub.text = "물에 잠긴 옛 창고"
 	snap_mates()
@@ -9926,7 +9948,7 @@ func update_under(dt: float) -> void:
 				under.put_out(l)
 			sfx(180, 0.4, "triangle", 0.2, -80)
 			toast("물빛 등불이 모두 꺼졌다. 첫 등불부터 8초 안에")
-			ui.mini.map_tex = under.map_tex(UNDER.UNDER_X + UNDER.W)
+			ui.mini.map_tex = under_map()
 	# Hangyeol's room: two big guardians rise when she steps in; the door shuts behind her until both fall
 	if under.door_open and not under_guards_done and under_guards.is_empty() and me.y < 12.4:
 		for at in under.guard_spots:
@@ -9955,7 +9977,7 @@ func update_under(dt: float) -> void:
 			gain_xp(250)
 			sfx(660, 0.4, "triangle", 0.25, 200)
 			toast("수호자들이 무너졌다. 금화 +200")
-			ui.mini.map_tex = under.map_tex(UNDER.UNDER_X + UNDER.W)
+			ui.mini.map_tex = under_map()
 			save_game()
 		elif me.y > 13.4: # she got out (a faint, a waystone): the guardians go back to sleep and the fight starts over
 			under_guards_clear()
@@ -9991,7 +10013,7 @@ func under_key() -> bool:
 				shake = 0.3
 				sfx(150, 0.8, "noise", 0.2, -60)
 				toast("마개가 풀리고, 잠긴 바닥의 물이 빠졌다")
-				ui.mini.map_tex = under.map_tex(UNDER.UNDER_X + UNDER.W)
+				ui.mini.map_tex = under_map()
 				save_game()
 				return true
 	if not under.door_open:
@@ -10006,7 +10028,7 @@ func under_key() -> bool:
 					under.open_door()
 					shake = 0.3
 					toast("네 등불이 함께 타오르자, 달 문이 열렸다")
-					ui.mini.map_tex = under.map_tex(UNDER.UNDER_X + UNDER.W)
+					ui.mini.map_tex = under_map()
 					save_game()
 				else:
 					toast(tr("물빛 등불 %d/4 · %.0f초") % [under.lamps_lit(), maxf(under.lamp_clock, 0.0)])

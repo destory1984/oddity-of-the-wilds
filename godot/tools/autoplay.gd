@@ -2418,7 +2418,7 @@ func run() -> void:
 		main.player.sp = 100.0
 		hold_world(Vector2(1, 0))
 		main.fake_keys[KEY_SHIFT] = true
-		await wait(1.0)
+		await wait(1.4) # room for a busy machine
 		release()
 		var skipped: bool = main.player.x > ux + 11.6
 		reset_to(Vector2(ux + 22.4, 17.0)) # onto the vent, which blows west over the drop
@@ -2593,7 +2593,7 @@ func run() -> void:
 		main.player.sp = 100.0
 		hold_world(Vector2(0, -1))
 		main.fake_keys[KEY_SHIFT] = true
-		await wait(1.0)
+		await wait(1.4) # room for a busy machine
 		release()
 		var skipped: bool = main.player.z < 15.6
 		reset_to(Vector2(sx + 11, 12.4)) # onto the vent, which blows north over the drop

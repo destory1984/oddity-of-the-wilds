@@ -167,6 +167,8 @@ func build(m: Node) -> void:
 		st.position = Vector3(marks.U.x, 0.03 - k * 0.12, marks.U.y - 0.3 + k * 0.25)
 		m.add_child(st)
 
+	m.grotto.exit_steps(m, marks.S) # framed steps and a warm lamp, as at the grotto's way out
+
 func light(l: Dictionary) -> void:
 	m_light(l, true)
 
