@@ -357,6 +357,8 @@ const SCENES := {
 	"walk_dr": {"play": true, "walk_dr": true, "at": Vector2(12, 14), "hour": 12.0},
 	"settings": {"play": true, "settings": true},
 	"east": {"play": true, "at": Vector2(42.0, 21.5), "hour": 12.0},
+	"fall": {"play": true, "fall": 2.5, "at": Vector2(20, 22)},
+	"chat": {"play": true, "chat": true, "at": Vector2(20, 22), "hour": 13.0},
 	"scrap": {"play": true, "at": Vector2(42.5, 5.5), "hour": 17.0},
 }
 
@@ -620,6 +622,13 @@ func apply_test_args(args: PackedStringArray) -> void:
 		toggle_settings(true)
 	if sc.get("opening", false):
 		begin_opening()
+	if sc.has("fall"):
+		get_tree().create_timer(sc.fall).timeout.connect(func(): player.inv = 0.0; hurt_player(9999, ground_y))
+	if sc.has("chat"): # companions trading a line in balloons
+		join_mate()
+		join_noeul()
+		snap_mates()
+		get_tree().create_timer(1.0).timeout.connect(func(): say_bubble(mate, "다리 아파. 좀 쉬었다 가자."); say_bubble(mate2, "……뭘 봐. 그냥 쉬는 거야."))
 	if sc.has("faint"):
 		get_tree().create_timer(sc.faint).timeout.connect(faint)
 	hour = float(opt.get("hour", sc.get("hour", hour)))
@@ -2566,35 +2575,71 @@ func toggle_settings(show: bool) -> void:
 var chat_t := 0.0
 var chat_cd := 6.0
 
+# a speech balloon: a cream rounded card with a brown rim and a little tail pointing down at the speaker,
+# drawn once per width and kept
+var balloon_cache := {}
+
+func balloon_tex(w: int) -> ImageTexture:
+	if balloon_cache.has(w):
+		return balloon_cache[w]
+	var h := 52
+	var tail := 14
+	var img := Image.create(w, h + tail, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var rim := Color("#5a3a22")
+	var fill := Color("#fff8e8")
+	var r := 16
+	for y in h:
+		for x in w:
+			var cx := clampi(x, r, w - 1 - r)
+			var cy := clampi(y, r, h - 1 - r)
+			var d := Vector2(x - cx, y - cy).length()
+			if d <= r:
+				img.set_pixel(x, y, rim if d > r - 3 else fill)
+	for k in tail: # the tail: a small triangle under the middle
+		var half := int((tail - k) * 0.8)
+		for x in range(w / 2 - half, w / 2 + half + 1):
+			var edge := x <= w / 2 - half + 2 or x >= w / 2 + half - 2 or k == tail - 1
+			img.set_pixel(x, h - 3 + k, rim if edge else fill)
+	var tex := ImageTexture.create_from_image(img)
+	balloon_cache[w] = tex
+	return tex
+
 func say_bubble(who: Node3D, text: String, dur := 3.5) -> void:
 	var b := Node3D.new()
+	var w := 40 + text.length() * 26
+	w = int(ceil(w / 16.0)) * 16 # a few widths only, so the cache stays small
+	var card := Sprite3D.new()
+	card.texture = balloon_tex(w)
+	card.pixel_size = 0.0065
+	card.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	card.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	card.no_depth_test = true
+	card.shaded = false
+	card.render_priority = 1
+	card.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
+	b.add_child(card)
 	var l := Label3D.new()
 	l.text = text
 	l.font = ui_font
-	l.font_size = 40
-	l.pixel_size = 0.006
-	l.modulate = Color("#3a2a1a")
+	l.font_size = 30
+	l.pixel_size = 0.0065
+	l.modulate = Color("#3a2414")
 	l.outline_size = 0
 	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	l.no_depth_test = true
 	l.render_priority = 2
+	l.position = Vector3(0, 0.045, 0) # centred on the card, above the tail
 	b.add_child(l)
-	var q := MeshInstance3D.new() # the balloon: a pale rounded-looking card behind the words
-	var qm := QuadMesh.new()
-	qm.size = Vector2(0.24 * text.length() * 0.6 + 0.5, 0.42)
-	q.mesh = qm
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.albedo_color = Color(1.0, 0.98, 0.92, 0.92)
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-	mat.no_depth_test = true
-	mat.render_priority = 1
-	q.material_override = mat
-	b.add_child(q)
-	b.position = Vector3(0, 2.35, 0)
+	b.position = Vector3(0, 2.45, 0)
+	b.scale = Vector3.ONE * 0.2
 	who.add_child(b)
-	get_tree().create_timer(dur).timeout.connect(func(): if is_instance_valid(b): b.queue_free())
+	var tw := b.create_tween() # pops up, then fades away
+	tw.tween_property(b, "scale", Vector3.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(dur)
+	tw.tween_property(card, "modulate:a", 0.0, 0.3)
+	tw.parallel().tween_property(l, "modulate:a", 0.0, 0.3)
+	tw.tween_callback(b.queue_free)
 
 func chat_lines(id: String) -> Array:
 	var lines: Array = STORY.MATE_CHAT[id].duplicate()
@@ -2722,6 +2767,81 @@ func update_mate_hud() -> void:
 		r.fill.size.x = 110.0 * ready
 		var fighting: bool = enemies.any(func(e): return not e.dead and not e.get("prop", false) and Vector2(e.x - node.position.x, e.z - node.position.z).length() < 5.0)
 		r.act.text = tr("싸우는 중") if fighting else tr("따라가는 중")
+
+# ---- round icon buttons for the bottom-left row (the font has no icon glyphs, so the icons are drawn here)
+const ICON_GOLD := Color("#f2d27a")
+
+func icon_tex(kind: String) -> ImageTexture:
+	var n := 24
+	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var dot := func(x: int, y: int, col := ICON_GOLD): if x >= 0 and y >= 0 and x < n and y < n: img.set_pixel(x, y, col)
+	var rect := func(x0: int, y0: int, w: int, h: int, col := ICON_GOLD): # lambdas copy outer vars, so colour is an argument
+		for y in range(y0, y0 + h):
+			for x in range(x0, x0 + w):
+				dot.call(x, y, col)
+	match kind:
+		"help": # a question mark
+			rect.call(8, 4, 8, 2)
+			rect.call(15, 5, 2, 5)
+			rect.call(7, 5, 2, 3)
+			rect.call(12, 10, 4, 2)
+			rect.call(11, 12, 2, 4)
+			rect.call(11, 18, 2, 2)
+		"sound", "mute": # a speaker, with waves or a cross
+			rect.call(4, 9, 4, 6)
+			for k in 6:
+				rect.call(8 + k, 9 - k, 1, 6 + k * 2)
+			if kind == "sound":
+				rect.call(16, 10, 1, 4)
+				rect.call(18, 8, 1, 8)
+				rect.call(20, 6, 1, 12)
+			else:
+				for k in 7:
+					dot.call(15 + k, 9 + k)
+					dot.call(21 - k, 9 + k)
+		"journal": # a closed book with a ribbon
+			rect.call(6, 4, 13, 16)
+			rect.call(8, 6, 9, 1, Color("#10142a"))
+			rect.call(8, 9, 9, 1, Color("#10142a"))
+			rect.call(8, 12, 6, 1, Color("#10142a"))
+			rect.call(7, 4, 1, 16, Color("#b89a50"))
+			rect.call(14, 16, 2, 6, Color("#d8607a"))
+		"gear": # a cog: ring, eight teeth, a hole
+			var ctr := Vector2(11.5, 11.5)
+			for y in n:
+				for x in n:
+					var d := Vector2(x, y).distance_to(ctr)
+					var a := atan2(y - ctr.y, x - ctr.x)
+					var tooth := fmod(a + TAU + PI / 8.0, PI / 4.0) < PI / 8.0
+					if (d <= 7.5 and d >= 3.2) or (tooth and d <= 10.0 and d > 7.0):
+						dot.call(x, y)
+	return ImageTexture.create_from_image(img)
+
+func icon_button(root: Control, kind: String, key: String, tip: String, x: float, fn: Callable) -> Button:
+	var b := Button.new()
+	b.icon = icon_tex(kind)
+	b.expand_icon = true
+	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	b.tooltip_text = tr(tip)
+	b.focus_mode = Control.FOCUS_NONE
+	for st in ["normal", "hover", "pressed"]:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.063, 0.078, 0.165, 0.9) if st != "hover" else Color(0.12, 0.14, 0.26, 0.95)
+		sb.border_color = Color(0.86, 0.72, 0.38, 0.9)
+		sb.set_border_width_all(2)
+		sb.set_corner_radius_all(22)
+		sb.content_margin_left = 10
+		sb.content_margin_right = 10
+		sb.content_margin_top = 10
+		sb.content_margin_bottom = 10
+		b.add_theme_stylebox_override(st, sb)
+	place(b, Control.PRESET_BOTTOM_LEFT, Vector2(x, -62), Vector2(44, 44))
+	b.pressed.connect(fn)
+	root.add_child(b)
+	var k := label(b, key, Vector2(31, 30), 10, Color("#c9bfa6")) # the key, small in the corner
+	k.size = Vector2(20, 14)
+	return b
 
 func spawn_boss() -> void:
 	var spot := Vector2(16, 4)
@@ -3778,38 +3898,11 @@ func build_hud() -> void:
 	ui.ways_text = wt
 	ways.visible = false
 	ui.ways = ways
-	var hint := Button.new()
-	hint.text = "H  조작법 보기"
-	hint.add_theme_font_override("font", ui_font)
-	place(hint, Control.PRESET_BOTTOM_LEFT, Vector2(14, -44), Vector2(130, 30))
-	hint.pressed.connect(func(): toggle_help(true))
-	root.add_child(hint)
-	ui.hint = hint
-	# sound on/off, next to the controls button (M does the same)
-	var snd := Button.new()
-	snd.add_theme_font_override("font", ui_font)
-	place(snd, Control.PRESET_BOTTOM_LEFT, Vector2(152, -44), Vector2(110, 30))
-	snd.focus_mode = Control.FOCUS_NONE
-	snd.pressed.connect(toggle_sound)
-	root.add_child(snd)
-	ui.sound_btn = snd
+	ui.hint = icon_button(root, "help", "H", "조작법", 14, func(): toggle_help(true))
+	ui.sound_btn = icon_button(root, "sound", "M", "소리 켜고 끄기", 66, toggle_sound)
 	refresh_sound_btn()
-	var jbtn := Button.new()
-	jbtn.text = "Q  일지"
-	jbtn.add_theme_font_override("font", ui_font)
-	place(jbtn, Control.PRESET_BOTTOM_LEFT, Vector2(270, -44), Vector2(90, 30))
-	jbtn.focus_mode = Control.FOCUS_NONE
-	jbtn.pressed.connect(func(): toggle_journal(not ui.journal.visible))
-	root.add_child(jbtn)
-	ui.journal_btn = jbtn
-	var sbtn := Button.new()
-	sbtn.text = "설정"
-	sbtn.add_theme_font_override("font", ui_font)
-	place(sbtn, Control.PRESET_BOTTOM_LEFT, Vector2(368, -44), Vector2(76, 30))
-	sbtn.focus_mode = Control.FOCUS_NONE
-	sbtn.pressed.connect(func(): toggle_settings(not settings_open))
-	root.add_child(sbtn)
-	ui.settings_btn = sbtn
+	ui.journal_btn = icon_button(root, "journal", "Q", "일지", 118, func(): toggle_journal(not ui.journal.visible))
+	ui.settings_btn = icon_button(root, "gear", "Esc", "설정", 170, func(): toggle_settings(not settings_open))
 	build_settings(root)
 
 	ui.toast = label(root, "", Vector2(0, 0), 20)
@@ -6145,6 +6238,13 @@ func join_noeul() -> void:
 	snap_mates()
 
 # Noeul keeps a step to Sora's right and throws brick dust at enemies within 4 m
+# companions slide along walls, houses and rocks instead of walking into them (they used to stand inside roofs)
+func mate_step(at: Vector3, d: Vector3) -> Vector3:
+	var p := at
+	if walkable(p.x + d.x, p.z) or not walkable(p.x, p.z): p.x += d.x
+	if walkable(p.x, p.z + d.z) or not walkable(p.x, p.z): p.z += d.z
+	return p
+
 func update_mate2(dt: float) -> void:
 	if mate2 == null:
 		return
@@ -6155,9 +6255,11 @@ func update_mate2(dt: float) -> void:
 	var spr: Sprite3D = mate2.get_child(0)
 	mate2_cd -= dt
 	var goal := me + Vector3(1.3, 0, -0.6)
+	if not walkable(goal.x, goal.z):
+		goal = me # her side is inside a house or a rock: just follow her
 	var to := goal - mate2.position
 	if to.length() > 0.3:
-		mate2.position += to.normalized() * minf(to.length() - 0.3, dt * 5.5)
+		mate2.position = mate_step(mate2.position, to.normalized() * minf(to.length() - 0.3, dt * 5.5))
 		spr.frame = 1
 		spr.flip_h = screen_left(Vector2(to.x, to.z))
 	else:
@@ -6191,12 +6293,14 @@ func update_mate(dt: float) -> void:
 			best = Vector2(e.x, e.z).distance_to(Vector2(mate.position.x, mate.position.z))
 			target = e
 	var goal := me + Vector3(-1.3, 0, -0.6)
+	if not walkable(goal.x, goal.z):
+		goal = me
 	if target != null:
 		goal = Vector3(target.x, 0, target.z)
 	var to := goal - mate.position
 	var stop := 1.4 if target != null else 0.3
 	if to.length() > stop:
-		mate.position += to.normalized() * minf(to.length() - stop, dt * 5.5)
+		mate.position = mate_step(mate.position, to.normalized() * minf(to.length() - stop, dt * 5.5))
 		mate.position.y = absf(sin(t * 11.0)) * 0.06
 		spr.flip_h = screen_left(Vector2(to.x, to.z))
 	else:
@@ -7170,8 +7274,8 @@ func toggle_sound() -> void:
 	refresh_sound_btn()
 
 func refresh_sound_btn() -> void:
-	ui.sound_btn.text = "♪  소리 끔" if muted else "♪  소리 켬"
-	ui.sound_btn.modulate = Color(0.6, 0.6, 0.65) if muted else Color.WHITE
+	ui.sound_btn.icon = icon_tex("mute" if muted else "sound")
+	ui.sound_btn.modulate = Color(0.75, 0.75, 0.8) if muted else Color.WHITE
 
 func toggle_help(show: bool) -> void:
 	if show:
@@ -7316,7 +7420,7 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func _unhandled_input(event: InputEvent) -> void:
-	if intro:
+	if intro or down_t > 0.0:
 		return
 	if shop_open:
 		if event is InputEventKey and event.pressed and not event.echo:
@@ -7377,6 +7481,11 @@ func _process(dt: float) -> void:
 		ui.shop_hint.visible = false
 		return
 	if settings_open: # and while the settings are open
+		return
+	if down_t > 0.0:
+		t += dt
+		update_fall(dt)
+		update_enemies(dt, ground_y)
 		return
 	if story_open:
 		if ui.story_text.visible_characters != -1:
@@ -8034,7 +8143,48 @@ func hurt_player(dmg: int, gy: float) -> void:
 	# getting hit: a short soft "oof" (two quiet tones) instead of a loud buzzing square thud
 	sfx(rnd(300.0, 340.0), 0.09, "triangle", 0.13, -140.0)
 	sfx(160.0, 0.12, "step", 0.08)
-	if player.hp <= 0:
+	if player.hp <= 0 and down_t <= 0.0:
+		start_fall()
+
+# Sora falls where she stands; 3 s later she wakes at the start (faint)
+var down_t := 0.0
+const DOWN_TIME := 3.0
+
+func start_fall() -> void:
+	down_t = DOWN_TIME
+	player.hp = 0.0
+	player.inv = 99.0
+	player.vx = 0.0
+	player.vz = 0.0
+	player.dodge = 0.0
+	guarding = false
+	idle_name = ""
+	set_hero_frame(player.dir, 0)
+	sfx(330, 0.25, "triangle", 0.2, -200)
+	get_tree().create_timer(0.3).timeout.connect(func(): sfx(150, 0.4, "triangle", 0.18, -60))
+	burst(Vector3(player.x, ground_y + 0.4, player.z), Color("#d8c8a0"), 16, 1.5)
+
+func update_fall(dt: float) -> void:
+	down_t -= dt
+	var k := clampf((DOWN_TIME - down_t) / 0.45, 0.0, 1.0) # tips over in 0.45 s, then lies still
+	var side := -1.0 if player.face.dot(Vector2(cos(cam_yaw), -sin(cam_yaw))) < 0.0 else 1.0
+	hero.billboard = BaseMaterial3D.BILLBOARD_DISABLED # a billboard ignores the node's tilt, so face the camera by hand
+	hero.no_depth_test = true # lying low she would sink into the tall grass
+	hero.rotation = Vector3(0, cam_yaw, -side * (PI / 2.0) * (1.0 - pow(1.0 - k, 3.0)))
+	hero.position = Vector3(player.x, ground_y + 0.35 * k, player.z) # lifted a little so the grass does not swallow her
+	var dim := clampf(1.0 - (DOWN_TIME - down_t - 2.0) / 1.0, 0.5, 1.0)
+	hero.modulate = Color(dim, dim, dim)
+	if hero_ghost != null:
+		hero_ghost.visible = false
+	if down_t <= 0.0:
+		down_t = 0.0
+		hero.rotation = Vector3.ZERO
+		hero.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+		hero.no_depth_test = false
+		if hero_ghost != null:
+			hero_ghost.visible = true
+		hero.modulate = Color.WHITE
+		player.inv = 0.8
 		faint()
 
 # Sora faints: say so plainly, keep gold and level, heal the boss, and wake her at the start

@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "mate_facing", "settings", "mate_chat", "east_bridge", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -2101,7 +2101,7 @@ func run() -> void:
 		var talked := false
 		for m in [main.mate, main.mate2]:
 			for c in m.get_children():
-				if c is Node3D and c.get_child_count() > 0 and c.get_child(0) is Label3D:
+				if c is Node3D and c.get_child_count() > 1 and c.get_child(1) is Label3D:
 					talked = true
 		calm_enemies(false)
 		check("mate_chat", talked and main.chat_cd > 10.0, "a companion says a line in a balloon after standing still=%s" % talked)
@@ -2125,6 +2125,29 @@ func run() -> void:
 		main.in_village = false
 		calm_enemies(false)
 		check("east_bridge", inside, "walking east over the new bridge reaches the village without the water skip=%s" % inside)
+	if want.call("fall_down"):
+		if main.intro:
+			main.start_game(false)
+		await wait(0.2)
+		main.close_story()
+		main.in_village = false
+		main.in_hill = false
+		main.in_lake = false
+		main.in_forest = false
+		main.in_garden = false
+		main.in_cave = false
+		calm_enemies(true)
+		reset_to(Vector2(30, 30))
+		main.player.inv = 0.0
+		main.player.hp = 5.0
+		main.hurt_player(50, 0.0)
+		await wait(1.0)
+		var lying: bool = main.down_t > 0.0 and absf(main.hero.rotation.z) > 1.2 and Vector2(main.player.x, main.player.z).distance_to(Vector2(30, 30)) < 0.2
+		await wait(2.4)
+		main.close_story()
+		var woke: bool = main.down_t == 0.0 and Vector2(main.player.x, main.player.z).distance_to(main.START) < 0.5 and main.hero.rotation.z == 0.0 and main.player.hp > 0.0
+		calm_enemies(false)
+		check("fall_down", lying and woke, "falls where she stands=%s wakes at the start after 3 s=%s" % [lying, woke])
 	calm_enemies(false)
 	var failed := results.count(false)
 	print("TESTS %d passed, %d failed" % [results.size() - failed, failed])
