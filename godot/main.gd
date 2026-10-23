@@ -7145,8 +7145,17 @@ func _process(dt: float) -> void:
 	var hop := sin((player.dodge / 0.32) * PI) * 0.35 if player.dodge > 0 else 0.0
 	hero.position = Vector3(player.x, gy + hop, player.z)
 	var blink: bool = player.inv > 0 and player.dodge <= 0 and sin(t * 40.0) < 0
-	# Sora is unshaded, so tint her by hand to sit in the night light
-	var lit := Color(1, 1, 1).lerp(Color(0.5, 0.56, 0.8), night)
+	# Sora is unshaded, so tint her by hand to sit in the night light: a mild blue at night (the old 0.5 made her
+	# much darker than her companions), warmed back to full by any lit lantern within 4 tiles
+	var lit := Color(1, 1, 1).lerp(Color(0.8, 0.82, 0.95), night)
+	var warm := 0.0
+	for l in lanterns:
+		if l.visible and not l.get_meta("dark", false):
+			var ld := Vector2(l.position.x - player.x, l.position.z - player.z).length()
+			warm = maxf(warm, clampf(1.0 - (ld - 1.5) / 2.5, 0.0, 1.0))
+	if in_cave or in_grotto() or jar_node != null and jar_node.visible:
+		warm = maxf(warm, 0.6) # the cave lamp on her, or the firefly jar at her side
+	lit = lit.lerp(Color(1.0, 0.95, 0.86), warm * night)
 	hero.modulate = Color(1, 0.5, 0.5) if player.hurt_t > 0 else Color(lit.r, lit.g, lit.b, 0.3 if blink else 1.0)
 	hero_shadow.position = Vector3(player.x, gy + 0.02, player.z)
 
