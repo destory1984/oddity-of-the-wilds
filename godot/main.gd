@@ -2825,6 +2825,7 @@ const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 285분 / 목표 300분 (95%)",
 	"",
 	"2026-10-24 아침",
+	"· v0.0.23: About 쪽에는 만든 사람(우주한량) 한 줄만 남기고 그림, 글꼴, 라이선스, 깃허브 단추를 뺐다.",
 	"· v0.0.22: 바뀐 것 목록이 100줄을 넘으면 최근 100줄만 보이고, 더 읽기 단추로 100줄씩 더 불러온다.",
 	"· v0.0.21: 일지(Q)와 조작법(H) 창에서 Esc를 누르면 창이 닫히고 놀이로 돌아간다. 전에는 아무 일도 없었다.",
 	"· v0.0.20: 설정 창의 버전 글자를 제목 아래에서 제목 오른쪽 같은 줄로 옮겼다.",
@@ -3244,16 +3245,11 @@ func build_settings(root: Control) -> void:
 	ui.news = news
 	ui.news_more = more
 	# About
-	var about_rows := [["만든 사람", "destory1984 (기획, 그림 주문), Claude (코드)"], ["그림", "GPT 이미지 생성. 소라의 쉬는 몸짓과 이 창의 모양은 같은 작가의 우주 한량에서 가져왔다"],
-		["글꼴", "Pretendard (SIL 오픈 폰트 라이선스 1.1)"], ["라이선스", "코드는 MIT. 소라 캐릭터와 제목 그림은 destory1984의 것이다"]]
-	for i in about_rows.size():
-		var at := label(ui.set_pages[3], about_rows[i][0], Vector2(0, i * 48), 16, Color("#eef3ff"))
-		at.size = Vector2(112, 20)
-		var ad := wrap_label(ui.set_pages[3], about_rows[i][1], Vector2(122, i * 48), 518, 16, ODD_MUTED)
-		scale_text(ad)
-	var ct := label(ui.set_pages[3], "만든 코드", Vector2(0, 4 * 48), 16, Color("#eef3ff"))
-	ct.size = Vector2(112, 20)
-	set_button(ui.set_pages[3], "깃허브에서 보기", Vector2(122, 4 * 48 - 6), Vector2(150, 36), func(): OS.shell_open("https://github.com/destory1984/the-crown-oddity"))
+	# About holds only the maker (the user cut the rest)
+	var at := label(ui.set_pages[3], "만든 사람", Vector2(0, 0), 16, Color("#eef3ff"))
+	at.size = Vector2(112, 20)
+	var ad := wrap_label(ui.set_pages[3], "우주한량", Vector2(122, 0), 518, 16, ODD_MUTED)
+	scale_text(ad)
 	var foot := set_button(col, "놀이로 돌아가기", Vector2(0, 512), Vector2(640, 44), func(): toggle_settings(false))
 	foot.add_theme_font_size_override("font_size", 15)
 	foot.add_theme_color_override("font_color", Color("#eef3ff"))

@@ -2208,9 +2208,17 @@ func run() -> void:
 		var hq0: int = main.hill_q
 		main.forest_q = 3
 		main.hill_q = 0
+		main.player.vx = 0.0 # the goblin's last hit may have pushed her, and moving resets the rest clock
+		main.player.vz = 0.0
 		main.chat_t = 9.5
 		main.chat_cd = 0.0
-		await wait(0.3)
+		for k in 20: # a busy machine may need a few frames more
+			if not main.talks_heard.is_empty():
+				break
+			main.player.vx = 0.0
+			main.player.vz = 0.0
+			main.chat_t = maxf(main.chat_t, 9.5)
+			await wait(0.1)
 		var story_first: bool = main.talks_heard.has("noeul_new")
 		main.forest_q = fq0
 		main.hill_q = hq0
