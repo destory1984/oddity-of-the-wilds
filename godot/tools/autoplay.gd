@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -678,8 +678,8 @@ func run() -> void:
 		main.crown_pips = 0
 		var lit_lamp = main.lanterns.filter(func(l): return l.position.x > 130.0 and not l.get_meta("dark", false))[0]
 		reset_to(Vector2(lit_lamp.position.x + 0.4, lit_lamp.position.z + 1.0))
-		await wait(21.0)
-		check("pip_rest", main.crown_pips == 2, "21 s resting by a lit lantern at night: pips 0->%d" % main.crown_pips)
+		await wait(23.0)
+		check("pip_rest", main.crown_pips == 2, "23 s resting by a lit lantern at night: pips 0->%d" % main.crown_pips)
 	if want.call("errand_done"):
 		main.crown_pips = 3
 		main.hour = 23.0
@@ -2220,6 +2220,103 @@ func run() -> void:
 		var up: bool = main.mate_down.mulgyeol == 0.0 and absf(main.mate_hp.mulgyeol - main.mate_max() * 0.5) < 5.0
 		calm_enemies(false)
 		check("mate_hp", down and up, "a companion at 0 HP sits out=%s and gets up with half health=%s" % [down, up])
+	if want.call("hollow"):
+		main.story_step = maxi(main.story_step, 10)
+		if main.intro:
+			main.start_game(false)
+		await wait(0.2)
+		main.close_story()
+		main.in_village = false
+		main.in_lake = false
+		main.in_hill = false
+		main.in_garden = false
+		main.in_cave = false
+		main.night_q = 4
+		main.lake_q = 4
+		main.forest_q = 3
+		main.hollow_q = 0
+		main.has_skip = true
+		main.has_unbrick = true
+		main.stream_told = true
+		main.hour = 12.0
+		main.crown_pips = 8
+		main.enter_forest()
+		main.join_noeul()
+		main.close_story()
+		calm_enemies(true)
+		var fm = main.forest
+		var g: Vector2 = fm.marks.G
+		var shut: bool = not main.player_can(g.x, g.y)
+		var north0: int = main.enemies.filter(func(e): return not e.dead and e.x > 170.0 and e.x < 230.0 and e.z < 21.5).size()
+		reset_to(g + Vector2(0, -1.0))
+		tap(KEY_E)
+		await wait(0.2)
+		main.close_story()
+		var opened: bool = main.hollow_q == 1 and main.player_can(g.x, g.y)
+		var woke: int = main.enemies.filter(func(e): return not e.dead and e.x > 170.0 and e.x < 230.0 and e.z > 21.5).size()
+		var north1: int = main.enemies.filter(func(e): return not e.dead and e.x > 170.0 and e.x < 230.0 and e.z < 21.5).size()
+		var hogs: Array = main.enemies.filter(func(e): return e.get("hog", false) and not e.dead)
+		calm_enemies(true)
+		main.skipping = false
+		var dry: bool = not main.player_can(198, 28.5)
+		main.skipping = true
+		var wet: bool = main.player_can(198, 28.5)
+		main.skipping = false
+		for l in fm.mem_lamps:
+			reset_to(l.pos + Vector2(1.0, 0))
+			tap(KEY_E)
+			await wait(0.15)
+			main.close_story()
+		var lit: bool = fm.mem_lamps.all(func(l): return l.lit) and main.crown_pips == 5
+		reset_to(fm.marks.C + Vector2(-2.0, 0))
+		main.player.inv = 9.0
+		await wait(0.3)
+		main.close_story()
+		await wait(0.2)
+		var cloaks: Array = main.enemies.filter(func(e): return e.get("cloak", false) and not e.dead)
+		var big: bool = cloaks.size() == 1 and cloaks[0].max_hp == 1000
+		if cloaks.size() == 1:
+			main.damage_enemy(cloaks[0], 100000.0, Vector2(main.player.x, main.player.z))
+			await wait(1.4)
+		main.close_story()
+		var beaten: bool = main.hollow_q == 2
+		var curled := false
+		var hit := false
+		if hogs.size() > 0:
+			var h: Dictionary = hogs[0]
+			h.curl = 0.5
+			var hp0: float = h.hp
+			main.damage_enemy(h, 30.0, Vector2(h.x - 1.0, h.z))
+			curled = h.hp == hp0
+			h.curl = 0.0
+			main.damage_enemy(h, 30.0, Vector2(h.x - 1.0, h.z))
+			hit = h.hp < hp0
+		main.crown_pips = 8
+		var d1: Dictionary = fm.doors[1]
+		reset_to(d1.pos + Vector2(0, -1.0))
+		tap(KEY_E)
+		await wait(0.15)
+		var door: bool = d1.open and main.player_can(d1.pos.x, d1.pos.y) and main.crown_pips == 8 - main.unbrick_cost()
+		reset_to(d1.pos + Vector2(0, 1.0))
+		tap(KEY_E)
+		await wait(0.15)
+		main.close_story()
+		var lantern: bool = main.hollow_q == 3 and fm.boxes[1].open
+		var saved = JSON.parse_string(FileAccess.get_file_as_string(main.SAVE_PATH))
+		var kept: bool = saved != null and int(saved.get("hollow_q", 0)) == 3 and saved.get("mem_lit", []) == [true, true, true] and saved.get("hollow_doors", []) == [false, true, false]
+		calm_enemies(false)
+		main.in_forest = false
+		main.in_village = true
+		var hp1: int = main.player.max_hp
+		reset_to(main.village.marks.M + Vector2(-1.2, 0))
+		tap(KEY_E)
+		await wait(0.2)
+		main.close_story()
+		var given: bool = main.hollow_q == 4 and main.player.max_hp == hp1 + 15 and main.thirteenth != null and not main.thirteenth.get_meta("dark", false)
+		check("hollow", shut and opened and woke == fm.south.size() and north1 == north0 and hogs.size() == 2 and dry and wet and lit and big and beaten and curled and hit and door and lantern and kept and given,
+			"gate shut/opened=%s/%s woke=%d of %d north unchanged=%s hogs=%d stream dry/skip=%s/%s three memories (pips 5)=%s cloak 1000=%s beaten=%s curled blocks=%s dizzy hits=%s sunset door=%s lantern=%s saved=%s Simji=%s" % [shut, opened, woke, fm.south.size(), north1 == north0, hogs.size(), dry, wet, lit, big, beaten, curled, hit, door, lantern, kept, given])
+		main.hour = 12.0
+		reset_to(main.village.marks.M + Vector2(-1.2, 0))
 	if want.call("undercroft"):
 		main.story_step = maxi(main.story_step, 10)
 		if main.intro:

@@ -3,11 +3,14 @@
 # unwinds them (벽돌 풀기); Noeul waits in the clearing at N for the second duel.
 # North-west grove (side puzzle): four moon stones (1-4) are turned with E; when they read crescent to full
 # from east to west, as the tablet (t) says, the brick wall V opens onto a niche with a moonkeeper chest (c).
+# South valley (rows 22 - 39, after Noeul joins): the grey gate G under her clearing, a live stream (~) crossed
+# with the water skip, three memory lamps (o), the empty cloak at C, and three picture doors (B) unwound with
+# the crown onto the squirrels' store (m), Noeul's hollow (h) and Hangyeol's pack (k).
 extends RefCounted
 
 const FOREST_X := 180
 const W := 36
-const H := 22
+const H := 40
 const ROWS := """####################################
 #TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT#
 #TT..c..TTT.......g..T........TTTTT#
@@ -29,6 +32,24 @@ S=======W....g..TTTTTTTTTTT...TTTTT#
 #TTTTTTTTT.L.TTTTTTTTTTT.......N...E
 #TTTTTTTTT...TTTTTTTTTTT.L.....w..T#
 #TTTTTTTTTTTTTTTTTTTTTTT........g.T#
+############################G#######
+#TTTTTTTTTTTTTTTTTTTTTTTTTT...TTTTT#
+#TT.....TTTTTTTTTTTTTTTTTT.....TTTT#
+#T..o...TTTTTTTTTTTTTTTTT...g...TTT#
+#T......===============......j..TTT#
+#T..L...TTTTTTTTTTTTTTTT..g......TT#
+#TT.....TTTTTTTTTTTTTTTTT........TT#
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#......TTTTTT...........TTTT.......#
+#..o...TTTTTT.....a.....TTTT...w...#
+#..j...TTTTTT.....C.....TTTT.......#
+#......======...s.......====w...o..#
+#L.....TTTTTT...........TTTT.....L.#
+#TTTTTTTTTTTTTTBTTBTTBTTTTTTTTTTTTT#
+#TTTTTTTTTTTT...TT.TT...TTTTTTTTTTT#
+#TTTTTTTTTTTT.m.T.h.T.k.TTTTTTTTTTT#
+#TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT#
 ####################################"""
 
 var grid: Array = []
@@ -44,6 +65,13 @@ var solved := false
 var gate: Node3D         # the brick wall V in front of the niche
 var chest: Node3D
 var chest_open := false
+var south: Array = []      # [{"pos", "kind"}] the valley's monsters (g a s j w), woken when the grey gate opens
+var gate_open := false     # the grey gate G
+var grey_gate: Node3D
+var mem_lamps: Array = []  # [{"pos", "light", "glass", "lit"}] west-north, west-south, east-south
+var doors: Array = []      # [{"pos", "node", "open", "pic"}] squirrel, sunset, moon (west to east)
+var boxes: Array = []      # [{"pos", "node", "open"}] the squirrels' store, Noeul's hollow, Hangyeol's pack
+const DOOR_PICS := ["다람쥐 꼬리 그림", "해 지는 그림", "초승달 그림"]
 
 func _init() -> void:
 	for line in ROWS.split("\n"):
@@ -70,7 +98,19 @@ func blocked(x: float, z: float) -> bool:
 		return not wall_at(x, z).get("open", false)
 	if c == "V":
 		return not solved
-	return c == "#" or c == "T" or c in "1234tc"
+	if c == "G":
+		return not gate_open
+	if c == "B":
+		var dr := door_at(x, z)
+		return dr.is_empty() or not dr.open
+	return c == "#" or c == "T" or c in "1234tc~omhk"
+
+func door_at(x: float, z: float) -> Dictionary:
+	var p := Vector2(round(x), round(z))
+	for d in doors:
+		if d.pos == p:
+			return d
+	return {}
 
 func build(m: Node) -> void:
 	var blocks: Array = [] # [Transform3D, Color]
@@ -79,11 +119,13 @@ func build(m: Node) -> void:
 		for x in W:
 			var c: String = grid[z][x]
 			var w := Vector2(FOREST_X + x, z)
-			if c in "SNEVtc":
+			if c in "SNEVtcGCmhk":
 				marks[c] = w
-			if c == "g":
+			if z > 21 and c in "gwasj": # the valley wakes later, with the grey gate
+				south.append({"pos": w, "kind": c})
+			elif c == "g":
 				goblins.append(w)
-			if c == "w":
+			elif c == "w":
 				wolves.append(w)
 			if c == "L":
 				lamp_spots.append(w)
@@ -93,8 +135,11 @@ func build(m: Node) -> void:
 				"=": col = Color("#a39c90")
 				"#": col = Color("#3e3a36")
 				"T": col = Color("#5d6352")
+				"~": col = Color("#2a4a5e") # the stream bed, under its glowing face
 			if c == "#":
 				hgt = 0.9
+			if c == "~":
+				hgt = 0.1
 			col = col.lightened(m.rnd(0, 0.08))
 			blocks.append([Transform3D(Basis().scaled(Vector3(1, hgt, 1)), Vector3(w.x, hgt / 2.0 - 0.4, w.y)), col])
 			if c == "T":
@@ -142,6 +187,79 @@ func build(m: Node) -> void:
 				var p := Vector2(FOREST_X + x, z)
 				walls.append({"pos": p, "node": brick_wall(m, p), "open": false})
 	build_grove(m)
+	build_hollow(m, post_mat, glass)
+
+# the south valley: grey gate, stream face, memory lamps (dark until the crown wakes them), picture doors, boxes
+func build_hollow(m: Node, post_mat: Material, glass: Material) -> void:
+	grey_gate = brick_wall(m, marks.G, Color("#8a8a90"), Color("#9a9aa0"))
+	var wet: Material = m.glow_mat(Color("#2f78b8"), 0.6)
+	wet.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
+	wet.blend_mode = BaseMaterial3D.BLEND_MODE_MIX
+	var face: MeshInstance3D = m.box(Vector3(W - 2.0, 0.02, 2.0), wet)
+	face.position = Vector3(FOREST_X + W / 2.0 - 0.5, -0.28, 28.5)
+	m.add_child(face)
+	for z in H:
+		for x in W:
+			var c: String = grid[z][x]
+			var w := Vector2(FOREST_X + x, z)
+			if c == "o":
+				m.lantern(w.x - 0.3, w.y, post_mat, glass)
+				var l: OmniLight3D = m.lanterns[m.lanterns.size() - 1]
+				var g: MeshInstance3D = l.get_meta("glass")
+				g.set_meta("lit_mat", g.material_override)
+				g.material_override = m.mat_color(Color("#3a3428"))
+				l.set_meta("dark", true)
+				mem_lamps.append({"pos": w, "light": l, "glass": g, "lit": false})
+			elif c == "B":
+				var k := doors.size()
+				var node := brick_wall(m, w)
+				# the picture on a little plaque above the bricks: a squirrel's tail, a sunset, a crescent moon
+				var pic: Array = [[Color("#c8783a"), Vector3(0.18, 0.34, 0.04), Vector3(0.12, 0.08, 0)],
+					[Color("#ff8a4a"), Vector3(0.5, 0.22, 0.04), Vector3(0, -0.04, 0)],
+					[Color("#f4e7b0"), Vector3(0.12, 0.34, 0.04), Vector3(-0.08, 0, 0)]][k]
+				var plaque: MeshInstance3D = m.box(Vector3(0.62, 0.42, 0.06), m.mat_color(Color("#3e3a36")))
+				plaque.position = Vector3(0, 1.8, 0)
+				node.add_child(plaque)
+				var mark: MeshInstance3D = m.box(pic[1], m.glow_mat(pic[0], 1.2))
+				mark.position = Vector3(0, 1.8, 0.05) + pic[2]
+				node.add_child(mark)
+				if k == 1: # the sunset's horizon line
+					var hz: MeshInstance3D = m.box(Vector3(0.56, 0.04, 0.04), m.mat_color(Color("#5a2a1e")))
+					hz.position = Vector3(0, 1.66, 0.06)
+					node.add_child(hz)
+				doors.append({"pos": w, "node": node, "open": false, "pic": DOOR_PICS[k]})
+			elif c in "mhk":
+				boxes.append({"pos": w, "node": make_box(m, w, Color("#c8783a") if c == "m" else (Color("#ff8a4a") if c == "h" else Color("#e8d27a"))), "open": false})
+
+func make_box(m: Node, at: Vector2, lid_col: Color) -> Node3D:
+	var b := Node3D.new()
+	var lid: Material = m.glow_mat(lid_col, 1.2)
+	for part in [[Vector3(0.7, 0.4, 0.5), Vector3(0, 0.2, 0), m.mat_color(Color("#4a3a2e"))], [Vector3(0.74, 0.1, 0.54), Vector3(0, 0.45, 0), lid]]:
+		var bb: MeshInstance3D = m.box(part[0], part[2])
+		bb.position = part[1]
+		b.add_child(bb)
+	b.position = Vector3(at.x, 0, at.y)
+	m.add_child(b)
+	return b
+
+func open_gate_look() -> void:
+	gate_open = true
+	grey_gate.visible = false
+
+func open_door(d: Dictionary) -> void:
+	d.open = true
+	for ch in d.node.get_children():
+		ch.visible = ch.position.y > 1.5 # the plaque stays up, the bricks go
+
+func open_box_look(b: Dictionary) -> void:
+	b.open = true
+	for ch in b.node.get_children():
+		ch.transparency = 0.45
+
+func light_mem(l: Dictionary) -> void:
+	l.lit = true
+	l.light.set_meta("dark", false)
+	l.glass.material_override = l.glass.get_meta("lit_mat")
 
 # the moon-stone grove: four stone posts with a glowing moon on top, a tablet, a wall and a chest
 func build_grove(m: Node) -> void:
@@ -201,10 +319,10 @@ func open_chest_look() -> void:
 		b.transparency = 0.45
 
 # a wall of studded toy bricks, red and grey, filling one tile of the path
-func brick_wall(m: Node, at: Vector2) -> Node3D:
+func brick_wall(m: Node, at: Vector2, col_a := Color("#a8322a"), col_b := Color("#8a8a90")) -> Node3D:
 	var g := Node3D.new()
-	var red: Material = m.mat_color(Color("#a8322a"))
-	var grey: Material = m.mat_color(Color("#8a8a90"))
+	var red: Material = m.mat_color(col_a)
+	var grey: Material = m.mat_color(col_b)
 	for row in 4:
 		for k in 2:
 			var b: MeshInstance3D = m.box(Vector3(0.48, 0.34, 0.9), red if (row + k) % 2 == 0 else grey)
@@ -237,6 +355,10 @@ func map_tex(width: int) -> ImageTexture:
 				"N": col = Color("#9a9aa0")
 				"1", "2", "3", "4", "t": col = Color("#8c8a84")
 				"V": col = Color("#c8322a")
-				"c": col = Color("#bcd6ff")
+				"c", "m", "h", "k": col = Color("#bcd6ff")
+				"~": col = Color("#2f78b8")
+				"G": col = Color("#9a9aa0")
+				"B": col = Color("#c8322a")
+				"o": col = Color("#ffd060")
 			img.set_pixel(FOREST_X + x, z, col)
 	return ImageTexture.create_from_image(img)

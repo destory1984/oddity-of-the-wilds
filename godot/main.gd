@@ -195,6 +195,8 @@ func skip_water(x: float, z: float) -> bool:
 		return castle.char_at(x, z) == "~"
 	if x >= GROTTO.GROTTO_X - 0.5:
 		return grotto.char_at(x, z) == "~"
+	if x >= FOREST.FOREST_X - 0.5 and x < GARDEN.GARDEN_X - 0.5:
+		return forest.char_at(x, z) == "~"
 	return x < CAVE_X - 0.5 and tile_at(x, z) == WATER and x > 1.0 and z > 1.0 and z < N - 2.0 and (x < N - 2.0 or (z > 17.5 and z < 23.5 and x < N - 0.5))
 
 func player_can(x: float, z: float) -> bool:
@@ -353,6 +355,7 @@ const SCENES := {
 	"hill": {"play": true, "village": true, "hill": true, "hour": 10.0},
 	"kid": {"play": true, "village": true, "kid": true, "hour": 20.5},
 	"grove": {"play": true, "village": true, "forest": true, "grove": true, "hour": 15.0},
+	"hollow": {"play": true, "village": true, "forest": true, "hollow": true, "hour": 21.0},
 	"flies": {"play": true, "at": Vector2(8, 23), "hour": 22.5, "flies": true},
 	"crab": {"play": true, "village": true, "crab": true, "hour": 14.0},
 	"grotto_in": {"play": true, "village": true, "crab": true, "grotto_in": true, "hour": 21.0},
@@ -456,6 +459,17 @@ func apply_test_args(args: PackedStringArray) -> void:
 				player.x = forest.marks.t.x + 2.0
 				player.z = forest.marks.t.y
 				close_story()
+			if sc.has("hollow"): # the south valley open, its lamps lit, Sora west of the cloak's yard
+				close_story()
+				forest_q = 3
+				join_noeul()
+				hollow_q = 1
+				forest.open_gate_look()
+				for l in forest.mem_lamps:
+					forest.light_mem(l)
+				spawn_hollow()
+				player.x = forest.marks.C.x - 3.0
+				player.z = forest.marks.C.y + 1.0
 		if sc.get("mold", false): # the last boss in the heart of the garden
 			night_q = 4
 			forest_q = 3
@@ -2600,9 +2614,10 @@ func travel(i: int) -> void:
 		save_game())
 
 const CHANGES := [
-	"개발 상황: 놀 수 있는 분량 약 244분 / 목표 300분 (81%)",
+	"개발 상황: 놀 수 있는 분량 약 256분 / 목표 300분 (85%)",
 	"",
 	"2026-10-23 저녁",
+	"· v0.0.2: 5장 숲 남쪽 잠든 골짜기(약 12분). 노을이 동료가 된 뒤 빈터 남쪽 회색 문으로 내려간다. 개울을 물수제비로 건너고, 기억 등불 셋으로 노을의 옛 기억을 찾고, 빈 망토(체력 1000)와 싸우고, 그림 문 셋 가운데 해 지는 그림 문에서 한결의 편지와 열셋째 등불을 찾는다. 심지에게 건네면 최대 체력 +15, 금화 150, 노을의 공격 간격 1.4 → 1.1초. 새 괴물 벽돌 고슴도치: 몸을 말면 모든 공격을 막고, 가시를 터뜨린 뒤 1.4초 어지러워 피해를 1.3배 받는다.",
 	"· v0.0.1: 설정 창 제목 아래에 버전과 날짜를 작게 띄운다. 기능을 하나 더할 때마다 끝 숫자가 1씩 오른다. 넷째 칸 이름을 만든 이 → About으로 바꿨다.",
 	"· v0.0.1: 설정 창 제목 아래에 버전과 날짜를 작게 띄운다. 기능을 하나 더할 때마다 끝 숫자가 1씩 오른다. 넷째 칸 이름을 만든 이 → About으로 바꿨다.",
 	"· 마을을 32x24 → 48x36으로 넓혔다. 장터(정직 상자 가판대 3곳, 과녁 마당), 여관(금화 10, 하룻밤 회복), 낚시하는 부두.",
@@ -3119,6 +3134,8 @@ func story_talk_ok(key: String) -> bool:
 		"knight": return castle_q >= 3 and garden_q == 0
 		"lamp": return under_chest_open
 		"magpie": return magpie_q >= 3
+		"hollow_hint": return forest_q >= 3 and hollow_q == 0
+		"hollow_done": return hollow_q >= 4
 		"letters": return village.bottles_got() == village.bottles.size()
 		"festival": return fest_gift
 		"inn": return inn_nights >= 1
@@ -3591,6 +3608,13 @@ func footstep() -> void:
 func damage_enemy(e: Dictionary, amt: float, from: Vector2, kb := 4.0, force_crit := false, stop := 0.05) -> void:
 	if e.get("locked", false) or e.get("air", false):
 		return # the mold at its last sliver only breaks to the wind; the hawk is out of reach in the air
+	if e.get("curl", 0.0) > 0.0: # a curled brick hedgehog: every side is spikes
+		pop_num(Vector3(e.x, 1.2, e.z), "막음", Color("#c8c8d0"))
+		burst(Vector3(e.x, 0.5, e.z), Color("#8a8a90"), 6, 2.0)
+		sfx(700, 0.06, "square", 0.15, -300)
+		return
+	if e.get("dizzy", 0.0) > 0.0:
+		amt *= 1.3
 	if e.get("shield", 0) > 0 and e.get("wind", 0.0) <= 0.0:
 		e.shield -= 1
 		pop_num(Vector3(e.x, 1.4, e.z), "막음", Color("#c8c8d0"))
@@ -3645,7 +3669,9 @@ func damage_enemy(e: Dictionary, amt: float, from: Vector2, kb := 4.0, force_cri
 		e.node.queue_free()
 		e.shadow.queue_free()
 		burst(Vector3(e.x, y + 0.4, e.z), Color("#ff9a4a"), 26, 3.5)
-		if e.get("noeul", false):
+		if e.get("cloak", false):
+			get_tree().create_timer(1.0).timeout.connect(cloak_beaten)
+		elif e.get("noeul", false):
 			get_tree().create_timer(1.0).timeout.connect(noeul_turned if e.get("second", false) else noeul_beaten)
 		elif e.get("turtle", false):
 			get_tree().create_timer(1.0).timeout.connect(turtle_beaten)
@@ -4699,6 +4725,7 @@ func save_game() -> void:
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
 		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "books": castle.books.map(func(b): return b.read), "has_bookmark": has_bookmark, "has_shard": has_shard, "shop_bought": shop_bought, "play_secs": play_secs, "ng": ng, "fest_gift": fest_gift, "mail_q": mail_q, "mail_got": mail_got, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes, "target_best": target_best, "has_medal": has_medal, "bottles": village.bottles.map(func(b): return b.got), "inn_nights": inn_nights, "magpie_q": magpie_q, "talks_heard": talks_heard.keys(),
+		"hollow_q": hollow_q, "mem_lit": forest.mem_lamps.map(func(l): return l.lit), "hollow_doors": forest.doors.map(func(dr): return dr.open), "hollow_boxes": forest.boxes.map(func(b): return b.open),
 		"seals": garden.seals.map(func(sl): return sl.open),
 		"stairs_wall": stairs.wall_open, "stairs_lamps": stairs.lamps.map(func(l): return l.lit),
 		"castle_q": castle_q, "bars": castle.bars, "levers": castle.levers.map(func(lv): return lv.up), "vault": castle.vault_open, "has_armour": has_armour, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read),
@@ -4732,6 +4759,7 @@ func load_game() -> void:
 	mul_q = int(d.get("mul_q", 0))
 	night_q = int(d.get("night_q", 0))
 	forest_q = int(d.get("forest_q", 0))
+	hollow_q = int(d.get("hollow_q", 0))
 	garden_q = int(d.get("garden_q", 0))
 	hill_q = int(d.get("hill_q", 0))
 	var ms: Array = d.get("mills", [])
@@ -4764,6 +4792,22 @@ func load_game() -> void:
 	for i in mini(wo.size(), forest.walls.size()):
 		if wo[i]:
 			forest.open_wall(forest.walls[i])
+	if hollow_q >= 1:
+		forest.open_gate_look()
+	var ml: Array = d.get("mem_lit", [])
+	for i in mini(ml.size(), forest.mem_lamps.size()):
+		if ml[i]:
+			forest.light_mem(forest.mem_lamps[i])
+	var hd: Array = d.get("hollow_doors", [])
+	for i in mini(hd.size(), forest.doors.size()):
+		if hd[i]:
+			forest.open_door(forest.doors[i])
+	var hb: Array = d.get("hollow_boxes", [])
+	for i in mini(hb.size(), forest.boxes.size()):
+		if hb[i]:
+			forest.open_box_look(forest.boxes[i])
+	if hollow_q >= 4:
+		hang_thirteenth()
 	if forest_q == 2:
 		forest_q = 1 # the duel starts over when she walks back to the clearing
 	has_unbrick = bool(d.get("has_unbrick", false))
@@ -5374,6 +5418,8 @@ func crown_key() -> void:
 	if in_cave and shrine_key():
 		return
 	if in_forest:
+		if hollow_key():
+			return
 		if grove_key():
 			return
 		if try_unbrick():
@@ -5413,6 +5459,9 @@ func crown_key() -> void:
 		if cupboard_key():
 			return
 		if trial_key():
+			return
+		if hollow_q == 3 and me.distance_to(village.marks.M) < 1.8:
+			simji_lantern()
 			return
 		if me.distance_to(village.marks.M) < 1.8 and deliver(1, STORY.MAIL_SIMJI):
 			return
@@ -5672,17 +5721,17 @@ func rise_together() -> void:
 	set_quest("동쪽 들판의 노을과 겨루자")
 	save_game()
 
-func spawn_noeul_duel(second := false) -> void:
+func spawn_noeul_duel(second := false, cloak := false) -> void:
 	if enemies.any(func(e): return e.get("noeul", false) and not e.dead):
 		return
-	var at: Vector2 = forest.marks.N if second else NOEUL_DUEL_AT + Vector2(VILLAGE.VILLAGE_X, 0)
+	var at: Vector2 = forest.marks.C if cloak else (forest.marks.N if second else NOEUL_DUEL_AT + Vector2(VILLAGE.VILLAGE_X, 0))
 	var node := Node3D.new()
 	node.add_child(noeul_sprite())
 	add_child(node)
-	var hp := 830.0 if second else 550.0
+	var hp := 1000.0 if cloak else (830.0 if second else 550.0)
 	enemies.append({"x": at.x, "z": at.y, "hp": hp, "max_hp": int(hp), "node": node, "shadow": blob(0.8), "t": 0.0,
 		"atk_cd": 2.0, "hurt": 0.0, "kx": 0.0, "kz": 0.0, "wx": at.x, "wz": at.y, "dead": false, "respawn": 0.0,
-		"noeul": true, "second": second, "cave": true, "wind": 0.0, "dash": 0.0, "dir": Vector2.ZERO, "stun": 0.0, "next": "dash", "rings": []})
+		"noeul": true, "second": second or cloak, "cloak": cloak, "cave": true, "wind": 0.0, "dash": 0.0, "dir": Vector2.ZERO, "stun": 0.0, "next": "dash", "rings": []})
 
 # Noeul's duel: a quick telegraphed dash, then rings of brick dust around Sora; below half HP, three rings
 func update_noeul(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
@@ -5690,12 +5739,14 @@ func update_noeul(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
 	var spr: Sprite3D = node.get_child(0)
 	var awake := d < 9.0
 	ui.boss.visible = awake or (ui.boss.visible and d < 13.0)
-	ui.boss_name.text = "노을"
+	var cloak: bool = e.get("cloak", false)
+	ui.boss_name.text = "빈 망토" if cloak else "노을"
 	ui.boss_bar.size.x = 420.0 * maxf(0.0, e.hp) / e.max_hp
 	e.t += dt
 	e.hurt -= dt
 	e.stun -= dt
-	spr.modulate = Color(1.6, 1.4, 1.4) if e.hurt > 0.0 else Color.WHITE
+	var base := Color(0.6, 0.6, 0.65, 0.75) if cloak else Color.WHITE # the empty cloak: grey and see-through
+	spr.modulate = Color(1.6, 1.4, 1.4, base.a) if e.hurt > 0.0 else base
 	if e.dash > 0.0:
 		e.dash -= dt
 		var nx: float = e.x + e.dir.x * 11.0 * dt
@@ -5783,6 +5834,8 @@ func enter_forest() -> void:
 			spawn_wolf(w)
 		show_story("", STORY.FOREST_IN)
 	spawn_cages()
+	if hollow_q == 1:
+		spawn_hollow()
 	if forest_q < 3:
 		set_quest("벽돌 벽을 왕관으로 풀며 숲 동쪽 끝의 노을에게 가자 (E)")
 	save_game()
@@ -5916,12 +5969,250 @@ func cage_hit(e: Dictionary) -> void:
 	save_game()
 
 func update_forest() -> void:
+	update_hollow()
 	if forest_q == 1 and not story_open and Vector2(player.x, player.z).distance_to(forest.marks.N) < 6.0:
 		forest_q = 2
 		show_story("", STORY.NOEUL_DUEL2)
 		after_story = spawn_noeul_duel.bind(true)
 		set_quest("노을과 다시 겨루자")
 		save_game()
+
+# ---- the forest's south valley (chapter 5 side zone, DESIGN.md "숲 남쪽 잠든 골짜기"). After Noeul joins,
+# her cloak scrap opens the grey gate under the clearing. Three memory lamps give back her story, the empty
+# cloak rises in the middle yard, and of three picture doors the sunset (노을, her name) hides her hollow:
+# Hangyeol's letter and the thirteenth lantern, which Simji hangs at the village's east gate.
+var hollow_q := 0          # 0 gate shut, 1 open, 2 the empty cloak beaten, 3 holding the thirteenth lantern, 4 given to Simji
+var hollow_spawned := false
+var stream_told := false
+var door_seen := -1        # the picture door last named in a toast
+var thirteenth: Node3D = null
+
+func hollow_key() -> bool:
+	var me := Vector2(player.x, player.z)
+	if hollow_q == 0 and me.distance_to(forest.marks.G) < 1.6:
+		if forest_q < 3:
+			toast("회색 벽돌 문. 왕관으로는 풀리지 않는다")
+			return true
+		hollow_q = 1
+		forest.open_gate_look()
+		burst(Vector3(forest.marks.G.x, 0.7, forest.marks.G.y), Color("#9a9aa0"), 40, 3.0)
+		shake = 0.25
+		sfx(220, 0.5, "triangle", 0.3, -80)
+		show_story("", STORY.HOLLOW_GATE)
+		spawn_hollow()
+		save_game()
+		return true
+	for l in forest.mem_lamps:
+		if not l.lit and me.distance_to(l.pos) < 1.6:
+			if not spend_pips(1):
+				return true
+			forest.light_mem(l)
+			burst(l.light.position, Color("#ffc46a"), 24, 2.5)
+			burst(Vector3(player.x, 1.6, player.z), Color("#9fd4ff"), 14, 1.5)
+			sfx(523, 0.4, "sine", 0.3, 300)
+			var n: int = forest.mem_lamps.filter(func(x): return x.lit).size()
+			show_story("", [STORY.HOLLOW_MEM1, STORY.HOLLOW_MEM2, STORY.HOLLOW_MEM3][n - 1])
+			save_game()
+			return true
+	for dr in forest.doors:
+		if not dr.open and me.distance_to(dr.pos) < 1.6:
+			if not spend_pips(unbrick_cost()):
+				return true
+			forest.open_door(dr)
+			burst(Vector3(dr.pos.x, 0.7, dr.pos.y), Color("#8a6a4a"), 36, 3.5)
+			burst(Vector3(player.x, 1.6, player.z), Color("#9fd4ff"), 14, 1.5)
+			shake = 0.25
+			sfx(196, 0.5, "triangle", 0.3, -60)
+			toast(tr("%s 문이 흙으로 풀렸다") % tr(dr.pic))
+			save_game()
+			return true
+	for i in forest.boxes.size():
+		var b: Dictionary = forest.boxes[i]
+		if not b.open and me.distance_to(b.pos) < 1.6:
+			if i == 1 and hollow_q < 2:
+				toast("굴 안이 회색 가루로 막혀 있다. 가운데 마당이 아직 술렁인다")
+				return true
+			open_hollow_box(i)
+			return true
+	return false
+
+func open_hollow_box(i: int) -> void:
+	var b: Dictionary = forest.boxes[i]
+	forest.open_box_look(b)
+	burst(Vector3(b.pos.x, 0.8, b.pos.y), Color("#e8d27a"), 40, 3.0)
+	sfx(784, 0.12, "triangle", 0.25)
+	match i:
+		0: # the squirrels' winter store
+			var n := 3 if has_acorn else 2
+			player.pots += n
+			player.gold += 40
+			show_story("", STORY.HOLLOW_SQUIRREL)
+			toast(tr("회복약 %d개, 금화 40") % n)
+		1: # Noeul's hollow
+			hollow_q = 3
+			show_story("", STORY.HOLLOW_LETTER)
+			toast("열셋째 등불 · 마을의 심지에게 가져가자")
+		2: # Hangyeol's pack
+			player.max_hp += 10
+			player.hp = float(player.max_hp)
+			player.gold += 80
+			show_story("", STORY.HOLLOW_MOON)
+			toast("최대 체력 +10, 금화 80")
+	save_game()
+
+# the valley's monsters wake once the grey gate is open; they do not come back
+func spawn_hollow() -> void:
+	if hollow_spawned:
+		return
+	hollow_spawned = true
+	for sp in forest.south:
+		match sp.kind:
+			"g", "s":
+				spawn_enemy(sp.pos)
+				if sp.kind == "s":
+					give_shield(enemies[enemies.size() - 1])
+			"a":
+				spawn_enemy(sp.pos, true)
+			"w":
+				spawn_wolf(sp.pos)
+			"j":
+				spawn_hog(sp.pos)
+
+func update_hollow() -> void:
+	var me := Vector2(player.x, player.z)
+	if hollow_q < 1 or player.z < 21.5:
+		if ui.zone_sub.text == "잠든 골짜기":
+			ui.zone_sub.text = "회색 오솔길"
+		return
+	if ui.zone_sub.text != "잠든 골짜기":
+		ui.zone_sub.text = "잠든 골짜기"
+	if story_open:
+		return
+	if not stream_told and player.z > 25.5:
+		stream_told = true
+		show_story("", STORY.HOLLOW_STREAM)
+		return
+	if hollow_q == 1 and forest.mem_lamps.all(func(l): return l.lit) and me.distance_to(forest.marks.C) < 5.0 \
+			and not enemies.any(func(e): return e.get("cloak", false) and not e.dead):
+		show_story("", STORY.HOLLOW_CLOAK)
+		after_story = spawn_noeul_duel.bind(false, true)
+		return
+	var near := -1
+	for i in forest.doors.size():
+		if not forest.doors[i].open and me.distance_to(forest.doors[i].pos) < 1.6:
+			near = i
+	if near != door_seen:
+		door_seen = near
+		if near >= 0:
+			toast(tr("문에 %s이 있다") % tr(forest.doors[near].pic))
+
+func cloak_beaten() -> void:
+	hollow_q = 2
+	ui.boss.visible = false
+	player.gold += 120
+	gain_xp(200)
+	show_story("", STORY.HOLLOW_CLOAK_DONE)
+	save_game()
+
+func simji_lantern() -> void:
+	hollow_q = 4
+	player.max_hp += 15
+	player.hp = float(player.max_hp)
+	player.gold += 150
+	show_story("", STORY.SIMJI_LANTERN)
+	hang_thirteenth()
+	save_game()
+
+# the thirteenth lantern on the post by the village's east gate: lit, so it is a rest spot at night
+func hang_thirteenth() -> void:
+	if thirteenth != null:
+		return
+	var glass: Material = glow_mat(Color("#ffc46a"), 4.0)
+	glass.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
+	glass.blend_mode = BaseMaterial3D.BLEND_MODE_MIX
+	var at: Vector2 = village.marks.F + Vector2(-1.0, -1.2)
+	lantern(at.x, at.y, mat_color(Color("#3b2a1e")), glass)
+	thirteenth = lanterns[lanterns.size() - 1]
+	rocks.append({"x": at.x, "z": at.y, "r": 0.25})
+
+# ---- brick hedgehog ("방패 괴물"): a round toy with brick spikes. Within 2.4 tiles it curls for 1.0 s and
+# turns every blow (a warning ring the last 0.6 s), then bursts its spikes (1.8 tiles, 8 + level) and is
+# dizzy for 1.4 s, taking x1.3. Companions bounce off it too: Sora has to wait for the opening.
+func make_hog() -> Node3D:
+	var root := Node3D.new()
+	var g := Node3D.new()
+	root.add_child(g)
+	var mats: Array = []
+	var body := Color("#8a6a4a")
+	var spike := Color("#8a8a90")
+	brick(g, mats, Vector3(0.56, 0.4, 0.62), Vector3(0, 0.28, 0), body)              # body
+	brick(g, mats, Vector3(0.26, 0.22, 0.2), Vector3(0, 0.24, 0.38), Color("#c8a07a")) # face
+	brick(g, mats, Vector3(0.08, 0.08, 0.06), Vector3(0, 0.22, 0.5), Color("#2a2420"), false) # nose
+	brick(g, mats, Vector3(0.06, 0.06, 0.03), Vector3(-0.07, 0.3, 0.48), Color("#ffc23a"), false, true) # eyes
+	brick(g, mats, Vector3(0.06, 0.06, 0.03), Vector3(0.07, 0.3, 0.48), Color("#ffc23a"), false, true)
+	for k in 7: # spikes along the back
+		var a := -1.2 + k * 0.4
+		brick(g, mats, Vector3(0.12, 0.2, 0.12), Vector3(sin(a) * 0.24, 0.5 + cos(a) * 0.04, -0.1 + cos(a) * 0.12 - absf(a) * 0.08), spike, false)
+	for k in 3:
+		brick(g, mats, Vector3(0.12, 0.18, 0.12), Vector3(-0.2 + k * 0.2, 0.46, -0.3), spike, false)
+	root.scale = Vector3.ONE * 1.3
+	root.set_meta("mats", mats)
+	root.set_meta("body", g)
+	return root
+
+func spawn_hog(at: Vector2) -> void:
+	var node := make_hog()
+	add_child(node)
+	var hp: int = 40 + player.lv * 9
+	enemies.append({"x": at.x, "z": at.y, "hp": float(hp), "max_hp": hp, "node": node, "shadow": blob(0.7), "t": rnd(0, 5),
+		"atk_cd": rnd(0.5, 1.5), "hurt": 0.0, "kx": 0.0, "kz": 0.0, "wx": at.x, "wz": at.y, "dead": false, "respawn": 0.0,
+		"hog": true, "cave": true, "curl": 0.0, "dizzy": 0.0, "warned": false})
+
+func update_hog(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
+	var v := Vector2.ZERO
+	var body: Node3D = e.node.get_meta("body")
+	if e.curl > 0.0:
+		e.curl -= dt
+		if e.curl <= 0.6 and not e.warned:
+			e.warned = true
+			warn_ring(Vector3(e.x, 0.0, e.z), 1.8, 0.6)
+		if e.curl <= 0.0: # the spikes burst
+			e.curl = 0.0
+			burst(Vector3(e.x, 0.4, e.z), Color("#8a8a90"), 24, 4.0)
+			sfx(140, 0.2, "square", 0.2, -60)
+			if d < 1.8:
+				player_hit(8 + player.lv, Vector2(e.x, e.z), e)
+			e.dizzy = 1.4
+			e.atk_cd = 2.4
+	elif e.dizzy > 0.0:
+		e.dizzy -= dt
+		v = Vector2(e.kx, e.kz)
+	elif e.hurt > 0.0:
+		v = Vector2(e.kx, e.kz)
+	elif d < 2.4 and e.atk_cd <= 0.0 and not intro:
+		e.curl = 1.0
+		e.warned = false
+	elif d < 7.0 and not intro:
+		v = to / maxf(d, 0.01) * 1.2
+	e.kx *= pow(0.002, dt)
+	e.kz *= pow(0.002, dt)
+	var nx: float = e.x + v.x * dt
+	var nz: float = e.z + v.y * dt
+	if walkable(nx, e.z): e.x = nx
+	if walkable(e.x, nz): e.z = nz
+	var node: Node3D = e.node
+	node.position = Vector3(e.x, height_at(e.x, e.z), e.z)
+	if e.dizzy > 0.0:
+		node.rotation.y += dt * 9.0 # spins on the spot
+	elif v.length() > 0.1:
+		node.rotation.y = lerp_angle(node.rotation.y, atan2(v.x, v.y), minf(1.0, dt * 8.0))
+	var rolled: bool = e.curl > 0.0
+	body.scale = Vector3(1.1, 0.75, 1.0) if rolled else Vector3.ONE # a tight ball while curled
+	for m in node.get_meta("mats"):
+		m.emission_enabled = e.hurt > 0.0 or (rolled and e.warned)
+		m.emission = Color("#ff3a2a") if rolled and e.hurt <= 0.0 else Color.WHITE
+		m.emission_energy_multiplier = 0.9
+	e.shadow.position = Vector3(e.x, 0.02, e.z)
 
 func noeul_turned() -> void:
 	forest_q = 3
@@ -6928,7 +7219,7 @@ func update_mate2(dt: float) -> void:
 			best = dd
 			target = e
 	if target != null and mate2_cd <= 0.0 and not story_open:
-		mate2_cd = 1.4
+		mate2_cd = 1.1 if hollow_q >= 4 else 1.4
 		spr.frame = 2
 		damage_enemy(target, player.atk * 0.7, Vector2(mate2.position.x, mate2.position.z), 2.0)
 		burst(Vector3(target.x, 0.8, target.z), Color("#9a9a9a"), 12, 2.0)
@@ -8018,6 +8309,9 @@ func journal_lines() -> Array:
 		side.call("울림 수정", tr("끝") if has_ring else (tr("상자를 열자") if crystal_done else tr("낮은 소리부터 차례로")))
 	if story_step >= 6:
 		side.call("동굴의 세 돌단", tr("아직 찾지 못했다") if not shrine_seen else (tr("깨운 기술: %s") % tr(["회오리", "불씨탄", "빛파동"][skill_up]) if skill_up >= 0 else tr("하나를 고르자")))
+	if forest_q >= 3:
+		var ml: int = forest.mem_lamps.filter(func(l): return l.lit).size()
+		side.call("노을의 열셋째 등불", [tr("숲 빈터 남쪽의 회색 문"), tr("기억 %d/3") % ml if ml < 3 else tr("가운데 마당으로"), tr("해 지는 그림 문을 찾자"), tr("마을의 심지에게 가져가자"), tr("끝")][hollow_q])
 	if marsh.picked_count() > 0 or has_tea:
 		side.call("늪의 달꽃", tr("끝") if has_tea else (tr("보리 할머니께 가져가자") if marsh.picked_count() == 3 else tr("%d/3 · 달이 반 넘게 찬 밤에만 핀다") % marsh.picked_count()))
 	if errand >= 1:
@@ -8074,6 +8368,7 @@ func journal_lines() -> Array:
 	if has_pearl: keep.append(tr("물빛 진주"))
 	if has_feather: keep.append(tr("바람 깃털"))
 	if has_acorn: keep.append(tr("다람쥐 도토리"))
+	if hollow_q == 3: keep.append(tr("열셋째 등불"))
 	if has_ring: keep.append(tr("수정 반지"))
 	if has_shoes: keep.append(tr("바람 신발"))
 	if has_armour: keep.append(tr("달지기 갑옷"))
@@ -8608,6 +8903,9 @@ func update_enemies(dt: float, gy: float) -> void:
 			continue
 		if e.get("wolf", false):
 			update_wolf(e, dt, d, to)
+			continue
+		if e.get("hog", false):
+			update_hog(e, dt, d, to)
 			continue
 		if e.get("bat", false):
 			update_bat(e, dt, d, to)
