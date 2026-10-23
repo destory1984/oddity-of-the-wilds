@@ -102,6 +102,40 @@
 - 효과음은 코드에서 합성한다. 글꼴은 Pretendard를 쓴다.
 - 자동 시험 88개가 처음 깨어나기부터 끝 장면까지 따라가며 확인한다.
 
+## 개발 구성도
+
+```mermaid
+flowchart LR
+  subgraph PC["개발 PC"]
+    SRC["wilds_godot/<br/>Godot 원본<br/>main.gd + 지역 스크립트"]
+    ART["GPT 이미지 생성<br/>(Codex CLI)"]
+    DEV["tools/dev.py<br/>check · shot · test · ship"]
+    TEST["tools/autoplay.gd<br/>자동 시험 90여 개"]
+    PLAY["play/<br/>로컬에서 해 보는 폴더"]
+  end
+  SITE["rpg_demo/<br/>사이트 저장소<br/>웹 실행 파일 + godot/ 사본"]
+  GH["GitHub<br/>destory1984/oddity-of-the-wilds"]
+  PAGES["GitHub Pages<br/>브라우저에서 하기"]
+
+  ART -->|그림| SRC
+  SRC --> DEV
+  DEV -->|시험| TEST
+  DEV -->|웹 내보내기| PLAY
+  DEV -->|통과하면 복사와 커밋| SITE
+  SITE -->|푸시, 1시간에 한 번까지| GH
+  GH --> PAGES
+```
+
+| 부분 | 하는 일 |
+|---|---|
+| `wilds_godot/` | Godot 4.7 원본. `main.gd` 가 늪, 소라, 전투, 이야기, 저장, 화면을 맡고, 지역마다 파일이 하나씩 있다(마을, 숲, 호수, 언덕, 정원, 늪 곁이야기, 물빛 동굴, 구름 둔덕, 달지기 성) |
+| `tools/dev.py check` | 스크립트 문법과 번역 표가 맞는지 본다 |
+| `tools/dev.py shot 장면` | 정해 둔 장면을 띄워 사진을 찍는다. 눈으로 확인할 때 쓴다 |
+| `tools/dev.py test` | 진짜 게임에 키를 넣어 처음부터 끝까지 따라가는 자동 시험을 돌린다 |
+| `tools/dev.py ship` | 검사와 시험을 통과하면 원본을 커밋하고, 웹으로 내보내 `play/` 와 이 저장소에 복사해 커밋한다. 푸시는 하지 않는다 |
+| 이 저장소 | 맨 위에 웹 실행 파일(index.html, index.wasm, index.pck), `godot/` 에 원본 사본, `docs/shots/` 에 사진 |
+| GitHub Pages | 이 저장소의 main 가지를 그대로 사이트로 보여 준다 |
+
 ## 이 폴더에서 직접 열기
 
 로컬 서버를 띄운다.
