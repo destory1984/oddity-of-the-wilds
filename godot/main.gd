@@ -270,6 +270,7 @@ func _ready() -> void:
 	cloud.build(self)
 	cloud.build_updraft(self, hill.marks.U)
 	castle.build(self)
+	build_trial()
 	build_player()
 	for i in 9:
 		spawn_enemy(Vector2(-1, -1), i >= 6) # the last three are brick archers
@@ -329,6 +330,7 @@ const SCENES := {
 	"shrine": {"play": true, "shrine": true},
 	"journal": {"play": true, "journal": true},
 	"wolves": {"play": true, "village": true, "forest": true, "wolves": true, "hour": 16.5},
+	"trial": {"play": true, "village": true, "trial": true, "hour": 21.0},
 	"scrap": {"play": true, "at": Vector2(42.5, 5.5), "hour": 17.0},
 }
 
@@ -476,6 +478,13 @@ func apply_test_args(args: PackedStringArray) -> void:
 				player.z = castle.marks.K.y + 1.0
 			set_quest(castle_quest())
 			snap_mates()
+		if sc.get("trial", false): # the moon trial's third wave, wolves around the stone ring
+			night_q = 4
+			player.x = village.marks.R.x + 1.5
+			player.z = village.marks.R.y - 0.5
+			trial_wave = 3
+			trial_start = t
+			spawn_trial_wave()
 		if sc.get("kid", false): # Kongal's kid goblin trotting after Sora in the south field
 			errand = 3
 			player.x = VILLAGE.VILLAGE_X + 9.0
@@ -1511,6 +1520,143 @@ func update_wolf(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
 		m.emission = Color("#ff3a2a") if e.wind > 0.0 and e.hurt <= 0 else Color.WHITE
 		m.emission_energy_multiplier = 0.9
 	e.shadow.position = Vector3(e.x, y + 0.02, e.z)
+
+# ---- 달빛 시련: a ring of standing stones in the village's south-west corner, open after the lantern night.
+# E at the moon stone starts five waves; the next comes 2.5 s after the last one falls. Fainting or leaving
+# the village ends the run. The first clear gives max HP +20, attack +3 and 300 gold; later clears 80 gold.
+const TRIAL_WAVES := [
+	["g", "g", "g", "g"],
+	["g", "g", "g", "a", "a"],
+	["w", "w", "w"],
+	["s", "s", "a", "a", "g"],
+	["W", "w", "w"], # W: the trial warden, a big goblin
+]
+var trial_wave := 0          # 0 idle, 1..5 the wave being fought
+var trial_wait := 0.0        # pause before the next wave
+var trial_start := 0.0
+var trial_best := 0.0        # best clear in seconds (0: never cleared)
+var trial_stone: Node3D
+
+func build_trial() -> void:
+	var at: Vector2 = village.marks.R
+	trial_stone = Node3D.new()
+	var stone: Material = mat_color(Color("#8a8a94"))
+	var core: MeshInstance3D = box(Vector3(0.7, 1.3, 0.7), stone)
+	core.position = Vector3(0, 0.65, 0)
+	trial_stone.add_child(core)
+	var moon: MeshInstance3D = box(Vector3(0.4, 0.4, 0.08), glow_mat(Color("#dfe8ff"), 1.2))
+	moon.position = Vector3(0, 1.05, 0.36)
+	trial_stone.add_child(moon)
+	for k in 6: # the ring of low standing stones
+		var a := k * TAU / 6.0
+		var post: MeshInstance3D = box(Vector3(0.3, 0.6, 0.3), stone)
+		post.position = Vector3(cos(a) * 2.2, 0.3, sin(a) * 2.2)
+		trial_stone.add_child(post)
+	var glow := OmniLight3D.new() # a pale moonlight over the ring; this corner of the village has no lantern
+	glow.light_color = Color("#bcd6ff")
+	glow.light_energy = 1.8
+	glow.omni_range = 7.0
+	glow.position = Vector3(0, 2.2, 0)
+	trial_stone.add_child(glow)
+	trial_stone.position = Vector3(at.x, 0, at.y)
+	add_child(trial_stone)
+	rocks.append({"x": at.x, "z": at.y, "r": 0.45})
+
+func trial_key() -> bool:
+	if trial_stone == null or Vector2(player.x, player.z).distance_to(village.marks.R) > 1.6:
+		return false
+	if night_q < 4:
+		toast("시련의 돌은 아직 잠들어 있다")
+		return true
+	if trial_wave > 0:
+		return true
+	trial_wave = 1
+	trial_wait = 1.5
+	trial_start = t
+	show_story("", STORY.TRIAL_IN)
+	return true
+
+func trial_foes() -> Array:
+	return enemies.filter(func(e): return e.get("trial", false) and not e.dead)
+
+func spawn_trial_wave() -> void:
+	var c: Vector2 = village.marks.R
+	var list: Array = TRIAL_WAVES[trial_wave - 1]
+	for i in list.size():
+		var at := c
+		for tries in 20:
+			var a := TAU * (i + rnd(0, 0.5)) / list.size()
+			at = c + Vector2(cos(a), sin(a)) * rnd(4.0, 5.5)
+			if walkable(at.x, at.y):
+				break
+		var kind: String = list[i]
+		if kind == "w":
+			spawn_wolf(at)
+		else:
+			spawn_enemy(at, kind == "a")
+		var e: Dictionary = enemies[enemies.size() - 1]
+		e.trial = true
+		e.cave = true
+		if kind == "s":
+			give_shield(e)
+		if kind == "W":
+			e.hp = 300.0 + player.lv * 30
+			e.max_hp = int(e.hp)
+			e.node.scale = Vector3.ONE * 2.2
+			var mats: Array = e.node.get_meta("mats")
+			mats[2].albedo_color = Color("#6a6a78")
+			mats[5].albedo_color = Color("#dfe8ff")
+		burst(Vector3(at.x, 0.6, at.y), Color("#dfe8ff"), 12, 2.0)
+	toast(tr("달빛 시련 %d/5") % trial_wave)
+	sfx(330 + trial_wave * 60, 0.3, "triangle", 0.2)
+
+func update_trial(dt: float) -> void:
+	if trial_wave == 0:
+		return
+	if not in_village:
+		end_trial("마을을 벗어나 시련이 끝났다")
+		return
+	if story_open:
+		return
+	if trial_wait > 0.0:
+		trial_wait -= dt
+		if trial_wait <= 0.0:
+			spawn_trial_wave()
+		return
+	if trial_foes().is_empty():
+		if trial_wave >= TRIAL_WAVES.size():
+			clear_trial()
+		else:
+			trial_wave += 1
+			trial_wait = 2.5
+
+func end_trial(msg: String) -> void:
+	for e in trial_foes():
+		e.dead = true
+		e.node.queue_free()
+		e.shadow.queue_free()
+	trial_wave = 0
+	trial_wait = 0.0
+	toast(msg)
+
+func clear_trial() -> void:
+	var secs := t - trial_start
+	var first := trial_best <= 0.0
+	trial_wave = 0
+	if first:
+		player.max_hp += 20
+		player.atk += 3
+		player.gold += 300
+		show_story("", STORY.TRIAL_DONE)
+	else:
+		player.gold += 80
+	player.hp = float(player.max_hp)
+	if first or secs < trial_best:
+		trial_best = secs
+	burst(Vector3(player.x, 1.6, player.z), Color("#dfe8ff"), 40, 4.0)
+	sfx(784, 0.3, "triangle", 0.25)
+	toast(tr("달빛 시련을 마쳤다: %d분 %02d초") % [int(secs) / 60, int(secs) % 60] + ("" if first else tr(" (금화 +80)")))
+	save_game()
 
 func spawn_boss() -> void:
 	var spot := Vector2(16, 4)
@@ -2818,7 +2964,7 @@ func save_game() -> void:
 		"fly_q": fly_q, "flies": marsh.flies.map(func(f): return f.caught),
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
-		"skill_up": skill_up, "shrine_seen": shrine_seen,
+		"skill_up": skill_up, "shrine_seen": shrine_seen, "trial_best": trial_best,
 		"castle_q": castle_q, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -2936,6 +3082,7 @@ func load_game() -> void:
 		cloud.opened_look()
 	has_feather = bool(d.get("has_feather", false))
 	skill_up = int(d.get("skill_up", -1))
+	trial_best = float(d.get("trial_best", 0.0))
 	shrine_seen = bool(d.get("shrine_seen", false))
 	castle_q = int(d.get("castle_q", 0))
 	if castle_q == 2:
@@ -3361,6 +3508,8 @@ func crown_key() -> void:
 	if in_hill and hill_key():
 		return
 	if in_village:
+		if trial_key():
+			return
 		if me.distance_to(village.marks.M) < 1.8:
 			if errand == 0:
 				errand = 1
@@ -5551,6 +5700,8 @@ func journal_lines() -> Array:
 		side.call("구름 둔덕", tr("끝") if cloud_q >= 3 else tr("언덕 북쪽 바람구멍으로"))
 	if castle_q >= 1:
 		side.call("한결의 일기", tr("%d/3 읽음") % castle.pages_read())
+	if night_q >= 4:
+		side.call("달빛 시련", tr("최고 기록 %d분 %02d초") % [int(trial_best) / 60, int(trial_best) % 60] if trial_best > 0.0 else tr("마을 남서쪽 돌 둘레에서"))
 	out.append("")
 	out.append(tr("지닌 것"))
 	var keep: Array = []
@@ -5885,6 +6036,7 @@ func _process(dt: float) -> void:
 		jar_node.position = Vector3(player.x + 0.35, ground_y + 0.55 + sin(t * 2.0) * 0.04, player.z + 0.1)
 	update_night(dt)
 	update_shrine(dt)
+	update_trial(dt)
 	if in_cave:
 		check_painting()
 	if in_cave and not has_skip and Vector2(player.x, player.z).distance_to(cave_marks.E) < 1.6 and toast_t <= 0.0:
@@ -6274,6 +6426,8 @@ func hurt_player(dmg: int, gy: float) -> void:
 
 # Sora faints: say so plainly, keep gold and level, heal the boss, and wake her at the start
 func faint() -> void:
+	if trial_wave > 0:
+		end_trial("시련에서 쓰러졌다")
 	if in_garden:
 		ui.mini.map_tex = village.map_tex(VILLAGE.VILLAGE_X + VILLAGE.W)
 		in_garden = false

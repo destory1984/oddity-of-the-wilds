@@ -26,12 +26,12 @@ G=S=========oooooooo===========F
 #..........HHH...........=.....#
 #..........HHH.......b...=.....#
 #....................d...=.....#
-#..............................#
+#....R.........................#
 #..............................#
 ################K###############"""
 
 var grid: Array = []
-var marks := {}          # S, G, M -> world Vector2
+var marks := {}          # S, G, M, F, K, R (the moon-trial stone) -> world Vector2
 var dark: Array = []     # [{"pos": Vector2, "light": OmniLight3D, "glass": MeshInstance3D, "lit": bool, "brick": Vector2}]
 var simji_node: Node3D
 # villagers you can talk to with E: id and tile in the village grid
@@ -68,7 +68,7 @@ func build(m: Node) -> void:
 		for x in W:
 			var c: String = grid[z][x]
 			var w := Vector2(VILLAGE_X + x, z)
-			if c in "SGMFK":
+			if c in "SGMFKR":
 				marks[c] = w
 			var col := Color("#5e8f30")
 			match c:

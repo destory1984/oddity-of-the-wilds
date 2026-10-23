@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -1400,6 +1400,41 @@ func run() -> void:
 			w.shadow.queue_free()
 		calm_enemies(false)
 		check("wolf", circled and lunged and spawned_forest, "circles=%s lunges=%s forest pack=%d" % [circled, lunged, main.forest.wolves.size()])
+	if want.call("trial"):
+		if main.intro:
+			main.start_game(false)
+		main.close_story()
+		main.in_village = true
+		main.in_forest = false
+		main.in_hill = false
+		main.in_lake = false
+		main.in_garden = false
+		main.night_q = 4
+		main.trial_best = 0.0
+		calm_enemies(true)
+		reset_to(main.village.marks.R + Vector2(0, 1.0))
+		tap(KEY_E)
+		await wait(0.2)
+		var began: bool = main.trial_wave == 1
+		main.close_story()
+		var g0: int = main.player.gold
+		var lv0: int = main.player.lv
+		var hp0: int = main.player.max_hp
+		var waves := 0
+		for i in 120:
+			main.player.inv = 9.0
+			var foes: Array = main.trial_foes()
+			if not foes.is_empty():
+				waves = maxi(waves, main.trial_wave)
+				for e in foes:
+					main.damage_enemy(e, 99999.0, Vector2(main.player.x, main.player.z))
+			if main.trial_wave == 0:
+				break
+			await wait(0.3)
+		main.close_story()
+		var cleared: bool = main.trial_best > 0.0 and main.player.gold >= g0 + 300 and main.player.max_hp == hp0 + 20 + 12 * (main.player.lv - lv0) # kills level her up too
+		calm_enemies(false)
+		check("trial", began and waves == 5 and cleared, "began=%s waves seen=%d cleared=%s best %.1f s" % [began, waves, cleared, main.trial_best])
 	calm_enemies(false)
 	var failed := results.count(false)
 	print("TESTS %d passed, %d failed" % [results.size() - failed, failed])
