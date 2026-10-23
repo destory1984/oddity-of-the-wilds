@@ -377,6 +377,7 @@ const SCENES := {
 	"ways": {"play": true, "ways": true, "hour": 16.0},
 	"walk_dr": {"play": true, "walk_dr": true, "at": Vector2(12, 14), "hour": 12.0},
 	"settings": {"play": true, "settings": true},
+	"hush": {"play": true, "village": true, "hush": true, "hour": 14.0},
 	"east": {"play": true, "at": Vector2(42.0, 21.5), "hour": 12.0},
 	"fall": {"play": true, "fall": 2.5, "at": Vector2(20, 22)},
 	"chat": {"play": true, "chat": true, "at": Vector2(20, 22), "hour": 13.0},
@@ -688,6 +689,11 @@ func apply_test_args(args: PackedStringArray) -> void:
 		fake_keys[KEY_D] = true
 	if sc.get("settings", false):
 		toggle_settings(true)
+	if sc.get("hush", false): # the sound switched off: a finger to her lips, held for the picture
+		get_tree().create_timer(1.5).timeout.connect(func():
+			muted = false
+			toggle_sound()
+			idle_left = 60.0)
 	if sc.get("opening", false):
 		begin_opening()
 	if sc.has("fall"):
@@ -1655,7 +1661,7 @@ func update_idle(dt: float) -> void:
 			idle_name = "idle"
 			idle_left = rnd(2.0, 4.0)
 		idle_k = 0.0
-	set_hero_idle(idle_name, int(idle_k) % 4)
+	set_hero_idle(idle_name, mini(int(idle_k * 1.2), 3) if idle_name == "see-hush" else int(idle_k) % 4) # the hush plays once and holds
 
 # ---------------------------------------------------------------- enemies
 # LEGO-style brick goblin: plastic boxes with studs on top faces
@@ -2617,6 +2623,7 @@ const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 256분 / 목표 300분 (85%)",
 	"",
 	"2026-10-23 저녁",
+	"· v0.0.3: 소리를 끄면 소라가 손가락을 입에 대고 \"쉬잇~\" 한다. 우주 한량의 그림을 가져왔다.",
 	"· v0.0.2: 5장 숲 남쪽 잠든 골짜기(약 12분). 노을이 동료가 된 뒤 빈터 남쪽 회색 문으로 내려간다. 개울을 물수제비로 건너고, 기억 등불 셋으로 노을의 옛 기억을 찾고, 빈 망토(체력 1000)와 싸우고, 그림 문 셋 가운데 해 지는 그림 문에서 한결의 편지와 열셋째 등불을 찾는다. 심지에게 건네면 최대 체력 +15, 금화 150, 노을의 공격 간격 1.4 → 1.1초. 새 괴물 벽돌 고슴도치: 몸을 말면 모든 공격을 막고, 가시를 터뜨린 뒤 1.4초 어지러워 피해를 1.3배 받는다.",
 	"· v0.0.1: 설정 창 제목 아래에 버전과 날짜를 작게 띄운다. 기능을 하나 더할 때마다 끝 숫자가 1씩 오른다. 넷째 칸 이름을 만든 이 → About으로 바꿨다.",
 	"· v0.0.1: 설정 창 제목 아래에 버전과 날짜를 작게 띄운다. 기능을 하나 더할 때마다 끝 숫자가 1씩 오른다. 넷째 칸 이름을 만든 이 → About으로 바꿨다.",
@@ -8234,6 +8241,21 @@ func toggle_sound() -> void:
 	save_settings()
 	toast("소리 끔" if muted else "소리 켬")
 	refresh_sound_btn()
+	if muted:
+		hush()
+
+# the sound switched off: a finger to her lips and "쉬잇~", as in Space Oddity (its see-hush drawings; the user,
+# 2026-10-23: "음향 off할 때에 소라가 쉬잇하는 표정 넣어줘"). Played once over 3 s while she stands.
+func hush() -> void:
+	idle_t = maxf(idle_t, 0.61)
+	idle_name = "see-hush"
+	idle_k = 0.0
+	idle_left = 3.0
+	var node := Node3D.new()
+	node.position = Vector3(player.x, ground_y, player.z)
+	add_child(node)
+	get_tree().create_timer(4.0).timeout.connect(node.queue_free)
+	say_bubble(node, tr("쉬잇~"), 3.0)
 
 func refresh_sound_btn() -> void:
 	ui.sound_btn.icon = odd_icon("mute" if muted else "sound")
