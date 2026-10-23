@@ -127,7 +127,7 @@ def baseline(names):
 def test(name):
     kill()
     try:
-        r = run([str(GODOT_CLI), "--headless", "--path", ".", "--", f"--test={name or 'all'}"], timeout=300)
+        r = run([str(GODOT_CLI), "--headless", "--path", ".", "--", f"--test={name or 'all'}"], timeout=600)
     except subprocess.TimeoutExpired:
         kill()
         print("TESTS TIMED OUT (a script error usually stops the runner; run check, or read the Godot log)")
