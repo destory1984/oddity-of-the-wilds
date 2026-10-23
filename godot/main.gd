@@ -3167,6 +3167,8 @@ var garden = GARDEN.new()
 var in_garden := false
 var garden_q := 0          # 0 never entered, 1 inside, 2 fighting the mold, 3 the villagers' lights are coming, 4 ready to wind, 5 wound (the end)
 var mold_wave := {}        # the mold's expanding shock ring: {"r": radius, "node": MeshInstance3D}
+var ring_k := -1           # the ring post the villagers are lighting now (-1: not lighting)
+var ring_t := 0.0          # seconds spent on this post
 var forest_q := 0          # 0 never entered, 1 walking the forest, 2 second duel, 3 Noeul turned
 var in_village := false
 var crown_pips := 8        # the crown's moon gauge, 0..8
@@ -4802,6 +4804,7 @@ func update_garden(dt: float) -> void:
 		spawn_mold()
 	if not mold_wave.is_empty():
 		update_mold_wave(dt)
+	update_ring(dt)
 
 func spawn_mold() -> void:
 	if enemies.any(func(e): return e.get("mold", false) and not e.dead):
@@ -4917,20 +4920,89 @@ func mold_locks(e: Dictionary) -> void:
 	after_story = light_ring
 	save_game()
 
-# the villagers' lights fill the ring posts one by one, and each fills one pip
+# the villagers light the ring posts one by one, each filling one pip. For every post the locked mold
+# sheds two grey shards that run for that post; a shard that reaches it snuffs the flame and the post
+# starts over. A post lights once its shards are cut down and at least 1.5 s have passed.
 func light_ring() -> void:
-	for k in 8:
-		get_tree().create_timer(0.35 * (k + 1)).timeout.connect(func():
-			garden.set_posts(k + 1)
-			crown_pips = k + 1
-			pip_flash = 0.3
-			var l: OmniLight3D = garden.posts[k]
-			burst(l.position, Color("#ffc46a"), 16, 2.0)
-			sfx(392 + 40 * k, 0.25, "sine", 0.2))
-	get_tree().create_timer(3.2).timeout.connect(func():
-		garden_q = 4
-		set_quest("왕관을 높이 들어 다 같이 땅을 감자 (E)")
-		save_game())
+	ring_k = 0
+	ring_t = 0.0
+	set_quest("마을 사람들이 등불을 켜는 동안 거푸집 조각을 막자 0/8")
+	shed_shards()
+
+func shed_shards() -> void:
+	var c: Vector2 = garden.marks.C
+	var l: OmniLight3D = garden.posts[ring_k]
+	for k in 2:
+		var at := c + Vector2(rnd(-1.5, 1.5), rnd(-1.5, 1.5))
+		spawn_enemy(at)
+		var e: Dictionary = enemies[enemies.size() - 1]
+		e.shard = true
+		e.cave = true # no respawn
+		e.hp = 18.0 + player.lv * 4
+		e.max_hp = int(e.hp)
+		e.post = Vector2(l.position.x, l.position.z)
+		var mats: Array = e.node.get_meta("mats")
+		for m in mats:
+			m.albedo_color = Color("#8a8a96").lightened(rnd(0, 0.15))
+		burst(Vector3(at.x, 1.0, at.y), Color("#8a8a96"), 10, 2.0)
+	sfx(110, 0.3, "square", 0.15, -30)
+
+func update_ring(dt: float) -> void:
+	if ring_k < 0 or garden_q != 3 or story_open:
+		return
+	ring_t += dt
+	var alive := enemies.filter(func(e): return e.get("shard", false) and not e.dead)
+	if alive.is_empty() and ring_t >= 1.5:
+		garden.set_posts(ring_k + 1)
+		crown_pips = ring_k + 1
+		pip_flash = 0.3
+		var l: OmniLight3D = garden.posts[ring_k]
+		burst(l.position, Color("#ffc46a"), 16, 2.0)
+		sfx(392 + 40 * ring_k, 0.25, "sine", 0.2)
+		ring_k += 1
+		ring_t = 0.0
+		if ring_k >= 8:
+			ring_k = -1
+			garden_q = 4
+			set_quest("왕관을 높이 들어 다 같이 땅을 감자 (E)")
+			save_game()
+		else:
+			set_quest(tr("마을 사람들이 등불을 켜는 동안 거푸집 조각을 막자 %d/8") % ring_k)
+			shed_shards()
+
+# a shard ignores Sora and runs for its post; reaching it snuffs the flame being lit and two more come
+func update_shard(e: Dictionary, dt: float) -> void:
+	var to: Vector2 = e.post - Vector2(e.x, e.z)
+	var d := to.length()
+	if e.hurt <= 0.0 and e.get("stun", 0.0) <= 0.0:
+		e.x += to.x / maxf(d, 0.01) * 1.9 * dt
+		e.z += to.y / maxf(d, 0.01) * 1.9 * dt
+	e.t += dt
+	e.hurt -= dt
+	e.stun = e.get("stun", 0.0) - dt
+	var node: Node3D = e.node
+	var hop := absf(sin(e.t * 8.0))
+	node.position = Vector3(e.x, hop * 0.12, e.z)
+	node.rotation.y = atan2(to.x, to.y)
+	for m in node.get_meta("mats"):
+		m.emission_enabled = e.hurt > 0
+		m.emission = Color.WHITE
+	e.shadow.position = Vector3(e.x, 0.02, e.z)
+	if d < 0.8:
+		e.dead = true
+		e.node.queue_free()
+		e.shadow.queue_free()
+		burst(Vector3(e.post.x, 1.5, e.post.y), Color("#4a4652"), 24, 3.0)
+		shake = 0.2
+		sfx(90, 0.3, "square", 0.2, -40)
+		toast("거푸집 조각이 등불을 덮쳤다!")
+		for g in enemies:
+			if g.get("shard", false) and not g.dead:
+				g.dead = true
+				g.node.queue_free()
+				g.shadow.queue_free()
+		ring_t = 0.0
+		shed_shards()
 
 func final_wind() -> void:
 	garden_q = 5
@@ -5824,6 +5896,9 @@ func update_enemies(dt: float, gy: float) -> void:
 		if e.get("knight", false):
 			update_knight(e, dt, d, to)
 			continue
+		if e.get("shard", false):
+			update_shard(e, dt)
+			continue
 		if e.get("hawk", false):
 			update_hawk(e, dt, d, to)
 			continue
@@ -6092,8 +6167,9 @@ func faint() -> void:
 		if garden_q >= 2 and garden_q < 5:
 			garden_q = 1 # the fight starts over
 			garden.set_posts(0)
+			ring_k = -1
 			for e in enemies:
-				if e.get("mold", false) and not e.dead:
+				if (e.get("mold", false) or e.get("shard", false)) and not e.dead:
 					e.dead = true
 					e.node.queue_free()
 					e.shadow.queue_free()

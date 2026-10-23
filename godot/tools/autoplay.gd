@@ -957,8 +957,22 @@ func run() -> void:
 			await wait(0.3)
 		var locked: bool = main.garden_q == 3 and mold.size() == 1 and mold[0].locked and main.crown_pips == 0
 		main.close_story()
-		await wait(3.6)
-		var ready: bool = main.garden_q == 4 and main.crown_pips == 8
+		await wait(0.2)
+		var shards_came: bool = main.enemies.any(func(e): return e.get("shard", false) and not e.dead)
+		var snuffed := false
+		if shards_came: # let one pair reach its post once: the post must start over
+			var sh: Array = main.enemies.filter(func(e): return e.get("shard", false) and not e.dead)
+			sh[0].x = sh[0].post.x
+			sh[0].z = sh[0].post.y
+			await wait(0.1)
+			snuffed = main.ring_k == 0 and main.enemies.filter(func(e): return e.get("shard", false) and not e.dead).size() == 2
+		for i in 80: # then cut the shards down as they come
+			if main.garden_q == 4:
+				break
+			for e in main.enemies.filter(func(e): return e.get("shard", false) and not e.dead):
+				main.damage_enemy(e, 999.0, Vector2(main.player.x, main.player.z))
+			await wait(0.3)
+		var ready: bool = main.garden_q == 4 and main.crown_pips == 8 and shards_came and snuffed
 		tap(KEY_E)
 		await wait(0.3)
 		main.close_story()
