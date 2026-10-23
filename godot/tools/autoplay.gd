@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -1649,6 +1649,31 @@ func run() -> void:
 			main.close_story()
 		main.in_lake = false
 		check("fishing", reach and cast and early and landed > 0, "spot reachable=%s cast=%s early pull loses it=%s landed=%d kinds=%d" % [reach, cast, early, landed, main.fish_kinds.count(true)])
+	if want.call("bat"):
+		var ok_spots := true
+		for b in main.BAT_SPOTS:
+			ok_spots = ok_spots and main.walkable(b.x, b.y)
+		calm_enemies(true)
+		reset_to(Vector2(20, 30))
+		main.spawn_bat(Vector2(23, 30))
+		var b0: Dictionary = main.enemies[main.enemies.size() - 1]
+		b0.hp = 99999.0
+		b0.atk_cd = 1.0
+		var swooped := false
+		var hp0: float = main.player.hp
+		for i in 50:
+			reset_to(Vector2(20, 30))
+			main.player.hp = hp0
+			await wait(0.1)
+			if b0.dash > 0.0:
+				swooped = true
+		var flies: bool = b0.node.position.y > 0.5
+		if not b0.dead:
+			b0.dead = true
+			b0.node.queue_free()
+			b0.shadow.queue_free()
+		calm_enemies(false)
+		check("bat", ok_spots and swooped and flies, "spots open=%s swoops=%s flies above ground=%s" % [ok_spots, swooped, flies])
 	calm_enemies(false)
 	var failed := results.count(false)
 	print("TESTS %d passed, %d failed" % [results.size() - failed, failed])

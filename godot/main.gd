@@ -1871,6 +1871,86 @@ func update_fishing(dt: float) -> void:
 		bobber.visible = false
 		toast("물고기가 미끼만 먹고 달아났다")
 
+# ---- brick bats in the cave and the castle library: they flutter in a loose ring about 2.5 tiles from Sora,
+# then a 0.4 s shiver ("!") and a swoop straight through where she stood (8 tiles/s for 0.5 s)
+const BAT_SPOTS := [Vector2(126, 3), Vector2(122, 12), Vector2(126, 14), Vector2(105, 12), Vector2(441, 3), Vector2(447, 5)]
+
+func spawn_bat(at: Vector2) -> void:
+	var root := Node3D.new()
+	var g := Node3D.new()
+	root.add_child(g)
+	var mats: Array = []
+	brick(g, mats, Vector3(0.3, 0.26, 0.3), Vector3(0, 0, 0), Color("#4a3a5a"))
+	brick(g, mats, Vector3(0.06, 0.06, 0.03), Vector3(-0.07, 0.04, 0.16), Color("#ff6a4a"), false, true)
+	brick(g, mats, Vector3(0.06, 0.06, 0.03), Vector3(0.07, 0.04, 0.16), Color("#ff6a4a"), false, true)
+	for side in [-1.0, 1.0]:
+		var wing := Node3D.new()
+		wing.name = "wl" if side < 0 else "wr"
+		wing.position = Vector3(side * 0.15, 0.05, 0)
+		g.add_child(wing)
+		var w := box(Vector3(0.42, 0.04, 0.26), mat_color(Color("#3a2e48")))
+		w.position = Vector3(side * 0.21, 0, 0)
+		wing.add_child(w)
+	root.scale = Vector3.ONE * 1.3
+	root.set_meta("mats", mats)
+	root.set_meta("body", g)
+	add_child(root)
+	var hp: int = 15 + player.lv * 5
+	enemies.append({"x": at.x, "z": at.y, "hp": float(hp), "max_hp": hp, "node": root, "shadow": blob(0.4), "t": rnd(0, 5),
+		"atk_cd": rnd(1.5, 3.0), "hurt": 0.0, "kx": 0.0, "kz": 0.0, "wx": at.x, "wz": at.y, "dead": false, "respawn": 0.0,
+		"bat": true, "cave": true, "wind": 0.0, "stun": 0.0, "dash": 0.0, "dir": Vector2.ZERO, "hit_done": false})
+
+func update_bat(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
+	e.t += dt
+	e.atk_cd -= dt
+	e.hurt -= dt
+	e.stun = e.get("stun", 0.0) - dt
+	var dirn: Vector2 = to / maxf(d, 0.01)
+	var v := Vector2.ZERO
+	if e.hurt > 0.0 or e.stun > 0.0:
+		e.dash = 0.0
+		e.wind = 0.0
+		v = Vector2(e.kx, e.kz)
+	elif e.dash > 0.0:
+		e.dash -= dt
+		v = e.dir * 8.0
+		if not e.hit_done and d < 0.8:
+			e.hit_done = true
+			player_hit(int(round(rnd(6, 9) + player.lv)), Vector2(e.x, e.z), e)
+	elif e.wind > 0.0:
+		e.wind -= dt
+		if e.wind <= 0.0:
+			e.dash = 0.5
+			e.dir = dirn
+			e.hit_done = false
+			e.atk_cd = rnd(2.0, 3.0)
+	elif d < 8.0 and not intro:
+		if e.atk_cd <= 0.0 and d < 4.0:
+			e.wind = 0.4
+			pop_num(Vector3(e.x, 2.0, e.z), "!", Color("#ff5a4a"))
+		else: # a jittery ring around her
+			v = dirn.rotated(PI / 2.0) * (2.5 + sin(e.t * 3.0) * 1.5) + dirn * clampf(d - 2.5, -1.0, 1.0) * 2.0
+	else:
+		v = Vector2(sin(e.t * 1.3), cos(e.t * 0.9)) * 1.0
+	e.kx *= pow(0.002, dt)
+	e.kz *= pow(0.002, dt)
+	var nx: float = e.x + v.x * dt
+	var nz: float = e.z + v.y * dt
+	if walkable(nx, e.z): e.x = nx
+	if walkable(e.x, nz): e.z = nz
+	var node: Node3D = e.node
+	var body: Node3D = node.get_meta("body")
+	var flap := sin(e.t * (30.0 if e.wind > 0.0 else 18.0)) * 0.7
+	body.get_node("wl").rotation.z = flap
+	body.get_node("wr").rotation.z = -flap
+	node.position = Vector3(e.x, 1.1 + sin(e.t * 4.0) * 0.12 - (0.5 if e.dash > 0.0 else 0.0), e.z)
+	node.rotation.y = atan2(dirn.x, dirn.y)
+	for m in node.get_meta("mats"):
+		m.emission_enabled = e.hurt > 0 or e.wind > 0.0
+		m.emission = Color("#ff3a2a") if e.wind > 0.0 and e.hurt <= 0 else Color.WHITE
+		m.emission_energy_multiplier = 0.9
+	e.shadow.position = Vector3(e.x, 0.02, e.z)
+
 func spawn_boss() -> void:
 	var spot := Vector2(16, 4)
 	for tries in 40:
@@ -4818,6 +4898,9 @@ func enter_castle() -> void:
 			spawn_enemy(f[0], f[1] == "a")
 			if f[1] == "s":
 				give_shield(enemies[enemies.size() - 1])
+		for b in BAT_SPOTS:
+			if b.x >= CASTLE.CASTLE_X:
+				spawn_bat(b)
 	if castle_q == 0:
 		castle_q = 1
 		show_story("", STORY.CASTLE_IN)
@@ -5964,6 +6047,9 @@ func enter_cave() -> void:
 		spawn_mole()
 		for c in CAVE_SPAWNS:
 			spawn_enemy(Vector2(CAVE_X + c[0], c[1]), c[2])
+		for b in BAT_SPOTS:
+			if b.x < CASTLE.CASTLE_X:
+				spawn_bat(b)
 
 	story_step = maxi(story_step, 6)
 	var sp: Vector2 = cave_marks.S
@@ -6596,6 +6682,9 @@ func update_enemies(dt: float, gy: float) -> void:
 			continue
 		if e.get("wolf", false):
 			update_wolf(e, dt, d, to)
+			continue
+		if e.get("bat", false):
+			update_bat(e, dt, d, to)
 			continue
 		if e.get("prop", false):
 			e.hurt -= dt
