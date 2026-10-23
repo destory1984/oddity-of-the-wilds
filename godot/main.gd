@@ -2818,6 +2818,7 @@ const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 285분 / 목표 300분 (95%)",
 	"",
 	"2026-10-24 아침",
+	"· v0.0.26: 동굴 밖에서 저장하고 다시 켜면 동굴에 내려갈 때마다 노을을 처음 만나는 벽화 장면이 다시 뜨던 잘못을 고쳤다. 열쇠와 연 문이 잊히던 것도 함께 고쳤다.",
 	"· v0.0.25: 미니맵의 계단 표시를 네모에서 작은 계단 그림(세 단)으로 바꿨다. 올라가는 곳은 금빛, 내려가는 곳은 보라이고, 카메라를 돌려도 똑바로 선다.",
 	"· v0.0.24: 설정 창의 네 쪽 이름을 Settings, Help, Changes, About으로 바꿨다. 어느 언어에서도 영어로 보인다.",
 	"· v0.0.23: About 쪽에는 만든 사람(우주한량) 한 줄만 남기고 그림, 글꼴, 라이선스, 깃허브 단추를 뺐다.",
@@ -5512,20 +5513,18 @@ func load_game() -> void:
 				e.node.queue_free()
 				e.shadow.queue_free()
 				open_cave(Vector2(e.x, e.z), false)
-	if was_in_cave: # rebuild the cave state, then put Sora back where she saved
+	# the key, the door and the painting scene come back wherever she saved: they used to come back only for a save made
+	# inside the cave, so a save outside replayed the first meeting with Noeul at every visit (the user, 2026-10-24)
+	has_key = bool(d.get("has_key", false))
+	saw_painting = bool(d.get("saw_painting", false))
+	cave_door_open = bool(d.get("door_open", false))
+	if was_in_cave: # rebuild the cave state (build_cave_props reads the three above), then put Sora back where she saved
 		var px: float = player.x
 		var pz: float = player.z
 		enter_cave()
 		player.x = px
 		player.z = pz
-		has_key = bool(d.get("has_key", false))
-		saw_painting = bool(d.get("saw_painting", false))
-		if bool(d.get("door_open", false)) and is_instance_valid(door_node):
-			cave_door_open = true
-			door_node.queue_free()
-			ui.mini.map_tex = cave_map_tex()
-		if has_key:
-			key_chest.modulate = Color(0.55, 0.55, 0.55)
+		ui.mini.map_tex = cave_map_tex()
 	if is_instance_valid(ui.title_hint):
 		ui.title_hint.text = "아무 키나 눌러 이어하기  ·  F9 처음부터"
 	repair_story_step(d)
@@ -9142,7 +9141,7 @@ func build_cave_props() -> void:
 	key_chest.pixel_size = 0.05
 	key_chest.offset = Vector2(0, 7)
 	key_chest.scale = Vector3(1, 1.0 / cos(0.78), 1)
-	key_chest.modulate = Color("#9fd4ff")
+	key_chest.modulate = Color(0.55, 0.55, 0.55) if has_key else Color("#9fd4ff")
 	key_chest.position = Vector3(k.x, 0.0, k.y)
 	add_child(key_chest)
 	var d: Vector2 = cave_marks.D
@@ -9157,6 +9156,8 @@ func build_cave_props() -> void:
 	var lock := box(Vector3(0.2, 0.25, 0.95), mat_color(Color("#d9b04a")))
 	lock.position = Vector3(0, 0.8, 0)
 	door_node.add_child(lock)
+	if cave_door_open: # opened before this load
+		door_node.queue_free()
 	var p: Vector2 = cave_marks.P
 	var wall := box(Vector3(2.4, 1.2, 0.06), glow_mat(Color("#3a6aa8"), 1.2))
 	wall.position = Vector3(p.x, 0.9, p.y - 1.45)
