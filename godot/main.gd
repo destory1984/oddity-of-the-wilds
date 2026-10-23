@@ -114,6 +114,8 @@ func cave_char(x: float, z: float) -> String:
 	return c
 
 func tile_at(x: float, z: float) -> int:
+	if x >= STAIRS.STAIRS_X - 0.5:
+		return WATER if stairs.blocked(x, z) else GRASS
 	if x >= HOUSE_X - 0.5:
 		return WATER if house_char(x, z) == "#" else GRASS
 	if x >= CASTLE.CASTLE_X - 0.5:
@@ -181,6 +183,8 @@ var skip_grace := 0.0   # a short let-go of Shift or the arrows mid-river does n
 
 # water the water skip can run over: the marsh rivers and ponds, and the deep runs in the grotto
 func skip_water(x: float, z: float) -> bool:
+	if x >= STAIRS.STAIRS_X - 0.5:
+		return stairs.char_at(x, z) == "~"
 	if x >= CASTLE.CASTLE_X - 0.5:
 		return castle.char_at(x, z) == "~"
 	if x >= GROTTO.GROTTO_X - 0.5:
@@ -276,6 +280,7 @@ func _ready() -> void:
 	cloud.build(self)
 	cloud.build_updraft(self, hill.marks.U)
 	castle.build(self)
+	stairs.build(self)
 	build_trial()
 	build_ways()
 	build_house_room()
@@ -359,6 +364,7 @@ const SCENES := {
 	"east": {"play": true, "at": Vector2(42.0, 21.5), "hour": 12.0},
 	"fall": {"play": true, "fall": 2.5, "at": Vector2(20, 22)},
 	"chat": {"play": true, "chat": true, "at": Vector2(20, 22), "hour": 13.0},
+	"stairs": {"play": true, "village": true, "castle": true, "stairs": true, "hour": 16.0},
 	"scrap": {"play": true, "at": Vector2(42.5, 5.5), "hour": 17.0},
 }
 
@@ -538,6 +544,13 @@ func apply_test_args(args: PackedStringArray) -> void:
 				player.x = castle.marks.K.x - 3.5
 				player.z = castle.marks.K.y + 1.0
 			set_quest(castle_quest())
+			if sc.has("stairs"):
+				castle_q = 3
+				enter_stairs()
+				close_story()
+				stairs.open_wall()
+				player.x = STAIRS.STAIRS_X + 9.0
+				player.z = 20.5
 			snap_mates()
 		if sc.get("trial", false): # the moon trial's third wave, wolves around the stone ring
 			night_q = 4
@@ -2954,6 +2967,94 @@ func icon_button(root: Control, kind: String, key: String, tip: String, x: float
 	root.add_child(b)
 	return b
 
+# ---- 달의 계단 (between the castle and the garden): four landings, four powers of the crown
+func enter_stairs() -> void:
+	in_hill = true
+	in_garden = false
+	player.x = stairs.marks.S.x
+	player.z = stairs.marks.S.y - 1.3
+	ground_y = 0.0
+	gust_dir = Vector2.ZERO
+	ui.mini.map_tex = stairs.map_tex(STAIRS.STAIRS_X + STAIRS.W)
+	ui.zone_name.text = "달의 계단"
+	ui.zone_sub.text = "정원으로 오르는 길"
+	snap_mates()
+	if garden_q >= 1 and not stairs.door_open: # an older save already past this way
+		open_stairs()
+	if not stairs_spawned:
+		stairs_spawned = true
+		for f in stairs.foes:
+			match f[1]:
+				"w": spawn_wolf(f[0])
+				"b": spawn_bat(f[0])
+				_:
+					spawn_enemy(f[0], f[1] == "a")
+					enemies[enemies.size() - 1].cave = true
+					if f[1] == "s":
+						give_shield(enemies[enemies.size() - 1])
+		if not stairs.door_open:
+			show_story("", STORY.STAIRS_IN)
+	if not stairs.door_open:
+		set_quest(stairs_quest())
+	save_game()
+
+func stairs_quest() -> String:
+	if not stairs.wall_open:
+		return "계단을 막은 벽돌 벽을 왕관으로 풀자 (E)"
+	return tr("꼭대기 계단참의 등불 셋을 왕관으로 켜자 (E) %d/3") % stairs.lamps_lit()
+
+func open_stairs() -> void:
+	stairs.open_wall()
+	for l in stairs.lamps:
+		stairs.light_lamp(l)
+	stairs.open_door()
+
+func leave_stairs() -> void:
+	player.x = castle.marks.E.x - 1.2
+	player.z = castle.marks.E.y
+	ground_y = 0.0
+	gust_dir = Vector2.ZERO
+	ui.mini.map_tex = castle.map_tex(CASTLE.CASTLE_X + CASTLE.W)
+	ui.zone_name.text = "가라앉은 달지기 성"
+	ui.zone_sub.text = "옥좌의 방"
+	snap_mates()
+	save_game()
+
+func stairs_key() -> bool:
+	var me := Vector2(player.x, player.z)
+	if not stairs.wall_open:
+		for n in stairs.wall_nodes:
+			if me.distance_to(Vector2(n.position.x, n.position.z)) < 1.6:
+				if not spend_pips(1):
+					return true
+				stairs.open_wall()
+				burst(Vector3(n.position.x, 0.7, n.position.z), Color("#8a6a4a"), 36, 3.5)
+				shake = 0.25
+				sfx(196, 0.5, "triangle", 0.3, -60)
+				toast("계단의 벽돌 벽이 흙으로 풀렸다")
+				ui.mini.map_tex = stairs.map_tex(STAIRS.STAIRS_X + STAIRS.W)
+				set_quest(stairs_quest())
+				save_game()
+				return true
+	for l in stairs.lamps:
+		if not l.lit and me.distance_to(l.pos) < 1.6:
+			if not spend_pips(1):
+				return true
+			stairs.light_lamp(l)
+			burst(Vector3(l.pos.x, 1.8, l.pos.y), Color("#dfe8ff"), 20, 2.0)
+			sfx(523 + stairs.lamps_lit() * 120, 0.25, "triangle", 0.22)
+			if stairs.lamps_lit() == stairs.lamps.size():
+				stairs.open_door()
+				shake = 0.3
+				ui.mini.map_tex = stairs.map_tex(STAIRS.STAIRS_X + STAIRS.W)
+				show_story("", STORY.STAIRS_TOP)
+				set_quest("굳은달 거푸집의 심장을 노리자")
+			else:
+				set_quest(stairs_quest())
+			save_game()
+			return true
+	return false
+
 func spawn_boss() -> void:
 	var spot := Vector2(16, 4)
 	for tries in 40:
@@ -4294,6 +4395,7 @@ func save_game() -> void:
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
 		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "books": castle.books.map(func(b): return b.read), "has_bookmark": has_bookmark, "has_shard": has_shard, "shop_bought": shop_bought, "play_secs": play_secs, "ng": ng, "fest_gift": fest_gift, "mail_q": mail_q, "mail_got": mail_got, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes,
 		"seals": garden.seals.map(func(sl): return sl.open),
+		"stairs_wall": stairs.wall_open, "stairs_lamps": stairs.lamps.map(func(l): return l.lit),
 		"castle_q": castle_q, "bars": castle.bars, "levers": castle.levers.map(func(lv): return lv.up), "vault": castle.vault_open, "has_armour": has_armour, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -4477,6 +4579,14 @@ func load_game() -> void:
 	for i in mini(sls.size(), garden.seals.size()):
 		if bool(sls[i]):
 			garden.open_seal(garden.seals[i])
+	if bool(d.get("stairs_wall", false)):
+		stairs.open_wall()
+	var sl: Array = d.get("stairs_lamps", [])
+	for i in mini(sl.size(), stairs.lamps.size()):
+		if bool(sl[i]):
+			stairs.light_lamp(stairs.lamps[i])
+	if stairs.lamps_lit() == stairs.lamps.size():
+		stairs.open_door()
 	var lvs: Array = d.get("levers", [])
 	for i in mini(lvs.size(), castle.levers.size()):
 		if bool(lvs[i]):
@@ -4493,7 +4603,9 @@ func load_game() -> void:
 		var hx: float = player.x
 		var hz: float = player.z
 		enter_hill()
-		if hx >= CASTLE.CASTLE_X - 0.5:
+		if hx >= STAIRS.STAIRS_X - 0.5:
+			enter_stairs()
+		elif hx >= CASTLE.CASTLE_X - 0.5:
 			enter_castle()
 		elif hx >= CLOUD.CLOUD_X - 0.5:
 			enter_cloud()
@@ -4804,6 +4916,9 @@ const MARSH := preload("res://marsh.gd")
 const GROTTO := preload("res://grotto.gd")
 const CLOUD := preload("res://cloud.gd")
 const CASTLE := preload("res://castle.gd")
+const STAIRS := preload("res://stairs.gd")
+var stairs = STAIRS.new()   # 달의 계단 from the castle's east gate up to the garden (Sora is still in_hill there)
+var stairs_spawned := false
 var castle = CASTLE.new()   # 가라앉은 달지기 성 between the hill and the garden (Sora is still in_hill in there)
 var castle_q := 0           # 0 never entered, 1 inside, 2 fighting the knight, 3 knight beaten (east gate open)
 var castle_spawned := false
@@ -4919,6 +5034,8 @@ func crown_key() -> void:
 	if in_grotto() and grotto_key():
 		return
 	if in_cloud() and cloud_key():
+		return
+	if in_stairs() and stairs_key():
 		return
 	if in_castle() and castle_key():
 		return
@@ -5812,6 +5929,8 @@ func in_cloud() -> bool:
 
 # wind vents exist on the cloud mound and on the castle's broken floor
 func vent_here(x: float, z: float) -> Vector2:
+	if in_stairs():
+		return stairs.vent_at(x, z)
 	if in_castle():
 		return castle.vent_at(x, z)
 	if in_cloud():
@@ -5819,6 +5938,8 @@ func vent_here(x: float, z: float) -> Vector2:
 	return Vector2.ZERO
 
 func gust_char(x: float, z: float) -> String:
+	if x >= STAIRS.STAIRS_X - 0.5:
+		return stairs.char_at(x, z)
 	return castle.char_at(x, z) if x >= CASTLE.CASTLE_X - 0.5 else cloud.char_at(x, z)
 
 func enter_cloud() -> void:
@@ -6020,7 +6141,10 @@ func scarecrow_beaten() -> void:
 # ---- 가라앉은 달지기 성 (chapter 7) between the hill and the garden: the bricked gate, the flooded hall,
 # the broken floor with vents, Hangyeol's three diary pages, the moon door and the brick knight
 func in_castle() -> bool:
-	return in_hill and player.x >= CASTLE.CASTLE_X - 0.5
+	return in_hill and player.x >= CASTLE.CASTLE_X - 0.5 and player.x < HOUSE_X - 0.5
+
+func in_stairs() -> bool:
+	return in_hill and player.x >= STAIRS.STAIRS_X - 0.5
 
 func enter_castle() -> void:
 	in_hill = true
@@ -6706,12 +6830,14 @@ func leave_garden() -> void:
 		castle.open_gate()
 	in_garden = false
 	in_hill = true
-	player.x = castle.marks.E.x - 1.2
-	player.z = castle.marks.E.y
+	if not stairs.door_open: # an older save that went straight from the castle: the climb is already behind her
+		open_stairs()
+	player.x = stairs.marks.N.x
+	player.z = stairs.marks.N.y + 1.3
 	ground_y = 0.0
-	ui.mini.map_tex = castle.map_tex(CASTLE.CASTLE_X + CASTLE.W)
-	ui.zone_name.text = "가라앉은 달지기 성"
-	ui.zone_sub.text = "옥좌의 방"
+	ui.mini.map_tex = stairs.map_tex(STAIRS.STAIRS_X + STAIRS.W)
+	ui.zone_name.text = "달의 계단"
+	ui.zone_sub.text = "꼭대기"
 	snap_mates()
 	ui.boss.visible = false
 	save_game()
@@ -7539,6 +7665,8 @@ func journal_lines() -> Array:
 		side.call("보이지 않는 구름길", tr("끝") if has_shard else tr("첫 섬 남쪽에서 E로 길을 비춰 보자"))
 	if hill_q >= 3:
 		side.call("구름 둔덕", tr("끝") if cloud_q >= 3 else tr("언덕 북쪽 바람구멍으로"))
+	if castle_q >= 3:
+		side.call("달의 계단", tr("끝") if stairs.door_open else (tr("등불 %d/3") % stairs.lamps_lit() if stairs.wall_open else tr("벽돌 벽을 풀자")))
 	if castle_q >= 1:
 		side.call("한결의 일기", tr("%d/3 읽음") % castle.pages_read())
 		side.call("서재의 달지기 책", tr("끝") if has_bookmark else tr("%d/5 읽음") % castle.books.filter(func(b): return b.read).size())
@@ -7881,9 +8009,13 @@ func _process(dt: float) -> void:
 		fade_then(leave_castle)
 	if in_castle() and Vector2(player.x, player.z).distance_to(castle.marks.E) < 0.8 and fade_rect.color.a == 0.0:
 		if castle_q >= 3 or garden_q >= 1:
-			fade_then(enter_garden)
+			fade_then(enter_stairs)
 		elif toast_t <= 0.0:
 			toast("동쪽 문이 굳게 닫혀 있다")
+	if in_stairs() and gust_dir == Vector2.ZERO and Vector2(player.x, player.z).distance_to(stairs.marks.S) < 0.8 and fade_rect.color.a == 0.0:
+		fade_then(leave_stairs)
+	if in_stairs() and Vector2(player.x, player.z).distance_to(stairs.marks.N) < 0.8 and fade_rect.color.a == 0.0:
+		fade_then(enter_garden)
 	if in_castle() and castle_q == 1 and castle.door_open and not story_open and gust_dir == Vector2.ZERO and Vector2(player.x, player.z).distance_to(castle.marks.K) < 5.0:
 		castle_q = 2
 		show_story("", STORY.KNIGHT_IN)

@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -944,7 +944,8 @@ func run() -> void:
 		main.in_village = false
 		main.in_hill = true
 		main.castle_q = 3
-		reset_to(main.castle.marks.E + Vector2(-0.3, 0))
+		main.open_stairs()
+		reset_to(main.stairs.marks.N + Vector2(0, 0.3))
 		await wait(1.5)
 		var entered: bool = main.in_garden and main.garden_q == 1
 		main.close_story()
@@ -1329,9 +1330,10 @@ func run() -> void:
 		var beaten: bool = main.castle_q == 3
 		reset_to(main.castle.marks.E + Vector2(-0.3, 0))
 		await wait(1.5)
-		var to_garden: bool = main.in_garden
+		var to_garden: bool = main.in_stairs()
 		main.close_story()
-		reset_to(main.garden.marks.S + Vector2(0.3, 0))
+		main.open_stairs()
+		reset_to(main.stairs.marks.S + Vector2(0, -0.3))
 		await wait(1.5)
 		var back: bool = main.in_castle()
 		main.in_hill = false
@@ -2171,6 +2173,66 @@ func run() -> void:
 		var up: bool = main.mate_down.mulgyeol == 0.0 and absf(main.mate_hp.mulgyeol - main.mate_max() * 0.5) < 5.0
 		calm_enemies(false)
 		check("mate_hp", down and up, "a companion at 0 HP sits out=%s and gets up with half health=%s" % [down, up])
+	if want.call("moon_stairs"):
+		main.story_step = maxi(main.story_step, 10)
+		if main.intro:
+			main.start_game(false)
+		await wait(0.2)
+		main.close_story()
+		main.in_village = false
+		main.in_lake = false
+		main.in_forest = false
+		main.in_garden = false
+		main.in_cave = false
+		main.in_hill = true
+		main.castle_q = 3
+		main.garden_q = 0
+		main.has_skip = true
+		main.crown_pips = 8
+		main.stairs.wall_open = false
+		for n in main.stairs.wall_nodes:
+			n.visible = true
+		main.stairs.door_open = false
+		main.stairs.door.visible = true
+		for l in main.stairs.lamps:
+			l.lit = false
+		main.enter_stairs()
+		main.close_story()
+		await wait(0.1)
+		calm_enemies(true)
+		var sx: float = main.STAIRS.STAIRS_X
+		var shut: bool = not main.player_can(sx + 11, 24)
+		reset_to(Vector2(sx + 11.5, 25.4))
+		tap(KEY_E)
+		await wait(0.1)
+		var wall: bool = main.stairs.wall_open and main.player_can(sx + 11, 24)
+		reset_to(Vector2(sx + 11.5, 19.6)) # skip north over the channel
+		main.player.sp = 100.0
+		hold_world(Vector2(0, -1))
+		main.fake_keys[KEY_SHIFT] = true
+		await wait(1.0)
+		release()
+		var skipped: bool = main.player.z < 15.6
+		reset_to(Vector2(sx + 11, 12.4)) # onto the vent, which blows north over the drop
+		hold_world(Vector2(0, -1))
+		await wait(1.6)
+		release()
+		await wait(0.1)
+		var blown: bool = main.player.z < 6.6 and main.gust_dir == Vector2.ZERO
+		for l in main.stairs.lamps:
+			reset_to(l.pos + Vector2(0, 1.2))
+			tap(KEY_E)
+			await wait(0.1)
+		main.close_story()
+		var door: bool = main.stairs.door_open and main.player_can(sx + 11, 2)
+		reset_to(main.stairs.marks.N + Vector2(0, 0.3))
+		await wait(1.5)
+		var garden: bool = main.in_garden
+		main.close_story()
+		main.in_garden = false
+		main.in_hill = false
+		calm_enemies(false)
+		check("moon_stairs", shut and wall and skipped and blown and door and garden, "wall shut/opened=%s/%s skipped the channel=%s vent carried her up=%s three lamps open the door=%s top leads to the garden=%s" % [shut, wall, skipped, blown, door, garden])
 	calm_enemies(false)
 	var failed := results.count(false)
 	print("TESTS %d passed, %d failed" % [results.size() - failed, failed])
