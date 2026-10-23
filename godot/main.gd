@@ -342,6 +342,7 @@ const SCENES := {
 	"moonflower": {"play": true, "at": Vector2(37.0, 24.5), "hour": 22.5, "day": 4},
 	"house": {"play": true, "village": true, "house": true, "hour": 15.0},
 	"festival": {"play": true, "village": true, "festival": true, "hour": 22.0, "day": 4},
+	"cloudpath": {"play": true, "village": true, "cloud": true, "path": true, "hour": 11.0},
 	"scrap": {"play": true, "at": Vector2(42.5, 5.5), "hour": 17.0},
 }
 
@@ -471,6 +472,10 @@ func apply_test_args(args: PackedStringArray) -> void:
 			close_story()
 			player.x = CLOUD.CLOUD_X + 3.0
 			player.z = 10.0
+			if sc.has("path"):
+				player.z = 12.0
+				cloud.reveal_t = 30.0
+				cloud.reveal(true)
 			if sc.has("scare"):
 				cloud_q = 2
 				spawn_scarecrow()

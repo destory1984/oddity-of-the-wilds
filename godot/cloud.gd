@@ -108,7 +108,9 @@ func build(m: Node) -> void:
 		chest.add_child(b)
 	chest.position = Vector3(marks.c.x, 0, marks.c.y)
 	m.add_child(chest)
-	var slab_mat: Material = m.glow_mat(Color("#bfe6ff"), 0.6)
+	var slab_mat := StandardMaterial3D.new() # flat blue: white glow vanished against the clouds
+	slab_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	slab_mat.albedo_color = Color("#4a8ad8")
 	for w in path_tiles:
 		var sl: MeshInstance3D = m.box(Vector3(0.96, 0.08, 0.96), slab_mat)
 		sl.position = Vector3(w.x, 0.0, w.y)
