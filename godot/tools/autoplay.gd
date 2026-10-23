@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -66,7 +66,7 @@ func reset_to(p: Vector2) -> void:
 
 func calm_enemies(on: bool) -> void:
 	for e in main.enemies:
-		if not e.get("boss", false) and not e.get("mole", false) and is_instance_valid(e.node):
+		if not e.get("boss", false) and not e.get("mole", false) and not e.get("prop", false) and is_instance_valid(e.node):
 			e.node.visible = not on
 			if on:
 				e.x = 2.0 # parked in the corner water, out of the way
@@ -299,7 +299,7 @@ func run() -> void:
 		await wait(1.0)
 	if want.call("momentum"):
 		calm_enemies(false)
-		var gob = main.enemies.filter(func(e): return not e.get("boss", false) and not e.dead)[0]
+		var gob = main.enemies.filter(func(e): return not e.get("boss", false) and not e.get("prop", false) and not e.dead)[0]
 		calm_enemies(true)
 		gob.node.visible = true
 		reset_to(Vector2(30, 30))
@@ -317,7 +317,7 @@ func run() -> void:
 		gob.node.visible = false
 	if want.call("level_moves"):
 		calm_enemies(false)
-		var gob = main.enemies.filter(func(e): return not e.get("boss", false) and not e.dead and e.x < 50.0)[0]
+		var gob = main.enemies.filter(func(e): return not e.get("boss", false) and not e.get("prop", false) and not e.dead and e.x < 50.0)[0]
 		calm_enemies(true)
 		gob.node.visible = true
 		var lv0: int = main.player.lv
@@ -389,7 +389,7 @@ func run() -> void:
 		main.mate_cd = 9.0 # companions (from the lake and forest tests) would hit it and cut the wind-up short
 		main.mate2_cd = 9.0
 		calm_enemies(false)
-		var gob = main.enemies.filter(func(e): return not e.get("boss", false) and not e.dead)[0]
+		var gob = main.enemies.filter(func(e): return not e.get("boss", false) and not e.get("prop", false) and not e.dead)[0]
 		calm_enemies(true)
 		gob.node.visible = true
 		reset_to(Vector2(30, 30))
@@ -1469,6 +1469,47 @@ func run() -> void:
 		var acorn: bool = main.has_acorn and main.player.hp >= 75.0 - 0.5
 		main.in_forest = false
 		check("squirrels", cages.size() == 5 and spots and two_hits and acorn, "cages=%d reachable=%s still shut after 2 hits=%s acorn heals 65=%s (hp %.0f)" % [cages.size(), spots, two_hits, acorn, main.player.hp])
+	if want.call("crystals"):
+		main.story_step = maxi(main.story_step, 6)
+		if main.intro:
+			main.start_game(false)
+		main.close_story()
+		await wait(0.1)
+		var cr: Array = main.crystals
+		main.crystal_done = false
+		main.crystal_run = 0
+		main.has_ring = false
+		var by_rank := {}
+		for e in cr:
+			by_rank[main.CRYSTAL_NOTE[int(e.crystal)]] = e
+		var ring := func(rank: int):
+			var e: Dictionary = by_rank[rank]
+			e.hurt = 0.0
+			main.crystal_hit(e)
+		var low: Dictionary = by_rank[0]
+		main.in_cave = true
+		reset_to(Vector2(low.x - 1.0, low.z))
+		main.player.face = Vector2(1, 0)
+		main.player.atk_cd = 0.0
+		main.attack() # a real sword swing rings the lowest crystal
+		var sword_rings: bool = main.crystal_run == 1
+		main.in_cave = false
+		main.crystal_run = 0
+		await wait(0.3)
+		ring.call(0)
+		ring.call(2) # wrong: back to the start
+		var reset: bool = main.crystal_run == 0
+		for k in 4:
+			ring.call(k)
+		var done: bool = main.crystal_done and main.crystal_chest.visible
+		var reach: bool = main.walkable(main.crystal_chest.position.x - 1.0, main.crystal_chest.position.z)
+		main.in_cave = true
+		reset_to(Vector2(main.crystal_chest.position.x - 1.0, main.crystal_chest.position.z))
+		tap(KEY_SPACE)
+		await wait(0.2)
+		main.close_story()
+		main.in_cave = false
+		check("crystals", cr.size() == 4 and sword_rings and reset and done and reach and main.has_ring, "crystals=%d sword rings=%s wrong note resets=%s solved=%s chest reachable=%s ring=%s" % [cr.size(), sword_rings, reset, done, reach, main.has_ring])
 	calm_enemies(false)
 	var failed := results.count(false)
 	print("TESTS %d passed, %d failed" % [results.size() - failed, failed])

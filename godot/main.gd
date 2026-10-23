@@ -260,6 +260,8 @@ func _ready() -> void:
 	darken_first_lamp()
 	build_cave()
 	build_shrine()
+	spawn_crystals()
+	build_crystal_chest()
 	village.build(self)
 	forest.build(self)
 	garden.build(self)
@@ -1910,7 +1912,7 @@ func damage_enemy(e: Dictionary, amt: float, from: Vector2, kb := 4.0, force_cri
 			burst(Vector3(e.x + e.face.x * 0.6, 1.2, e.z + e.face.y * 0.6), Color("#c8962a"), 6, 2.0)
 			sfx(700, 0.06, "square", 0.15, -300)
 			return
-	var crit := force_crit or rng.randf() < 0.15
+	var crit := force_crit or rng.randf() < (0.25 if has_ring else 0.15)
 	if (e.get("boss", false) or e.get("mole", false)) and e.get("stun", 0.0) > 0.0:
 		amt *= 1.5
 	var dmg := int(round(amt * rnd(0.85, 1.15) * (1.0 if force_crit else (1.8 if crit else 1.0))))
@@ -2057,6 +2059,11 @@ func attack() -> void:
 			hit_any = true
 	if hit_any and counter_t > 0.0:
 		counter_t = 0.0
+	if in_cave:
+		for c in crystals:
+			var dc := Vector2(c.x - player.x, c.z - player.z)
+			if dc.length() < reach + 0.3 and (spin or slam or dc.normalized().dot(f) > cone):
+				crystal_hit(c)
 	if slam:
 		shake = maxf(shake, 0.3)
 		burst(here + Vector3(0, 0.2, 0), Color("#d8c8a0"), 30, 3.5)
@@ -2972,7 +2979,7 @@ func save_game() -> void:
 		"fly_q": fly_q, "flies": marsh.flies.map(func(f): return f.caught),
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
-		"skill_up": skill_up, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best,
+		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best,
 		"castle_q": castle_q, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -3090,6 +3097,9 @@ func load_game() -> void:
 		cloud.opened_look()
 	has_feather = bool(d.get("has_feather", false))
 	skill_up = int(d.get("skill_up", -1))
+	crystal_done = bool(d.get("crystal_done", false))
+	has_ring = bool(d.get("has_ring", false))
+	crystal_chest.visible = crystal_done and not has_ring
 	var fr: Array = d.get("freed", [])
 	for i in mini(fr.size(), forest.freed.size()):
 		forest.freed[i] = bool(fr[i])
@@ -3985,7 +3995,7 @@ func spawn_cages() -> void:
 		root.position = Vector3(at.x, 0, at.y)
 		enemies.append({"x": at.x, "z": at.y, "hp": 3.0, "max_hp": 3, "node": root, "shadow": blob(0.6), "t": 0.0,
 			"atk_cd": 99.0, "hurt": 0.0, "kx": 0.0, "kz": 0.0, "wx": at.x, "wz": at.y, "dead": false, "respawn": 0.0,
-			"cage": i, "cave": true})
+			"cage": i, "cave": true, "prop": true})
 		root.set_meta("mats", mats)
 		root.set_meta("body", g)
 
@@ -4859,7 +4869,7 @@ func update_mate2(dt: float) -> void:
 	var best := 4.0
 	for e in enemies:
 		var dd := Vector2(e.x, e.z).distance_to(Vector2(mate2.position.x, mate2.position.z))
-		if not e.dead and dd < best and not e.get("air", false) and not e.has("cage"):
+		if not e.dead and dd < best and not e.get("air", false) and not e.get("prop", false):
 			best = dd
 			target = e
 	if target != null and mate2_cd <= 0.0 and not story_open:
@@ -4880,7 +4890,7 @@ func update_mate(dt: float) -> void:
 	var target = null
 	var best := 5.0
 	for e in enemies:
-		if not e.dead and not e.has("cage") and Vector2(e.x, e.z).distance_to(Vector2(mate.position.x, mate.position.z)) < best:
+		if not e.dead and not e.get("prop", false) and Vector2(e.x, e.z).distance_to(Vector2(mate.position.x, mate.position.z)) < best:
 			best = Vector2(e.x, e.z).distance_to(Vector2(mate.position.x, mate.position.z))
 			target = e
 	var goal := me + Vector3(-1.3, 0, -0.6)
@@ -5553,6 +5563,8 @@ func build_shrine() -> void:
 		rocks.append({"x": at.x, "z": at.y, "r": 0.5})
 
 func update_shrine(dt: float) -> void:
+	for c in crystals:
+		c.hurt -= dt
 	for i in shrine_nodes.size():
 		var gem: Node3D = shrine_nodes[i].get_node("gem")
 		gem.rotation.y += dt * (2.5 if skill_up == i else 0.6)
@@ -5562,7 +5574,97 @@ func update_shrine(dt: float) -> void:
 		show_story("", STORY.SHRINE_IN)
 		save_game()
 
+# ---- the singing crystals in the shrine room: each rings its own note when struck. Struck from the lowest note
+# to the highest (the taller the crystal, the lower its note), a moonkeeper chest rises with the crystal ring:
+# critical hits 15% -> 25%. A wrong note resets the run with a dull buzz.
+const CRYSTAL_AT := [Vector2(2, 18), Vector2(6, 18), Vector2(10, 18), Vector2(13, 19)] # cave tiles
+const CRYSTAL_NOTE := [2, 0, 3, 1] # rank of each crystal's note, 0 the lowest
+const NOTES := [262.0, 330.0, 392.0, 523.0]
+var crystal_run := 0         # how many notes in a row are right so far
+var crystal_done := false
+var has_ring := false
+var crystal_chest: Node3D
+var crystal_told := false
+
+# the crystals live in their own list (not among the enemies): a sword swing in the cave checks them in attack()
+var crystals: Array = []     # [{"x", "z", "node", "crystal": index, "hurt"}]
+
+func spawn_crystals() -> void:
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color("#9fe0ff")
+	for i in CRYSTAL_AT.size():
+		var at: Vector2 = CRYSTAL_AT[i] + Vector2(CAVE_X, 0)
+		var root := Node3D.new()
+		var g := Node3D.new()
+		root.add_child(g)
+		var h: float = 1.8 - CRYSTAL_NOTE[i] * 0.45 # tallest sings lowest
+		var c := box(Vector3(0.36, h, 0.36), mat)
+		c.position = Vector3(0, h / 2.0, 0)
+		c.rotation.y = 0.6
+		g.add_child(c)
+		var c2 := box(Vector3(0.2, h * 0.6, 0.2), mat)
+		c2.position = Vector3(0.24, h * 0.3, 0.1)
+		c2.rotation = Vector3(0, 0.3, -0.3)
+		g.add_child(c2)
+		root.position = Vector3(at.x, 0, at.y)
+		add_child(root)
+		root.set_meta("body", g)
+		crystals.append({"x": at.x, "z": at.y, "node": root, "crystal": i, "hurt": 0.0})
+
+func build_crystal_chest() -> void:
+	crystal_chest = Node3D.new()
+	for part in [[Vector3(0.8, 0.45, 0.55), Vector3(0, 0.22, 0), mat_color(Color("#3a5a7a"))], [Vector3(0.84, 0.1, 0.59), Vector3(0, 0.5, 0), glow_mat(Color("#9fe0ff"), 1.0)]]:
+		var b := box(part[0], part[2])
+		b.position = part[1]
+		crystal_chest.add_child(b)
+	crystal_chest.position = Vector3(CAVE_X + 7.0, 0, 21.0)
+	crystal_chest.visible = crystal_done and not has_ring
+	add_child(crystal_chest)
+
+func crystal_hit(e: Dictionary) -> void:
+	if e.hurt > 0.0:
+		return # one sword swing rings it once
+	e.hurt = 0.25
+	var rank: int = CRYSTAL_NOTE[int(e.crystal)]
+	sfx(NOTES[rank], 0.5, "sine", 0.3)
+	burst(Vector3(e.x, 1.0, e.z), Color("#9fe0ff"), 8, 1.5)
+	(e.node.get_meta("body") as Node3D).scale = Vector3.ONE * 1.12
+	get_tree().create_timer(0.15).timeout.connect(func(): if is_instance_valid(e.node): (e.node.get_meta("body") as Node3D).scale = Vector3.ONE)
+	if crystal_done:
+		return
+	if not crystal_told:
+		crystal_told = true
+		toast("수정이 맑게 운다. 낮은 소리부터 차례로 울려 볼까?")
+	if rank == crystal_run:
+		crystal_run += 1
+		if crystal_run == NOTES.size():
+			crystal_done = true
+			crystal_chest.visible = true
+			burst(crystal_chest.position + Vector3(0, 0.6, 0), Color("#9fe0ff"), 30, 3.0)
+			for k in 4:
+				get_tree().create_timer(0.12 * k).timeout.connect(func(): sfx(NOTES[k] * 2.0, 0.3, "sine", 0.2))
+			toast("수정들이 함께 울리자 상자가 솟아올랐다")
+			save_game()
+	else:
+		crystal_run = 1 if rank == 0 else 0
+		get_tree().create_timer(0.2).timeout.connect(func(): sfx(110, 0.25, "square", 0.15))
+
+func crystal_chest_key() -> bool:
+	if not crystal_done or has_ring or Vector2(player.x, player.z).distance_to(Vector2(crystal_chest.position.x, crystal_chest.position.z)) > 1.6:
+		return false
+	has_ring = true
+	for b in crystal_chest.get_children():
+		b.transparency = 0.45
+	burst(crystal_chest.position + Vector3(0, 0.8, 0), Color("#9fe0ff"), 40, 3.0)
+	sfx(784, 0.12, "triangle", 0.25)
+	show_story("", STORY.CRYSTAL_RING)
+	save_game()
+	return true
+
 func shrine_key() -> bool:
+	if crystal_chest_key():
+		return true
 	var me := Vector2(player.x, player.z)
 	for i in 3:
 		if me.distance_to(cave_marks[str(i + 1)]) < 1.4:
@@ -5617,6 +5719,7 @@ func enter_cave() -> void:
 		spawn_mole()
 		for c in CAVE_SPAWNS:
 			spawn_enemy(Vector2(CAVE_X + c[0], c[1]), c[2])
+
 	story_step = maxi(story_step, 6)
 	var sp: Vector2 = cave_marks.S
 	player.x = sp.x
@@ -5754,6 +5857,8 @@ func journal_lines() -> Array:
 	if story_step >= 2:
 		var n: int = marsh.count()
 		side.call("늪의 옛 지도 조각", tr("끝") if marsh.chest_open else (tr("달지기 상자가 동쪽 둔덕에 솟았다") if n == 3 else tr("%d/3 찾음") % n))
+	if shrine_seen:
+		side.call("울림 수정", tr("끝") if has_ring else (tr("상자를 열자") if crystal_done else tr("낮은 소리부터 차례로")))
 	if story_step >= 6:
 		side.call("동굴의 세 돌단", tr("아직 찾지 못했다") if not shrine_seen else (tr("깨운 기술: %s") % tr(["회오리", "불씨탄", "빛파동"][skill_up]) if skill_up >= 0 else tr("하나를 고르자")))
 	if errand >= 1:
@@ -5782,6 +5887,7 @@ func journal_lines() -> Array:
 	if has_pearl: keep.append(tr("물빛 진주"))
 	if has_feather: keep.append(tr("바람 깃털"))
 	if has_acorn: keep.append(tr("다람쥐 도토리"))
+	if has_ring: keep.append(tr("수정 반지"))
 	out.append("  " + (", ".join(keep) if not keep.is_empty() else tr("왕관 하나")))
 	return out
 
@@ -6237,7 +6343,7 @@ func update_enemies(dt: float, gy: float) -> void:
 		if e.get("wolf", false):
 			update_wolf(e, dt, d, to)
 			continue
-		if e.has("cage"):
+		if e.get("prop", false):
 			e.hurt -= dt
 			e.shadow.position = Vector3(e.x, 0.02, e.z)
 			continue
