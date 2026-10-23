@@ -1137,6 +1137,20 @@ func near_shop() -> bool:
 
 const SHOP_GREET := ["어서 오렴. 천천히 골라 보거라.", "오늘은 뭐가 필요하니?", "늪이 험하지? 약은 넉넉히 챙기렴.", "늪 구석구석에 달지기들의 옛 지도 조각이 흩어져 있다더구나."]
 
+# Bori has heard what Sora has been up to: a line for each keepsake or deed, mixed in with her usual greetings
+func bori_news() -> Array:
+	var out: Array = []
+	if marsh.chest_open: out.append("지도 조각을 다 맞췄다며? 달지기들 솜씨는 여전하구나.")
+	if fly_q >= 3: out.append("반딧불 병이구나. 밤길이 덜 무섭겠어.")
+	if has_pearl: out.append("물빛 진주라니. 물결네 할아버지가 아끼던 거란다.")
+	if has_feather: out.append("바람 깃털을 지녔구나. 걸음이 한결 가벼워 보인다.")
+	if has_acorn: out.append("다람쥐들이 고맙다고 도토리를 줬다고? 귀엽기도 하지.")
+	if has_ring: out.append("그 반지 소리가 맑구나. 동굴 수정이지?")
+	if castle.pages_read() >= 3: out.append("한결의 일기를 읽었다고…… 그 녀석, 끝까지 혼자 짊어졌구나.")
+	if trial_best > 0.0: out.append("심지가 그러던데, 달빛 시련을 마쳤다며? 대단하구나.")
+	if has_armour: out.append("달지기 갑옷이 잘 어울리는구나. 이제야 마음이 놓인다.")
+	return out
+
 func toggle_shop(open: bool) -> void:
 	if open and story_step < 3:
 		meet_bori()
@@ -1144,7 +1158,9 @@ func toggle_shop(open: bool) -> void:
 	shop_open = open
 	ui.shop.visible = open
 	if open:
-		ui.shop_say.text = SHOP_GREET[rng.randi() % SHOP_GREET.size()]
+		var lines: Array = SHOP_GREET.duplicate()
+		lines.append_array(bori_news())
+		ui.shop_say.text = lines[rng.randi() % lines.size()]
 		ui.shop_keeper.texture = load("res://art/portrait/bori.png")
 		refresh_shop()
 		sfx(660, 0.12, "triangle", 0.2)
