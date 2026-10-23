@@ -1,11 +1,16 @@
 # 바람 언덕 (story step 10.5): a 34x24 area at x >= HILL_X, east of the hardened forest.
 # Three windmills (M) have stopped and bricked over; winding each with the crown makes it turn.
 # When all three turn, the wind lifts a plank bridge over the gorge (_) to the brick hawk's ledge (B).
+# Below the south fence (rows 23 - 39, DESIGN.md "참새 방앗간"): the broken wall G opens onto a windless hollow with
+# the old mill's big windmill Q. Running past four pinwheels (v) from the post P calls the wind down; the mill
+# fills its channel (~), a big guardian rises at its mouth K, and over the water lie the flour boat b, the
+# landing bell k and the miller's chest c.
 extends RefCounted
 
 const HILL_X := 310
 const W := 34
-const H := 24
+const H := 40
+const MILL_Z := 24 # first row of the mill hollow
 const BRIDGE_ROWS := [11, 12, 13]
 const ROWS := """##################################
 #...................__.......U...#
@@ -30,6 +35,22 @@ S========...L..M....__.L...B.....X
 #..r...........a....__........r..#
 #...........r.....L.__..w........#
 #...................__...........#
+###########################G######
+#########################.....####
+#.........###############..a..####
+#..v....L.###############.s...####
+#.........r##############...w.####
+#.....................r.v.......j#
+#....r.....Q..................w..#
+#....................r....r......#
+#.....P.........K..........L...v.#
+#..............r.....v...........#
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#.......b...k....................#
+#................................#
+#....c.....................L.....#
+#................................#
 ##################################"""
 
 var grid: Array = []
@@ -38,6 +59,16 @@ var mills: Array = []    # [{"pos": Vector2, "blades": Node3D, "turning": bool}]
 var foes: Array = []     # [world Vector2, kind] with kind "s" shield goblin, "a" archer, "g" goblin, "w" wolf
 var bridge: Node3D
 var bridged := false
+var south_foes: Array = []  # [world Vector2, kind] below the fence: woken when the wall opens
+var south_marks := {}    # G wall, Q big windmill, P wind post, K the channel mouth, b boat, k bell, c chest
+var wheels: Array = []   # world Vector2 of the four pinwheels that call the wind down
+var mill4 := {}          # the mill's big windmill {"pos", "blades", "turning"}; not one of the three in mills
+var gate_open := false
+var filled := false
+var gate_node: Node3D
+var water: MeshInstance3D
+var sparrows: Node3D
+var chest_node: Node3D
 
 func _init() -> void:
 	for line in ROWS.split("\n"):
@@ -55,7 +86,9 @@ func blocked(x: float, z: float) -> bool:
 	var c := char_at(x, z)
 	if c == "_":
 		return not (bridged and int(round(z)) in BRIDGE_ROWS)
-	return c == "#" or c == "r" or c == "M"
+	if c == "G":
+		return not gate_open
+	return c == "#" or c == "r" or c == "M" or c in "Qbkc~" # the channel: only the water skip crosses it, once filled
 
 func build(m: Node) -> void:
 	var blocks: Array = []
@@ -66,8 +99,15 @@ func build(m: Node) -> void:
 			var w := Vector2(HILL_X + x, z)
 			if c in "SXBUR": # R: the moon trial stones (moved here from the village, 2026-10-23)
 				marks[c] = w
-			if c in "sagw":
-				foes.append([w, c])
+			if c in "sagwj":
+				(south_foes if z >= MILL_Z else foes).append([w, c])
+			if c in "GQPKbkc":
+				south_marks[c] = w
+			if c == "v":
+				wheels.append(w)
+			if c == "~":
+				blocks.append([Transform3D(Basis().scaled(Vector3(1, 0.4, 1)), Vector3(w.x, -1.4, w.y)), Color("#2a3440")]) # the dry channel bed
+				continue
 			if c == "L":
 				lamp_spots.append(w)
 			if c == "_":
@@ -113,6 +153,69 @@ func build(m: Node) -> void:
 		bridge.add_child(rope)
 	bridge.visible = false
 	m.add_child(bridge)
+	build_mill(m)
+
+# the hollow below: the broken wall, the big windmill, the channel's hidden water, the boat, the bell, the chest,
+# and the sparrows waiting on the wall
+func build_mill(m: Node) -> void:
+	gate_node = m.forest.brick_wall(m, south_marks.G)
+	var q: Vector2 = south_marks.Q
+	mill4 = {"pos": q, "blades": windmill(m, q), "turning": false}
+	(mill4.blades as Node3D).get_parent().scale = Vector3.ONE * 1.3
+	var wet: Material = m.glow_mat(Color("#2f78b8"), 0.6)
+	wet.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
+	wet.blend_mode = BaseMaterial3D.BLEND_MODE_MIX
+	water = m.box(Vector3(W - 2.0, 0.04, 2.0), wet)
+	water.position = Vector3(HILL_X + W / 2.0 - 0.5, -0.25, 33.5)
+	water.visible = false
+	m.add_child(water)
+	var boat := Node3D.new()
+	for part in [[Vector3(1.6, 0.35, 0.7), Vector3(0, 0.1, 0)], [Vector3(0.25, 0.5, 0.7), Vector3(0.75, 0.25, 0)], [Vector3(0.6, 0.3, 0.4), Vector3(-0.2, 0.4, 0)]]:
+		var bb: MeshInstance3D = m.box(part[0], m.mat_color(Color("#7a5a3a") if part[1].y < 0.35 else Color("#e8e0c8")))
+		bb.position = part[1]
+		boat.add_child(bb)
+	boat.position = Vector3(south_marks.b.x, 0, south_marks.b.y)
+	boat.rotation.y = 0.2
+	m.add_child(boat)
+	var wood: Material = m.mat_color(Color("#3b2a1e"))
+	var pole: MeshInstance3D = m.box(Vector3(0.14, 1.7, 0.14), wood)
+	pole.position = Vector3(south_marks.k.x, 0.85, south_marks.k.y)
+	m.add_child(pole)
+	var bell: MeshInstance3D = m.box(Vector3(0.3, 0.3, 0.3), m.mat_color(Color("#e8c84a")))
+	bell.position = Vector3(south_marks.k.x + 0.25, 1.45, south_marks.k.y)
+	m.add_child(bell)
+	chest_node = Node3D.new()
+	for part in [[Vector3(0.8, 0.45, 0.55), Vector3(0, 0.22, 0), m.mat_color(Color("#8a6a4a"))], [Vector3(0.84, 0.1, 0.59), Vector3(0, 0.5, 0), m.glow_mat(Color("#e8d27a"), 1.2)]]:
+		var cb: MeshInstance3D = m.box(part[0], part[2])
+		cb.position = part[1]
+		chest_node.add_child(cb)
+	chest_node.position = Vector3(south_marks.c.x, 0, south_marks.c.y)
+	m.add_child(chest_node)
+	sparrows = Node3D.new()
+	var brown: Material = m.mat_color(Color("#8a6a4a"))
+	for k in 6:
+		var sp: MeshInstance3D = m.box(Vector3(0.14, 0.12, 0.2), brown)
+		sp.position = Vector3(-0.45 + k * 0.18, 1.52 + (k % 2) * 0.03, 0.0)
+		sparrows.add_child(sp)
+	sparrows.position = Vector3(south_marks.G.x, 0, south_marks.G.y)
+	sparrows.visible = false
+	m.add_child(sparrows)
+
+func open_wall() -> void:
+	gate_open = true
+	gate_node.visible = false
+	sparrows.visible = false
+
+func wind_mill4(m: Node) -> void:
+	wind_mill(mill4, m)
+
+func fill() -> void:
+	filled = true
+	water.visible = true
+
+func chest_look() -> void:
+	for b in chest_node.get_children():
+		b.transparency = 0.45
 
 # a stone windmill; its blades are grey brick until wound, then white canvas that turns
 func windmill(m: Node, at: Vector2) -> Node3D:
@@ -168,7 +271,11 @@ func map_tex(width: int) -> ImageTexture:
 				"#", "r": col = Color(0, 0, 0, 0)
 				"_": col = Color("#a07a4a") if bridged and z in BRIDGE_ROWS else Color(0, 0, 0, 0)
 				"=": col = Color("#4a5a3a")
-				"M": col = Color("#f2ead8")
+				"M", "Q": col = Color("#f2ead8")
+				"~": col = Color("#2f78b8") if filled else Color("#1a1826")
+				"G": col = Color("#1e3420") if gate_open else Color("#c8322a")
+				"b", "k", "c": col = Color("#bcd6ff")
+				"P": col = Color("#7ac8e8")
 				"L": col = Color("#ffd060")
 				"B": col = Color("#c8322a")
 			img.set_pixel(HILL_X + x, z, col)

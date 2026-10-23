@@ -195,6 +195,8 @@ func skip_water(x: float, z: float) -> bool:
 		return castle.char_at(x, z) == "~"
 	if x >= GROTTO.GROTTO_X - 0.5:
 		return grotto.char_at(x, z) == "~"
+	if x >= HILL.HILL_X - 0.5 and x < GROTTO.GROTTO_X - 0.5:
+		return hill.filled and hill.char_at(x, z) == "~"
 	if x >= FOREST.FOREST_X - 0.5 and x < GARDEN.GARDEN_X - 0.5:
 		return forest.char_at(x, z) == "~"
 	return x < CAVE_X - 0.5 and tile_at(x, z) == WATER and x > 1.0 and z > 1.0 and z < N - 2.0 and (x < N - 2.0 or (z > 17.5 and z < 23.5 and x < N - 0.5))
@@ -293,6 +295,7 @@ func _ready() -> void:
 	build_ways()
 	build_house_room()
 	build_race()
+	build_windrun()
 	build_player()
 	for i in 9:
 		spawn_enemy(Vector2(-1, -1), i >= 6) # the last three are brick archers
@@ -360,6 +363,8 @@ const SCENES := {
 	"grove": {"play": true, "village": true, "forest": true, "grove": true, "hour": 15.0},
 	"hollow": {"play": true, "village": true, "forest": true, "hollow": true, "hour": 21.0},
 	"road": {"play": true, "village": true, "road": true, "hour": 14.0},
+	"mill": {"play": true, "village": true, "mill": true, "hour": 15.0},
+	"mill_water": {"play": true, "village": true, "mill": true, "water": true, "hour": 15.0},
 	"road_echo": {"play": true, "village": true, "road": true, "echo": true, "hour": 14.0},
 	"flies": {"play": true, "at": Vector2(8, 23), "hour": 22.5, "flies": true},
 	"crab": {"play": true, "village": true, "crab": true, "hour": 14.0},
@@ -505,6 +510,28 @@ func apply_test_args(args: PackedStringArray) -> void:
 				spawn_hollow()
 				player.x = forest.marks.C.x - 3.0
 				player.z = forest.marks.C.y + 1.0
+		if sc.get("mill", false): # the sparrows' mill below the wind hills, the big windmill wound
+			night_q = 4
+			lake_q = 4
+			forest_q = 3
+			hill_q = 3
+			join_mate()
+			join_noeul()
+			enter_hill()
+			close_story()
+			hill.raise_bridge()
+			hill.open_wall()
+			mill_q = 2
+			mill_in_told = true
+			hill.wind_mill4(self)
+			player.x = hill.south_marks.P.x + 1.0
+			player.z = hill.south_marks.P.y
+			if sc.has("water"):
+				mill_q = 4
+				hill.fill()
+				player.x = HILL.HILL_X + 20.0
+				player.z = 32.0
+			snap_mates()
 		if sc.get("road", false): # Hangyeol's yard below the garden, at his camp, the roots unwound
 			night_q = 4
 			lake_q = 4
@@ -2591,7 +2618,7 @@ func festival_key() -> bool:
 # attack, max HP, gold, potions, keepsakes, the woken skill, feats and records. Monsters then take
 # 1/(1 + 0.5 x round) of the damage and deal (1 + 0.5 x round) times as much.
 const NG_KEEP := ["lv", "xp", "max_hp", "atk", "gold", "pots", "has_pearl", "has_feather", "has_acorn", "has_ring", "has_shoes",
-	"has_armour", "has_tea", "has_shard", "has_bookmark", "has_lamp", "has_medal", "skill_up", "stats", "feats", "trial_best", "race_best", "fish"]
+	"has_armour", "has_tea", "has_shard", "has_bookmark", "has_lamp", "has_medal", "has_oar_ring", "skill_up", "stats", "feats", "trial_best", "race_best", "fish"]
 var ng := 0                 # how many rounds were finished before this one
 var ng_armed := 0.0         # seconds left to confirm with a second E
 
@@ -2736,9 +2763,10 @@ func travel(i: int) -> void:
 		save_game())
 
 const CHANGES := [
-	"개발 상황: 놀 수 있는 분량 약 264분 / 목표 300분 (88%)",
+	"개발 상황: 놀 수 있는 분량 약 273분 / 목표 300분 (91%)",
 	"",
 	"2026-10-24 새벽",
+	"· v0.0.16: 6장에 참새 방앗간(약 9분). 벽돌 매를 물리친 뒤 언덕 남쪽 무너진 담을 풀면 바람 없는 골이 나온다. 큰 풍차를 감고, 깃대에서 12초 안에 바람개비 넷을 지나 바람을 불러 내리면 물길이 찬다. 어귀의 큰 수호자를 쓰러뜨리고 물수제비로 나루에 건너가면 가루 배, 종, 궤짝(삿대 고리: 물결의 장대 60 → 70%, 최대 체력 +10). 장터의 달빛 가루는 이 방앗간에서 빻던 것이다.",
 	"· v0.0.15: 8 → 9장에 한결의 마지막 길(약 8분). 계단 꼭대기에서 정원 아래 무너진 뜰로 들어간다. 뿌리 벽돌을 풀고, 한결의 야영터에서 다섯째 일기와 빈 등불 고리를 찾고, 왕관으로 비춰야 보이는 발자국을 따라 깊은 틈을 건너, 거푸집이 떠 둔 벽돌 한결과 싸운다. 한결이 왕관을 늪으로 보낸 까닭이 밝혀진다. 일곱째 길돌 정원 앞 야영터.",
 	"· v0.0.14: 우주 한량의 배치 규칙대로 화면의 단추와 판을 모두 가장자리에서 8px에 맞췄다(왼쪽 아래 단추, 왼쪽 위 초상, 미니맵, 기술 칸, 금화 칸). 단추 사이도 8px이다.",
 	"· v0.0.13: 땅 밑에서 올라가는 곳을 지도에 금빛 네모로 표시한다(성 아래 잠긴 층, 물빛 동굴, 지하 동굴). 내려가는 곳은 보라색 그대로. 잠긴 층의 올라가는 계단에 틀과 등을 달았다.",
@@ -3322,6 +3350,8 @@ func story_talk_ok(key: String) -> bool:
 		"noeul_new": return forest_q >= 3 and hill_q < 3
 		"hawk": return hill_q >= 3 and cloud_q < 3
 		"scare": return cloud_q >= 3
+		"mill_hint": return hill_q >= 3 and mill_q == 0
+		"mill_done": return mill_q >= 5
 		"pearl": return grotto_q >= 4
 		"jar": return fly_q >= 3 and mate2 != null
 		"castle_in": return castle_q >= 1 and castle_q < 3 and castle.pages_read() < 3
@@ -3993,6 +4023,8 @@ func damage_enemy(e: Dictionary, amt: float, from: Vector2, kb := 4.0, force_cri
 			get_tree().create_timer(1.0).timeout.connect(crab_beaten)
 		elif e.get("scare", false):
 			get_tree().create_timer(1.0).timeout.connect(scarecrow_beaten)
+		elif e.get("mill_guard", false):
+			get_tree().create_timer(1.0).timeout.connect(mill_guard_beaten)
 		elif e.get("echo", false):
 			get_tree().create_timer(1.0).timeout.connect(echo_beaten)
 		elif e.get("knight", false):
@@ -5059,7 +5091,7 @@ func save_game() -> void:
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
 		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "books": castle.books.map(func(b): return b.read), "has_bookmark": has_bookmark, "has_shard": has_shard, "shop_bought": shop_bought, "play_secs": play_secs, "ng": ng, "fest_gift": fest_gift, "mail_q": mail_q, "mail_got": mail_got, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes, "target_best": target_best, "has_medal": has_medal, "bottles": village.bottles.map(func(b): return b.got), "inn_nights": inn_nights, "magpie_q": magpie_q, "talks_heard": talks_heard.keys(),
-		"road_q": road_q, "road_box": road_box, "hollow_q": hollow_q, "mem_lit": forest.mem_lamps.map(func(l): return l.lit), "hollow_doors": forest.doors.map(func(dr): return dr.open), "hollow_boxes": forest.boxes.map(func(b): return b.open),
+		"road_q": road_q, "road_box": road_box, "mill_q": mill_q, "has_oar_ring": has_oar_ring, "hollow_q": hollow_q, "mem_lit": forest.mem_lamps.map(func(l): return l.lit), "hollow_doors": forest.doors.map(func(dr): return dr.open), "hollow_boxes": forest.boxes.map(func(b): return b.open),
 		"seals": garden.seals.map(func(sl): return sl.open),
 		"stairs_wall": stairs.wall_open, "stairs_lamps": stairs.lamps.map(func(l): return l.lit),
 		"castle_q": castle_q, "bars": castle.bars, "levers": castle.levers.map(func(lv): return lv.up), "vault": castle.vault_open, "has_armour": has_armour, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read),
@@ -5276,6 +5308,16 @@ func load_game() -> void:
 	if bool(d.get("castle_gate", false)):
 		castle.open_gate()
 	road_q = int(d.get("road_q", 0))
+	mill_q = int(d.get("mill_q", 0))
+	has_oar_ring = bool(d.get("has_oar_ring", false))
+	if mill_q >= 1:
+		hill.open_wall()
+	if mill_q >= 2:
+		hill.wind_mill4(self)
+	if mill_q >= 3:
+		hill.fill()
+	if mill_q >= 5:
+		hill.chest_look()
 	road_box = bool(d.get("road_box", false))
 	if road_box:
 		garden.blanket_look()
@@ -5821,6 +5863,8 @@ func crown_key() -> void:
 	if in_lake and lake_key():
 		return
 	if in_hill and trial_key():
+		return
+	if in_hill and player.x < GROTTO.GROTTO_X - 0.5 and mill_key():
 		return
 	if in_hill and race_key():
 		return
@@ -7634,7 +7678,7 @@ func update_mate(dt: float) -> void:
 	spr.frame = 1 if fmod(t, 3.0) < 0.3 else 0
 	if target != null and best < 1.9 and mate_cd <= 0.0 and not story_open:
 		mate_cd = 1.0
-		damage_enemy(target, player.atk * 0.6, Vector2(mate.position.x, mate.position.z), 3.0)
+		damage_enemy(target, player.atk * mate_power(), Vector2(mate.position.x, mate.position.z), 3.0)
 		burst(Vector3(target.x, 0.8, target.z), Color("#7fd8d0"), 8, 1.6)
 
 # ---- the wind hills (between the forest and the garden)
@@ -7709,7 +7753,234 @@ func hill_key() -> bool:
 			return true
 	return false
 
+# ---- 참새 방앗간 (DESIGN.md, chapter 6): below the wind hills' south fence, a windless hollow with an old mill.
+# Unwind the broken wall (after the hawk), wind the big windmill, then run past four pinwheels within 12 s from the
+# post to call the wind down: the mill fills its channel and a big guardian rises at the mouth. Over the water by
+# the skip: the flour boat, the landing bell and the miller's chest (the oar ring: Mulgyeol hits 60 -> 70%).
+# Seven foes and the guardian come once; calling the wind again pays nothing.
+const WINDRUN_TIME := 12.0
+var mill_q := 0          # 0 shut, 1 wall unwound, 2 big windmill wound, 3 wind called (water in), 4 guardian down, 5 chest
+var has_oar_ring := false
+var mill_spawned := false
+var mill_hint_told := false
+var mill_in_told := false
+var windrun_on := false
+var windrun_left := 0.0
+var windrun_got: Array = []
+var windrun_nodes: Array = []
+var windrun_quest := ""
+
+func mate_power() -> float:
+	return 0.7 if has_oar_ring else 0.6
+
+# the wind post (a sky-blue flag) and the four pinwheels in the hollow; they stand still until passed
+func build_windrun() -> void:
+	var post := Node3D.new()
+	var wood: Material = mat_color(Color("#7a5a3a"))
+	var pole: MeshInstance3D = box(Vector3(0.18, 1.6, 0.18), wood)
+	pole.position = Vector3(0, 0.8, 0)
+	post.add_child(pole)
+	var flag: MeshInstance3D = box(Vector3(0.7, 0.4, 0.06), mat_color(Color("#7ac8e8")))
+	flag.position = Vector3(0.38, 1.4, 0)
+	post.add_child(flag)
+	var at: Vector2 = hill.south_marks.P
+	post.position = Vector3(at.x, 0, at.y)
+	add_child(post)
+	rocks.append({"x": at.x, "z": at.y, "r": 0.3})
+	var cols := [Color("#e84a4a"), Color("#4a8ae8"), Color("#e8c84a"), Color("#4ac87a")]
+	for p in hill.wheels:
+		var g := Node3D.new()
+		var stick: MeshInstance3D = box(Vector3(0.1, 1.3, 0.1), wood)
+		stick.position = Vector3(0, 0.65, 0)
+		g.add_child(stick)
+		var hub := Node3D.new()
+		hub.name = "hub"
+		hub.position = Vector3(0, 1.35, 0.08)
+		g.add_child(hub)
+		for k in 4:
+			var blade: MeshInstance3D = box(Vector3(0.42, 0.16, 0.03), mat_color(cols[k]))
+			blade.position = Vector3(cos(k * PI / 2.0) * 0.22, sin(k * PI / 2.0) * 0.22, 0)
+			blade.rotation.z = k * PI / 2.0
+			hub.add_child(blade)
+		g.position = Vector3(p.x, 0, p.y)
+		add_child(g)
+		windrun_nodes.append(g)
+
+func mill_key() -> bool:
+	var me := Vector2(player.x, player.z)
+	var sm: Dictionary = hill.south_marks
+	if not hill.gate_open and me.distance_to(sm.G) < 1.6:
+		if hill_q < 3:
+			toast("무너진 벽돌 담이다")
+			return true
+		if not spend_pips(unbrick_cost()):
+			return true
+		hill.open_wall()
+		mill_q = maxi(mill_q, 1)
+		ui.mini.map_tex = hill.map_tex(HILL.HILL_X + HILL.W)
+		burst(Vector3(sm.G.x, 0.7, sm.G.y), Color("#8a6a4a"), 36, 3.5)
+		burst(Vector3(sm.G.x, 1.6, sm.G.y), Color("#8a6a4a"), 12, 2.5) # the sparrows fly down
+		shake = 0.25
+		sfx(196, 0.5, "triangle", 0.3, -60)
+		show_story("", STORY.MILL_GATE)
+		spawn_mill_foes()
+		save_game()
+		return true
+	if me.y < HILL.MILL_Z - 0.5:
+		return false
+	if mill_q == 1 and me.distance_to(sm.Q) < 2.0:
+		if not spend_pips(1):
+			return true
+		hill.wind_mill4(self)
+		mill_q = 2
+		burst(Vector3(sm.Q.x, 3.5, sm.Q.y + 0.9), Color("#f2ead8"), 30, 3.0)
+		sfx(330, 0.5, "sine", 0.25, 200)
+		show_story("", STORY.MILL_STILL)
+		save_game()
+		return true
+	if mill_q >= 2 and not windrun_on and me.distance_to(sm.P) < 1.6:
+		windrun_on = true
+		windrun_left = WINDRUN_TIME
+		windrun_got = []
+		windrun_quest = ui.quest.text
+		sfx(523, 0.12, "triangle", 0.2)
+		toast("12초 안에 바람개비 넷을 지나자!")
+		return true
+	if me.distance_to(sm.b) < 1.8:
+		show_story("", STORY.MILL_BOAT)
+		return true
+	if me.distance_to(sm.k) < 1.6:
+		sfx(1175, 0.6, "sine", 0.25)
+		show_story("", STORY.MILL_BELL)
+		return true
+	if mill_q == 4 and me.distance_to(sm.c) < 1.6:
+		mill_q = 5
+		hill.chest_look()
+		if not has_oar_ring:
+			has_oar_ring = true
+			player.max_hp += 10
+			player.hp = float(player.max_hp)
+			player.pots += 1
+			show_story("", STORY.MILL_CHEST)
+		else: # a new round: the ring came along
+			player.gold += 40
+			player.pots += 1
+			toast("금화 40, 회복약 1")
+		burst(Vector3(sm.c.x, 0.8, sm.c.y), Color("#e8d27a"), 40, 3.0)
+		sfx(784, 0.12, "triangle", 0.25)
+		save_game()
+		return true
+	return false
+
+func spawn_mill_foes() -> void:
+	if mill_spawned or mill_q >= 4:
+		return
+	mill_spawned = true
+	for f in hill.south_foes:
+		match f[1]:
+			"w":
+				spawn_wolf(f[0])
+			"j":
+				spawn_hog(f[0])
+			_:
+				spawn_enemy(f[0], f[1] == "a")
+				if f[1] == "s":
+					give_shield(enemies[enemies.size() - 1])
+
+# the big guardian at the channel's mouth (the undercroft guardians' look), with two goblins
+func spawn_mill_guard() -> void:
+	if enemies.any(func(e): return e.get("mill_guard", false) and not e.dead):
+		return
+	var at: Vector2 = hill.south_marks.K
+	spawn_enemy(at)
+	var e: Dictionary = enemies[enemies.size() - 1]
+	e.hp = 300.0 + player.lv * 30
+	e.max_hp = int(e.hp)
+	e.size_k = 1.7
+	e.mill_guard = true
+	var mats: Array = e.node.get_meta("mats")
+	mats[2].albedo_color = Color("#5a6470")
+	mats[5].albedo_color = Color("#bfe6ff")
+	e.atk_cd = 1.5
+	for k in 2:
+		spawn_enemy(at + Vector2(rnd(-2.0, 2.0), rnd(-1.5, -0.5)))
+	burst(Vector3(at.x, 0.6, at.y), Color("#bfe6ff"), 20, 2.5)
+	shake = 0.3
+	sfx(110, 0.4, "square", 0.25, 60)
+
+func mill_guard_beaten() -> void:
+	mill_q = maxi(mill_q, 4)
+	player.gold += 60
+	gain_xp(120)
+	show_story("", STORY.MILL_GUARD_DOWN)
+	save_game()
+
+func update_mill(dt: float) -> void:
+	var me := Vector2(player.x, player.z)
+	var sm: Dictionary = hill.south_marks
+	hill.sparrows.visible = hill_q >= 3 and not hill.gate_open
+	if mill_q >= 3:
+		hill.mill4.blades.rotation.z += dt * 1.2
+	for i in windrun_nodes.size():
+		if (windrun_on and i in windrun_got) or mill_q >= 3:
+			windrun_nodes[i].get_node("hub").rotation.z += dt * 6.0
+	if me.y > HILL.MILL_Z - 0.5:
+		ui.zone_sub.text = "참새 방앗간"
+	elif ui.zone_sub.text == "참새 방앗간":
+		ui.zone_sub.text = "멈춘 풍차들"
+	if windrun_on:
+		update_windrun(dt)
+	if story_open:
+		return
+	if hill_q >= 3 and mill_q == 0 and not mill_hint_told and me.distance_to(sm.G) < 5.0:
+		mill_hint_told = true
+		show_story("", STORY.MILL_HINT)
+		return
+	if mill_q >= 1 and mill_q < 4:
+		spawn_mill_foes()
+	if mill_q >= 1 and not mill_in_told and me.y > 27.5:
+		mill_in_told = true
+		show_story("", STORY.MILL_IN)
+		return
+	if mill_q == 3 and me.y > 27.5:
+		spawn_mill_guard()
+
+func update_windrun(dt: float) -> void:
+	if not in_hill or player.z < HILL.MILL_Z - 0.5:
+		end_windrun("바람이 흩어졌다. 깃대에서 다시 해 보자")
+		return
+	windrun_left -= dt
+	for i in hill.wheels.size():
+		if i in windrun_got:
+			continue
+		var w: Vector2 = hill.wheels[i]
+		if Vector2(player.x, player.z).distance_to(w) < 1.0:
+			windrun_got.append(i)
+			burst(Vector3(w.x, 1.3, w.y), Color("#f2ead8"), 14, 2.0)
+			sfx(660 + windrun_got.size() * 80, 0.12, "triangle", 0.2)
+	set_quest(tr("바람 부르기 %d/4 · %d초") % [windrun_got.size(), int(ceil(windrun_left))])
+	if windrun_got.size() == hill.wheels.size():
+		if mill_q == 2:
+			end_windrun("바람이 골로 내려왔다!")
+			mill_q = 3
+			hill.fill()
+			ui.mini.map_tex = hill.map_tex(HILL.HILL_X + HILL.W)
+			show_story("", STORY.MILL_WIND)
+			after_story = spawn_mill_guard
+			save_game()
+		else:
+			end_windrun("바람이 골을 한 바퀴 돌았다")
+	elif windrun_left <= 0.0:
+		end_windrun("바람이 흩어졌다. 깃대에서 다시 해 보자")
+
+func end_windrun(msg: String) -> void:
+	windrun_on = false
+	set_quest(windrun_quest)
+	toast(msg)
+
 func update_hill(dt: float) -> void:
+	if player.x < GROTTO.GROTTO_X - 0.5:
+		update_mill(dt)
 	for mill in hill.mills:
 		if mill.turning:
 			mill.blades.rotation.z += dt * 1.6
@@ -8876,6 +9147,8 @@ func journal_lines() -> Array:
 		var nf: int = forest.freed.filter(func(f): return f).size()
 		side.call("갇힌 다람쥐", tr("끝") if has_acorn else tr("%d/5 구함") % nf)
 		side.call("숲의 달 순서 돌", tr("끝") if forest.chest_open else (tr("상자를 열자") if forest.solved else tr("숲 북서쪽 숲터")))
+	if hill_q >= 3:
+		side.call("참새 방앗간", [tr("언덕 남쪽 담 위의 참새"), tr("큰 풍차를 왕관으로 감자"), tr("깃대에서 바람개비 넷을 돌리자"), tr("물길 어귀의 벽돌"), tr("건너편 나루의 궤짝"), tr("끝")][mill_q])
 	if hill_q >= 1:
 		side.call("바람개비 경주", tr("최고 기록 %.1f초") % race_best if race_best > 0.0 else tr("언덕 남서쪽 깃대에서"))
 	if cloud_q >= 1:
@@ -8915,6 +9188,7 @@ func journal_lines() -> Array:
 	if hollow_q == 3: keep.append(tr("열셋째 등불"))
 	if has_ring: keep.append(tr("수정 반지"))
 	if has_shoes: keep.append(tr("바람 신발"))
+	if has_oar_ring: keep.append(tr("삿대 고리"))
 	if has_armour: keep.append(tr("달지기 갑옷"))
 	if has_tea: keep.append(tr("달꽃 차"))
 	if has_shard: keep.append(tr("구름 조각"))
@@ -9827,7 +10101,7 @@ func faint() -> void:
 		for e in enemies:
 			if e.get("hawk", false) and not e.dead:
 				e.hp = float(e.max_hp)
-			if (e.get("scare", false) or e.get("knight", false)) and not e.dead:
+			if (e.get("scare", false) or e.get("knight", false) or e.get("mill_guard", false)) and not e.dead:
 				e.dead = true
 				e.node.queue_free()
 				e.shadow.queue_free()

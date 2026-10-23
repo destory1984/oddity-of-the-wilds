@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "mill", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -2332,6 +2332,81 @@ func run() -> void:
 		main.in_garden = false
 		check("road", arrived and shut and roots and page and hook and fell and stood and rose and beaten and arena and kept,
 			"arrived at the yard=%s roots shut/unwound=%s/%s fifth page=%s hook=%s fell off and back=%s footprint holds=%s brick Hangyeol 950=%s beaten opens the gate=%s arena=%s saved and waystone=%s" % [arrived, shut, roots, page, hook, fell, stood, rose, beaten, arena, kept])
+	if want.call("mill"):
+		# the sparrows' mill below the wind hills' south fence
+		if main.intro:
+			main.start_game(false)
+		await wait(0.2)
+		main.close_story()
+		main.in_village = false
+		main.in_forest = false
+		main.in_lake = false
+		main.in_garden = false
+		main.in_cave = false
+		main.in_hill = true
+		main.forest_q = 3
+		main.hill_q = 3
+		main.mill_q = 0
+		main.mill_hint_told = true
+		main.mill_in_told = true
+		main.hill.raise_bridge()
+		var hx: float = main.HILL.HILL_X
+		var sm: Dictionary = main.hill.south_marks
+		var shut: bool = not main.player_can(sm.G.x, sm.G.y)
+		var foes0: int = main.hill.foes.size()
+		main.hour = 12.0
+		main.crown_pips = 4
+		reset_to(sm.G + Vector2(0, -1.0))
+		tap(KEY_E)
+		await wait(0.15)
+		main.close_story()
+		var wall: bool = main.mill_q == 1 and main.player_can(sm.G.x, sm.G.y) and main.crown_pips == 4 - main.unbrick_cost() and main.hill.foes.size() == foes0
+		calm_enemies(true)
+		main.crown_pips = 1
+		reset_to(sm.Q + Vector2(1.5, 0))
+		tap(KEY_E)
+		await wait(0.15)
+		main.close_story()
+		var wound: bool = main.mill_q == 2 and main.hill.mills.size() == 3 and main.crown_pips == 0
+		main.skipping = true
+		var dry: bool = not main.player_can(hx + 20, 33.5)
+		main.skipping = false
+		reset_to(sm.P + Vector2(1.0, 0))
+		tap(KEY_E)
+		await wait(0.1)
+		var began: bool = main.windrun_on
+		for w in main.hill.wheels:
+			reset_to(w)
+			await wait(0.1)
+		main.close_story()
+		await wait(0.3)
+		main.close_story()
+		await wait(0.2)
+		var called: bool = began and main.mill_q == 3 and main.hill.filled and not main.windrun_on
+		main.skipping = true
+		var wet: bool = main.player_can(hx + 20, 33.5)
+		main.skipping = false
+		var guards: Array = main.enemies.filter(func(e): return e.get("mill_guard", false) and not e.dead)
+		var guard_ok: bool = guards.size() == 1 and guards[0].max_hp == 300 + main.player.lv * 30
+		var g0: int = main.player.gold
+		if guards.size() == 1:
+			main.damage_enemy(guards[0], 100000.0, Vector2(guards[0].x - 1.0, guards[0].z))
+			await wait(1.4)
+		main.close_story()
+		var down: bool = main.mill_q == 4 and main.player.gold == g0 + 60
+		var hp0: int = main.player.max_hp
+		main.has_oar_ring = false
+		reset_to(sm.c + Vector2(1.0, 0))
+		tap(KEY_E)
+		await wait(0.15)
+		main.close_story()
+		var chest: bool = main.mill_q == 5 and main.has_oar_ring and main.player.max_hp == hp0 + 10 and main.mate_power() == 0.7
+		var saved = JSON.parse_string(FileAccess.get_file_as_string(main.SAVE_PATH))
+		var kept: bool = saved != null and int(saved.get("mill_q", 0)) == 5 and bool(saved.get("has_oar_ring", false))
+		calm_enemies(false)
+		main.in_hill = false
+		check("mill", shut and wall and wound and dry and called and wet and guard_ok and down and chest and kept,
+			"wall shut/unwound=%s/%s windmill wound=%s channel dry=%s wind called and water in=%s skip crosses=%s guardian=%s down=%s chest oar ring=%s saved=%s" % [shut, wall, wound, dry, called, wet, guard_ok, down, chest, kept])
 	if want.call("trial_repeat"):
 		# after the first clear, the trial's foes give nothing (the field is where gold and XP come from)
 		var best0: float = main.trial_best
@@ -2407,7 +2482,7 @@ func run() -> void:
 		var opened: bool = main.hollow_q == 1 and main.player_can(g.x, g.y)
 		var woke: int = main.enemies.filter(func(e): return not e.dead and e.x > 170.0 and e.x < 230.0 and e.z > 21.5).size()
 		var north1: int = main.enemies.filter(func(e): return not e.dead and e.x > 170.0 and e.x < 230.0 and e.z < 21.5).size()
-		var hogs: Array = main.enemies.filter(func(e): return e.get("hog", false) and not e.dead)
+		var hogs: Array = main.enemies.filter(func(e): return e.get("hog", false) and not e.dead and e.x > 170.0 and e.x < 230.0) # the forest's own
 		calm_enemies(true)
 		main.skipping = false
 		var dry: bool = not main.player_can(198, 28.5)
