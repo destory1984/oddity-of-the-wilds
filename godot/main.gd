@@ -1211,30 +1211,23 @@ func build_vegetation() -> void:
 	vegetation(cattail, 0.8, 1.7, cattail_spots, 0.07)
 
 # the ways down under the ground (the cave mouth, the island's stair to the grotto, the castle's stair to the
-# undercroft) show on the minimap as a violet square with a pale middle (the user asked for them on the map)
+# undercroft) and the ways up out of an underground place show on the minimap as small upright stairs, violet going
+# down, gold going up (the user could not find the undercroft's stair up, 2026-10-23, and asked for the marks to look
+# like stairs, 2026-10-24). The map only keeps where they are, in its "stairs" meta: minimap.gd draws them on screen,
+# so they stay sharp and upright while the map turns and stretches with the camera
 func with_stair_marks(tex: ImageTexture, spots: Array) -> ImageTexture:
-	var img := tex.get_image()
-	for sp: Vector2 in spots:
-		for dz in range(-1, 2):
-			for dx in range(-1, 2):
-				var x := int(round(sp.x)) + dx
-				var z := int(round(sp.y)) + dz
-				if x >= 0 and z >= 0 and x < img.get_width() and z < img.get_height():
-					img.set_pixel(x, z, Color("#f2e6ff") if dx == 0 and dz == 0 else Color("#b45cff"))
-	return ImageTexture.create_from_image(img)
+	return stair_marks(tex, spots, false)
 
-# the ways up out of an underground place, as gold squares (the ways down are violet): the user could not find the
-# stair up in the undercroft (2026-10-23)
 func with_up_marks(tex: ImageTexture, spots: Array) -> ImageTexture:
-	var img := tex.get_image()
+	return stair_marks(tex, spots, true)
+
+func stair_marks(tex: ImageTexture, spots: Array, up: bool) -> ImageTexture:
+	var out := ImageTexture.create_from_image(tex.get_image())
+	var list: Array = tex.get_meta("stairs", []).duplicate()
 	for sp: Vector2 in spots:
-		for dz in range(-1, 2):
-			for dx in range(-1, 2):
-				var x := int(round(sp.x)) + dx
-				var z := int(round(sp.y)) + dz
-				if x >= 0 and z >= 0 and x < img.get_width() and z < img.get_height():
-					img.set_pixel(x, z, Color("#fff4c8") if dx == 0 and dz == 0 else Color("#ffc23a"))
-	return ImageTexture.create_from_image(img)
+		list.append([Vector2(round(sp.x), round(sp.y)), up])
+	out.set_meta("stairs", list)
+	return out
 
 func under_map() -> ImageTexture:
 	return with_up_marks(under.map_tex(UNDER.UNDER_X + UNDER.W), [under.marks.S])
@@ -2825,6 +2818,7 @@ const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 285분 / 목표 300분 (95%)",
 	"",
 	"2026-10-24 아침",
+	"· v0.0.25: 미니맵의 계단 표시를 네모에서 작은 계단 그림(세 단)으로 바꿨다. 올라가는 곳은 금빛, 내려가는 곳은 보라이고, 카메라를 돌려도 똑바로 선다.",
 	"· v0.0.24: 설정 창의 네 쪽 이름을 Settings, Help, Changes, About으로 바꿨다. 어느 언어에서도 영어로 보인다.",
 	"· v0.0.23: About 쪽에는 만든 사람(우주한량) 한 줄만 남기고 그림, 글꼴, 라이선스, 깃허브 단추를 뺐다.",
 	"· v0.0.22: 바뀐 것 목록이 100줄을 넘으면 최근 100줄만 보이고, 더 읽기 단추로 100줄씩 더 불러온다.",

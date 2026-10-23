@@ -46,6 +46,9 @@ func _draw() -> void:
 		draw_rect(Rect2(mc.x - 0.4, mc.y + 0.2, 1.8, 0.6), Color("#bcd6ff"))
 		draw_rect(Rect2(mc.x + 0.2, mc.y - 0.4, 0.6, 1.8), Color("#bcd6ff"))
 	draw_set_transform_matrix(Transform2D())
+	# the ways down (violet) and up (gold) as small upright stairs of three steps, drawn on screen over their tile
+	for st: Array in map_tex.get_meta("stairs", []):
+		draw_stairs(xf * (st[0] + Vector2(0.5, 0.5)), st[1], s)
 	# Sora's face in a small round badge marks the player
 	var u := c
 	draw_circle(u, 5.0 * s, Color("#183070"))
@@ -64,3 +67,17 @@ func _draw() -> void:
 		var a := k * PI / 2.0
 		var q := cc + Vector2(cos(a), sin(a)) * (size.x / 2.0 - 3.0)
 		draw_colored_polygon(PackedVector2Array([q + Vector2(0, -5), q + Vector2(5, 0), q + Vector2(0, 5), q + Vector2(-5, 0)]), Color("#e8b018"))
+
+# three steps climbing to the right (up) or going down to the right (down) on a dark round back
+func draw_stairs(at: Vector2, up: bool, s: float) -> void:
+	var step := Color("#ffc23a") if up else Color("#b45cff")
+	var tread := Color("#fff4c8") if up else Color("#f2e6ff")
+	draw_circle(at, 6.5 * s, Color(0.04, 0.03, 0.08, 0.9))
+	draw_arc(at, 6.5 * s, 0.0, TAU, 24, step, 1.0, true)
+	var w := 2.6 * s
+	for k in 3:
+		var h := (k + 1) * 2.6 * s
+		var x := at.x - 1.5 * w + (k if up else 2 - k) * w
+		var bottom := at.y + 1.5 * 2.6 * s
+		draw_rect(Rect2(x, bottom - h, w, h), step)
+		draw_rect(Rect2(x, bottom - h, w, maxf(1.0, 0.6 * s)), tread)
