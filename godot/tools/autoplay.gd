@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -366,6 +366,7 @@ func run() -> void:
 		await wait(1.5) # the cut needs 1 s of guard in game time; a slow machine runs behind
 		var hp2: float = gob.hp
 		main.player.atk_cd = 0.0
+		main.guard_since = main.t - 2.0 # held long enough whatever the game clock did on a busy machine
 		main.attack()
 		main.fake_keys.clear()
 		var charged: bool = hp2 - gob.hp >= main.player.atk * 2.5
@@ -977,6 +978,7 @@ func run() -> void:
 		main.forest_q = 3
 		main.hill_q = 3
 		main.garden_q = 0
+		main.road_q = 4 # Hangyeol's yard behind her: the stairs' top leads straight to the arena
 		main.in_village = false
 		main.in_hill = true
 		main.castle_q = 3
@@ -2148,6 +2150,7 @@ func run() -> void:
 		var talked: bool = main.bubbles_said > 0
 		await wait(11.0) # let a talk the rest started run out
 		var said0: int = main.bubbles_said
+		main.chat_cd = 30.0 # no talk of its own may start over this one
 		main.rest_talk(main.STORY.REST_TALK[0]) # Sora, Mulgyeol, Noeul, Mulgyeol: all three talk
 		await wait(8.0)
 		var said: int = main.bubbles_said - said0
@@ -2249,6 +2252,86 @@ func run() -> void:
 		var up: bool = main.mate_down.mulgyeol == 0.0 and absf(main.mate_hp.mulgyeol - main.mate_max() * 0.5) < 5.0
 		calm_enemies(false)
 		check("mate_hp", down and up, "a companion at 0 HP sits out=%s and gets up with half health=%s" % [down, up])
+	if want.call("road"):
+		# Hangyeol's last road: the yard below the garden between the stairs' top and the arena
+		main.story_step = maxi(main.story_step, 11)
+		if main.intro:
+			main.start_game(false)
+		await wait(0.2)
+		main.close_story()
+		main.in_village = false
+		main.in_forest = false
+		main.in_lake = false
+		main.in_cave = false
+		main.in_hill = true
+		main.forest_q = 3
+		main.hill_q = 3
+		main.castle_q = 3
+		main.hollow_q = 4
+		main.garden_q = 0
+		main.road_q = 0
+		main.open_stairs()
+		main.garden.roots_open = false # an earlier test opened the yard: shut it again
+		main.garden.gate_open = false
+		main.garden.reveal(false)
+		for r in main.garden.roots:
+			r[1].visible = true
+		reset_to(main.stairs.marks.N + Vector2(0, 0.3))
+		await wait(1.5)
+		var gx: float = main.GARDEN.GARDEN_X
+		var arrived: bool = main.in_garden and main.road_q == 1 and main.garden_q == 0 and Vector2(main.player.x, main.player.z).distance_to(main.garden.road_marks.A) < 2.5
+		main.close_story()
+		calm_enemies(true)
+		var shut: bool = not main.player_can(gx + 16, 35)
+		main.hour = 12.0
+		main.crown_pips = 3
+		var foes0: int = main.enemies.filter(func(e): return not e.dead and e.x > gx).size()
+		reset_to(Vector2(gx + 15, 35))
+		tap(KEY_E)
+		await wait(0.15)
+		var roots: bool = main.garden.roots_open and main.crown_pips == 0 and main.road_q == 2 and main.player_can(gx + 16, 35) \
+			and main.enemies.filter(func(e): return not e.dead and e.x > gx).size() == foes0 + 2
+		calm_enemies(true)
+		reset_to(Vector2(gx + 23, 34))
+		tap(KEY_E)
+		await wait(0.15)
+		main.close_story()
+		var page: bool = main.road_q == 3
+		reset_to(Vector2(gx + 20, 33))
+		tap(KEY_E)
+		await wait(0.15)
+		var hook: bool = main.story_open
+		main.close_story()
+		reset_to(Vector2(gx + 10, 30)) # off his steps: down the gap and back up at the camp's edge
+		await wait(0.2)
+		var fell: bool = absf(main.player.x - (gx + 19)) < 0.6 and absf(main.player.z - 32.0) < 0.6 and main.player.hp == main.player.max_hp - 8
+		reset_to(Vector2(gx + 17, 29)) # on a footprint: she stays
+		await wait(0.2)
+		var stood: bool = absf(main.player.x - (gx + 17)) < 0.3 and absf(main.player.z - 29.0) < 0.3
+		var g0: int = main.player.gold
+		reset_to(Vector2(gx + 13, 25))
+		main.player.inv = 9.0
+		await wait(0.3)
+		main.close_story()
+		await wait(0.2)
+		var echoes: Array = main.enemies.filter(func(e): return e.get("echo", false) and not e.dead)
+		var rose: bool = echoes.size() == 1 and echoes[0].max_hp == 950
+		if echoes.size() == 1:
+			var ec: Dictionary = echoes[0]
+			main.damage_enemy(ec, 100000.0, Vector2(ec.x, ec.z) - ec.face) # from behind: his shield keeps his front
+			await wait(1.4)
+		main.close_story()
+		var beaten: bool = main.road_q == 4 and main.player.gold == g0 + 100 and main.player_can(gx + 14, 21)
+		reset_to(Vector2(gx + 14, 19))
+		await wait(0.3)
+		var arena: bool = main.garden_q == 1
+		main.close_story()
+		var saved = JSON.parse_string(FileAccess.get_file_as_string(main.SAVE_PATH))
+		var kept: bool = saved != null and int(saved.get("road_q", 0)) == 4 and main.way_known(6)
+		calm_enemies(false)
+		main.in_garden = false
+		check("road", arrived and shut and roots and page and hook and fell and stood and rose and beaten and arena and kept,
+			"arrived at the yard=%s roots shut/unwound=%s/%s fifth page=%s hook=%s fell off and back=%s footprint holds=%s brick Hangyeol 950=%s beaten opens the gate=%s arena=%s saved and waystone=%s" % [arrived, shut, roots, page, hook, fell, stood, rose, beaten, arena, kept])
 	if want.call("trial_repeat"):
 		# after the first clear, the trial's foes give nothing (the field is where gold and XP come from)
 		var best0: float = main.trial_best
@@ -2282,7 +2365,8 @@ func run() -> void:
 		main.toggle_sound()
 		await wait(0.3)
 		var hushing: bool = main.muted and main.idle_name == "see-hush" and main.bubbles_said == said0 + 1
-		await wait(2.4)
+		main.idle_k = 5.0 # well past the fourth drawing, whatever the game clock did on a busy machine
+		await wait(0.1)
 		var held: bool = main.hero.region_rect.position.x == 3 * 192
 		main.toggle_sound()
 		await wait(0.2)
@@ -2608,6 +2692,7 @@ func run() -> void:
 			await wait(0.1)
 		main.close_story()
 		var door: bool = main.stairs.door_open and main.player_can(sx + 11, 2)
+		main.road_q = 4
 		reset_to(main.stairs.marks.N + Vector2(0, 0.3))
 		await wait(1.5)
 		var garden: bool = main.in_garden

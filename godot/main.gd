@@ -359,6 +359,8 @@ const SCENES := {
 	"kid": {"play": true, "village": true, "kid": true, "hour": 20.5},
 	"grove": {"play": true, "village": true, "forest": true, "grove": true, "hour": 15.0},
 	"hollow": {"play": true, "village": true, "forest": true, "hollow": true, "hour": 21.0},
+	"road": {"play": true, "village": true, "road": true, "hour": 14.0},
+	"road_echo": {"play": true, "village": true, "road": true, "echo": true, "hour": 14.0},
 	"flies": {"play": true, "at": Vector2(8, 23), "hour": 22.5, "flies": true},
 	"crab": {"play": true, "village": true, "crab": true, "hour": 14.0},
 	"grotto_in": {"play": true, "village": true, "crab": true, "grotto_in": true, "hour": 21.0},
@@ -503,6 +505,27 @@ func apply_test_args(args: PackedStringArray) -> void:
 				spawn_hollow()
 				player.x = forest.marks.C.x - 3.0
 				player.z = forest.marks.C.y + 1.0
+		if sc.get("road", false): # Hangyeol's yard below the garden, at his camp, the roots unwound
+			night_q = 4
+			lake_q = 4
+			forest_q = 3
+			hill_q = 3
+			castle_q = 3
+			hollow_q = 4
+			join_mate()
+			join_noeul()
+			road_q = 2
+			enter_garden()
+			close_story()
+			player.x = garden.road_marks.k.x - 2.0
+			player.z = garden.road_marks.k.y + 1.0
+			garden.reveal(true)
+			if sc.has("echo"): # the brick Hangyeol risen in his yard
+				road_q = 3
+				spawn_knight(true)
+				player.x = garden.road_marks.X.x - 1.0
+				player.z = garden.road_marks.X.y + 3.0
+			snap_mates()
 		if sc.get("mold", false): # the last boss in the heart of the garden
 			night_q = 4
 			forest_q = 3
@@ -2604,7 +2627,7 @@ func write_new_round() -> void:
 
 # ---- moon waystones: a standing stone in each hub. E at one opens a list of the stones already reached;
 # a number key (1 - 6) travels there. Esc or E closes the list.
-const WAY_NAMES := ["늪 오두막", "마을 광장", "남쪽 호수 부두", "굳은 숲 입구", "바람 언덕", "달지기 성 문"]
+const WAY_NAMES := ["늪 오두막", "마을 광장", "남쪽 호수 부두", "굳은 숲 입구", "바람 언덕", "달지기 성 문", "정원 앞 야영터"]
 var way_open := false
 var way_nodes: Array = []
 
@@ -2616,6 +2639,7 @@ func way_spot(i: int) -> Vector2:
 		3: return forest.marks.S + Vector2(2.5, -1.5)
 		4: return hill.marks.S + Vector2(2.0, -1.5)
 		5: return castle.marks.S + Vector2(2.5, 1.5)
+		6: return garden.road_marks.Y
 	return Vector2.ZERO
 
 func way_known(i: int) -> bool:
@@ -2626,6 +2650,7 @@ func way_known(i: int) -> bool:
 		3: return forest_q >= 1
 		4: return hill_q >= 1
 		5: return castle_q >= 1
+		6: return road_q >= 1
 	return false
 
 func build_ways() -> void:
@@ -2702,6 +2727,7 @@ func travel(i: int) -> void:
 			3: enter_forest()
 			4: enter_hill()
 			5: enter_castle()
+			6: enter_garden()
 		var to := way_spot(i) + Vector2(0, 1.2)
 		player.x = to.x
 		player.z = to.y
@@ -2710,9 +2736,10 @@ func travel(i: int) -> void:
 		save_game())
 
 const CHANGES := [
-	"개발 상황: 놀 수 있는 분량 약 256분 / 목표 300분 (85%)",
+	"개발 상황: 놀 수 있는 분량 약 264분 / 목표 300분 (88%)",
 	"",
 	"2026-10-24 새벽",
+	"· v0.0.15: 8 → 9장에 한결의 마지막 길(약 8분). 계단 꼭대기에서 정원 아래 무너진 뜰로 들어간다. 뿌리 벽돌을 풀고, 한결의 야영터에서 다섯째 일기와 빈 등불 고리를 찾고, 왕관으로 비춰야 보이는 발자국을 따라 깊은 틈을 건너, 거푸집이 떠 둔 벽돌 한결과 싸운다. 한결이 왕관을 늪으로 보낸 까닭이 밝혀진다. 일곱째 길돌 정원 앞 야영터.",
 	"· v0.0.14: 우주 한량의 배치 규칙대로 화면의 단추와 판을 모두 가장자리에서 8px에 맞췄다(왼쪽 아래 단추, 왼쪽 위 초상, 미니맵, 기술 칸, 금화 칸). 단추 사이도 8px이다.",
 	"· v0.0.13: 땅 밑에서 올라가는 곳을 지도에 금빛 네모로 표시한다(성 아래 잠긴 층, 물빛 동굴, 지하 동굴). 내려가는 곳은 보라색 그대로. 잠긴 층의 올라가는 계단에 틀과 등을 달았다.",
 	"· v0.0.12: 멀리 보기(Z X, 휠)로 카메라를 물리면 땅이 뿌옇게 덮이던 안개를 약하게 했다. 안개가 카메라 거리만큼 뒤로 물러난다.",
@@ -3966,6 +3993,8 @@ func damage_enemy(e: Dictionary, amt: float, from: Vector2, kb := 4.0, force_cri
 			get_tree().create_timer(1.0).timeout.connect(crab_beaten)
 		elif e.get("scare", false):
 			get_tree().create_timer(1.0).timeout.connect(scarecrow_beaten)
+		elif e.get("echo", false):
+			get_tree().create_timer(1.0).timeout.connect(echo_beaten)
 		elif e.get("knight", false):
 			get_tree().create_timer(1.0).timeout.connect(knight_beaten)
 		elif e.get("hawk", false):
@@ -5030,7 +5059,7 @@ func save_game() -> void:
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
 		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "books": castle.books.map(func(b): return b.read), "has_bookmark": has_bookmark, "has_shard": has_shard, "shop_bought": shop_bought, "play_secs": play_secs, "ng": ng, "fest_gift": fest_gift, "mail_q": mail_q, "mail_got": mail_got, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes, "target_best": target_best, "has_medal": has_medal, "bottles": village.bottles.map(func(b): return b.got), "inn_nights": inn_nights, "magpie_q": magpie_q, "talks_heard": talks_heard.keys(),
-		"hollow_q": hollow_q, "mem_lit": forest.mem_lamps.map(func(l): return l.lit), "hollow_doors": forest.doors.map(func(dr): return dr.open), "hollow_boxes": forest.boxes.map(func(b): return b.open),
+		"road_q": road_q, "road_box": road_box, "hollow_q": hollow_q, "mem_lit": forest.mem_lamps.map(func(l): return l.lit), "hollow_doors": forest.doors.map(func(dr): return dr.open), "hollow_boxes": forest.boxes.map(func(b): return b.open),
 		"seals": garden.seals.map(func(sl): return sl.open),
 		"stairs_wall": stairs.wall_open, "stairs_lamps": stairs.lamps.map(func(l): return l.lit),
 		"castle_q": castle_q, "bars": castle.bars, "levers": castle.levers.map(func(lv): return lv.up), "vault": castle.vault_open, "has_armour": has_armour, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read),
@@ -5246,6 +5275,15 @@ func load_game() -> void:
 		castle_q = 1 # the knight fight starts over
 	if bool(d.get("castle_gate", false)):
 		castle.open_gate()
+	road_q = int(d.get("road_q", 0))
+	road_box = bool(d.get("road_box", false))
+	if road_box:
+		garden.blanket_look()
+	if road_q >= 2 or garden_q >= 1:
+		garden.open_roots()
+	if road_q >= 4 or garden_q >= 1:
+		garden.open_gate()
+		garden.reveal(true)
 	var sls: Array = d.get("seals", [])
 	for i in mini(sls.size(), garden.seals.size()):
 		if bool(sls[i]):
@@ -5757,6 +5795,8 @@ func crown_key() -> void:
 		return
 	if in_garden and garden_q == 4:
 		final_wind()
+		return
+	if in_garden and road_key():
 		return
 	if in_garden and garden_q == 1 and seal_key():
 		return
@@ -7259,17 +7299,17 @@ func castle_key() -> bool:
 			return true
 	return false
 
-func spawn_knight() -> void:
+func spawn_knight(echo := false) -> void:
 	if enemies.any(func(e): return e.get("knight", false) and not e.dead):
 		return
-	var at: Vector2 = castle.marks.K
+	var at: Vector2 = garden.road_marks.X if echo else castle.marks.K
 	var root := Node3D.new()
 	var body := Node3D.new()
 	body.name = "body"
 	root.add_child(body)
-	var plate: Material = mat_color(Color("#7a7a86"))
+	var plate: Material = mat_color(Color("#8a8a90") if echo else Color("#7a7a86"))
 	var dark: Material = mat_color(Color("#3a3a46"))
-	var red: Material = mat_color(Color("#a8322a"))
+	var red: Material = mat_color(Color("#6e6c78") if echo else Color("#a8322a")) # the brick Hangyeol: grey where the knight is red
 	for part in [[Vector3(0.3, 0.6, 0.3), Vector3(-0.22, 0.3, 0), dark], [Vector3(0.3, 0.6, 0.3), Vector3(0.22, 0.3, 0), dark],
 			[Vector3(0.9, 0.8, 0.55), Vector3(0, 1.0, 0), plate], [Vector3(0.6, 0.55, 0.55), Vector3(0, 1.7, 0), plate],
 			[Vector3(0.5, 0.08, 0.06), Vector3(0, 1.72, 0.29), dark], [Vector3(0.12, 0.35, 0.12), Vector3(0, 2.1, 0), red],
@@ -7277,7 +7317,14 @@ func spawn_knight() -> void:
 		var b := box(part[0], part[2])
 		b.position = part[1]
 		body.add_child(b)
-	var shield := box(Vector3(0.9, 1.1, 0.14), mat_color(Color("#c8962a"))) # the big shield, held in front
+	var shield := box(Vector3(0.9, 1.1, 0.14), mat_color(Color("#6a6672") if echo else Color("#c8962a"))) # the big shield, held in front
+	if echo: # a brick crown on his head, its seams violet like the mold's
+		var crown := box(Vector3(0.5, 0.25, 0.5), mat_color(Color("#6e6c78")))
+		crown.position = Vector3(0, 2.1, 0)
+		body.add_child(crown)
+		var seam := box(Vector3(0.52, 0.05, 0.52), glow_mat(Color("#b48cff"), 1.6))
+		seam.position = Vector3(0, 2.05, 0)
+		body.add_child(seam)
 	shield.position = Vector3(-0.35, 1.0, 0.45)
 	body.add_child(shield)
 	var sword := box(Vector3(0.12, 0.12, 1.3), mat_color(Color("#d8d8e0")))
@@ -7289,7 +7336,8 @@ func spawn_knight() -> void:
 	body.add_child(eye)
 	root.scale = Vector3.ONE * 1.25
 	add_child(root)
-	enemies.append({"x": at.x, "z": at.y, "hp": 1100.0, "max_hp": 1100, "node": root, "shadow": blob(1.3), "t": 0.0,
+	var hp := 950.0 if echo else 1100.0
+	enemies.append({"x": at.x, "z": at.y, "hp": hp, "max_hp": int(hp), "node": root, "shadow": blob(1.3), "t": 0.0, "echo": echo,
 		"atk_cd": 1.5, "hurt": 0.0, "kx": 0.0, "kz": 0.0, "wx": at.x, "wz": at.y, "dead": false, "respawn": 0.0,
 		"knight": true, "cave": true, "wind": 0.0, "stun": 0.0, "tired": 0.0, "dash": 0.0, "dir": Vector2.ZERO,
 		"next": "", "combo": 0, "slam_cd": 0.0, "hit_done": false, "face": Vector2(-1, 0)})
@@ -7303,7 +7351,7 @@ func update_knight(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
 	var body: Node3D = node.get_node("body")
 	var sword: Node3D = body.get_node("sword")
 	ui.boss.visible = d < 13.0
-	ui.boss_name.text = "벽돌 기사"
+	ui.boss_name.text = "벽돌 한결" if e.get("echo", false) else "벽돌 기사"
 	ui.boss_bar.size.x = 420.0 * maxf(0.0, e.hp) / e.max_hp
 	e.t += dt
 	e.hurt -= dt
@@ -7788,22 +7836,167 @@ func enter_garden() -> void:
 	in_hill = false
 	in_garden = true
 	story_step = maxi(story_step, 11)
-	player.x = garden.marks.S.x + 1.5
-	player.z = garden.marks.S.y
+	if garden_q >= 1 or road_q >= 4: # the arena reached before, or Hangyeol's yard behind her: the yard stays open
+		garden.open_roots()
+		garden.open_gate()
+		garden.reveal(true)
+	elif road_q >= 2:
+		garden.open_roots()
 	ground_y = 0.0
 	ui.mini.map_tex = garden.map_tex(GARDEN.GARDEN_X + GARDEN.W)
+	if garden_q == 0 and road_q < 4: # in at the yard below, by the stairs' top
+		player.x = garden.road_marks.A.x + 1.5
+		player.z = garden.road_marks.A.y
+		ui.zone_name.text = "한결의 마지막 길"
+		ui.zone_sub.text = "무너진 뜰"
+		spawn_road()
+		if road_q == 0:
+			road_q = 1
+			show_story("", STORY.ROAD_IN)
+		set_quest(road_quest())
+		save_game()
+		return
+	player.x = garden.marks.S.x + 1.5
+	player.z = garden.marks.S.y
 	ui.zone_name.text = "정원 한가운데"
-	ui.zone_sub.text = "굳은달 빈터"
-	if garden_q == 0:
-		garden_q = 1
-		show_story("", STORY.GARDEN_IN)
-	if garden_q < 5:
+	ui.zone_sub.text = "굳은달 빈터" # the arrival scene now comes in update_garden, the first time she stands in the arena
+	if garden_q >= 1 and garden_q < 5:
 		if garden.seals_open() < garden.seals.size():
 			set_quest(tr("거푸집 둘레의 벽돌 봉인을 풀자 (E) %d/3") % garden.seals_open())
 		else:
 			set_quest("굳은달 거푸집의 심장을 노리자")
 	if garden_q >= 5:
 		garden.set_posts(8)
+	save_game()
+
+# ---- 한결의 마지막 길 (DESIGN.md, chapter 8 to 9): the yard below the arena where Hangyeol camped the night
+# before he went in. Root bricks, his camp (the empty hook for the thirteenth lantern, his fifth page, a blanket),
+# his footprints over the deep gap that show for 3 s when the crown shines, and the brick Hangyeol the mold cast
+# of him. Beating it opens the grey gate into the arena. Six foes, once; the echo pays 200 XP and 100 gold once.
+var road_q := 0          # 0 not yet, 1 arrived, 2 roots unwound, 3 fifth page read, 4 the brick Hangyeol down
+var road_box := false    # the blanket opened
+var road_spawned := false
+var road_camp_told := false
+
+func road_quest() -> String:
+	match road_q:
+		1: return "뿌리 벽돌을 왕관으로 풀자 (E)"
+		2: return "한결의 야영터를 살펴보자"
+		3: return "깊은 틈 위 한결의 발자국을 따라가자 (E로 비추기)"
+	return "회색 문을 지나 빈터로 가자"
+
+func spawn_road() -> void:
+	if road_spawned or road_q >= 4:
+		return
+	road_spawned = true
+	for f in garden.road_foes:
+		match f[1]:
+			"w":
+				spawn_wolf(f[0])
+			"a":
+				spawn_enemy(f[0], true)
+			"s":
+				spawn_enemy(f[0])
+				give_shield(enemies[enemies.size() - 1])
+
+func road_key() -> bool:
+	var me := Vector2(player.x, player.z)
+	if me.y < GARDEN.ROAD_Z - 0.5:
+		return false
+	if not garden.roots_open:
+		for r in garden.roots:
+			if me.distance_to(r[0]) < 1.6:
+				if not spend_pips(unbrick_cost()):
+					return true
+				garden.open_roots()
+				ui.mini.map_tex = garden.map_tex(GARDEN.GARDEN_X + GARDEN.W)
+				burst(Vector3(r[0].x, 0.7, r[0].y), Color("#9a4ad8"), 36, 3.5)
+				shake = 0.25
+				sfx(196, 0.5, "triangle", 0.3, -60)
+				for k in 2: # like a seal: two goblins break out of the roots
+					spawn_enemy(r[0] + Vector2(rnd(1.0, 2.0), rnd(-1.0, 1.0)))
+				road_q = maxi(road_q, 2)
+				set_quest(road_quest())
+				toast("뿌리 벽돌이 흙으로 풀렸다")
+				save_game()
+				return true
+	if me.distance_to(garden.road_marks.k) < 1.6:
+		show_story("", STORY.ROAD_HOOK13 if hollow_q >= 3 else STORY.ROAD_HOOK)
+		return true
+	if me.distance_to(garden.road_marks.j) < 1.6:
+		show_story("", STORY.ROAD_PAGE)
+		if road_q < 3:
+			road_q = 3
+			set_quest(road_quest())
+			save_game()
+		return true
+	if not road_box and me.distance_to(garden.road_marks.c) < 1.6:
+		road_box = true
+		garden.blanket_look()
+		player.pots += 2
+		player.max_hp += 10
+		player.hp = float(player.max_hp)
+		burst(Vector3(garden.road_marks.c.x, 0.6, garden.road_marks.c.y), Color("#e8d27a"), 30, 2.5)
+		sfx(784, 0.12, "triangle", 0.25)
+		show_story("", STORY.ROAD_BLANKET)
+		save_game()
+		return true
+	if me.x > GARDEN.GARDEN_X + 11.5 and me.x < GARDEN.GARDEN_X + 21.5 and me.y > 26.5 and me.y < 32.5: # by the gap: the crown shows his steps for 3 s
+		garden.reveal_t = 3.0
+		garden.reveal(true)
+		burst(Vector3(player.x, 1.6, player.z), Color("#bfe6ff"), 14, 1.5)
+		sfx(988, 0.3, "sine", 0.18)
+		return true
+	return false
+
+func update_road(dt: float) -> void:
+	var me := Vector2(player.x, player.z)
+	if garden.reveal_t > 0.0:
+		garden.reveal_t -= dt
+		if garden.reveal_t <= 0.0 and not (road_q >= 4 or garden_q >= 1):
+			garden.reveal(false)
+	if garden_q == 0 and me.y < GARDEN.ROAD_Z - 0.5 and not story_open: # first steps into the arena
+		garden_q = 1
+		show_story("", STORY.GARDEN_IN)
+		set_quest(tr("거푸집 둘레의 벽돌 봉인을 풀자 (E) %d/3") % garden.seals_open())
+		ui.zone_name.text = "정원 한가운데"
+		ui.zone_sub.text = "굳은달 빈터"
+		save_game()
+		return
+	if me.y < GARDEN.ROAD_Z - 0.5:
+		return
+	ui.zone_sub.text = "한결의 야영터" if me.x > GARDEN.GARDEN_X + 16.5 else "무너진 뜰"
+	if fade_rect.color.a == 0.0 and garden.char_at(me.x, me.y) == ",": # off his steps: down the gap and back up
+		player.x = GARDEN.GARDEN_X + 19.0
+		player.z = 32.0
+		hurt_player(8, 0.0)
+		burst(Vector3(player.x, 0.5, player.z), Color("#ffffff"), 20, 2.5)
+		toast("발을 헛디뎌 틈 아래로 떨어졌다가 기어 올라왔다")
+		return
+	if fade_rect.color.a == 0.0 and me.distance_to(garden.road_marks.A) < 0.9:
+		fade_then(leave_garden)
+		return
+	if story_open:
+		return
+	if road_q == 2 and not road_camp_told and me.x > GARDEN.GARDEN_X + 16.5:
+		road_camp_told = true
+		show_story("", STORY.ROAD_CAMP)
+		return
+	if road_q == 3 and me.y > 21.5 and me.y < 26.5 and me.x > GARDEN.GARDEN_X + 8.5 and me.x < GARDEN.GARDEN_X + 18.5 \
+			and not enemies.any(func(e): return e.get("echo", false) and not e.dead):
+		show_story("", STORY.ROAD_ECHO)
+		after_story = spawn_knight.bind(true)
+
+func echo_beaten() -> void:
+	road_q = 4
+	garden.open_gate()
+	garden.reveal(true)
+	ui.mini.map_tex = garden.map_tex(GARDEN.GARDEN_X + GARDEN.W)
+	ui.boss.visible = false
+	player.gold += 100
+	gain_xp(200)
+	show_story("", STORY.ROAD_ECHO_DOWN)
+	set_quest(road_quest())
 	save_game()
 
 func leave_garden() -> void:
@@ -7827,6 +8020,7 @@ func leave_garden() -> void:
 	save_game()
 
 func update_garden(dt: float) -> void:
+	update_road(dt)
 	if garden_q == 1 and not story_open and garden.seals_open() == garden.seals.size() and Vector2(player.x, player.z).distance_to(garden.marks.C) < 8.0:
 		garden_q = 2
 		spawn_mold()
@@ -8081,7 +8275,11 @@ func mold_breaks() -> void:
 	gain_xp(400)
 	story_step = 12
 	var record: String = tr("||여기까지 걸린 시간 %s, 물리친 괴물 %d마리, 이룬 도전 과제 %d/6.") % [play_time_text(), stats.kills, feats_done.count(true)]
-	show_story("res://art/story/12_festival.jpg", STORY.ENDING + [record])
+	var ending: Array = STORY.ENDING.duplicate()
+	if road_q >= 3: # before "그래서, 찾았니?"
+		var at := ending.find("보리 할머니|bori|그래서, 찾았니?")
+		ending.insert(at if at >= 0 else ending.size(), STORY.ENDING_ROAD)
+	show_story("res://art/story/12_festival.jpg", ending + [record])
 	set_quest("끝. 다시 돌기 시작한 정원을 거닐자 (정원 한가운데서 E 두 번: 새 바퀴)")
 	save_game()
 
@@ -8802,7 +9000,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		toggle_settings(true)
 		return
 	if way_open and event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode >= KEY_1 and event.keycode <= KEY_6:
+		if event.keycode >= KEY_1 and event.keycode <= KEY_7:
 			travel(event.keycode - KEY_1)
 			return
 		if event.keycode == KEY_ESCAPE:
@@ -9589,12 +9787,17 @@ func faint() -> void:
 		ui.mini.map_tex = village.map_tex(VILLAGE.VILLAGE_X + VILLAGE.W)
 		in_garden = false
 		in_village = true
+		for e in enemies:
+			if e.get("echo", false) and not e.dead:
+				e.dead = true
+				e.node.queue_free()
+				e.shadow.queue_free()
 		if garden_q >= 2 and garden_q < 5:
 			garden_q = 1 # the fight starts over
 			garden.set_posts(0)
 			ring_k = -1
 			for e in enemies:
-				if (e.get("mold", false) or e.get("shard", false)) and not e.dead:
+				if (e.get("mold", false) or e.get("shard", false) or e.get("echo", false)) and not e.dead:
 					e.dead = true
 					e.node.queue_free()
 					e.shadow.queue_free()
