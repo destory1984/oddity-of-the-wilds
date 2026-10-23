@@ -273,6 +273,7 @@ func _ready() -> void:
 	cloud.build_updraft(self, hill.marks.U)
 	castle.build(self)
 	build_trial()
+	build_race()
 	build_player()
 	for i in 9:
 		spawn_enemy(Vector2(-1, -1), i >= 6) # the last three are brick archers
@@ -334,6 +335,7 @@ const SCENES := {
 	"wolves": {"play": true, "village": true, "forest": true, "wolves": true, "hour": 16.5},
 	"trial": {"play": true, "village": true, "trial": true, "hour": 21.0},
 	"cage": {"play": true, "village": true, "forest": true, "cage": true, "hour": 14.0},
+	"race": {"play": true, "village": true, "hill": true, "race": true, "hour": 10.0},
 	"scrap": {"play": true, "at": Vector2(42.5, 5.5), "hour": 17.0},
 }
 
@@ -443,6 +445,13 @@ func apply_test_args(args: PackedStringArray) -> void:
 			player.x = hill.mills[0].pos.x + 2.5
 			player.z = hill.mills[0].pos.y + 2.0
 			snap_mates()
+			if sc.has("race"):
+				player.x = HILL.HILL_X + RACE_POST.x + 1.0
+				player.z = RACE_POST.y
+				race_key()
+				player.x = HILL.HILL_X + 6.0
+				player.z = 16.5
+				snap_mates()
 		if sc.get("cloud", false): # the cloud mound above the hill, mates along; with "scare" the scarecrow is up
 			night_q = 4
 			lake_q = 4
@@ -1664,6 +1673,109 @@ func clear_trial() -> void:
 	sfx(784, 0.3, "triangle", 0.25)
 	toast(tr("달빛 시련을 마쳤다: %d분 %02d초") % [int(secs) / 60, int(secs) % 60] + ("" if first else tr(" (금화 +80)")))
 	save_game()
+
+# ---- the pinwheel race on the wind hills (west of the gorge): E at the race post starts a 25 s run;
+# pass through all five pinwheels, in any order. The first win gives the wind shoes (running 6.2 -> 7.0
+# tiles/s); later wins 30 gold. The best time shows in the journal.
+const RACE_POST := Vector2(2, 21)  # hill tiles
+const RACE_WHEELS := [Vector2(9, 4), Vector2(17, 2), Vector2(12, 9), Vector2(7, 15), Vector2(16, 21)]
+const RACE_TIME := 25.0
+var race_on := false
+var race_left := 0.0
+var race_got: Array = []
+var race_nodes: Array = []
+var race_best := 0.0
+var race_quest := ""          # the quest line to put back after the race
+var has_shoes := false
+
+func build_race() -> void:
+	var hx := float(HILL.HILL_X)
+	var post := Node3D.new()
+	var wood: Material = mat_color(Color("#7a5a3a"))
+	var pole: MeshInstance3D = box(Vector3(0.18, 1.6, 0.18), wood)
+	pole.position = Vector3(0, 0.8, 0)
+	post.add_child(pole)
+	var flag: MeshInstance3D = box(Vector3(0.7, 0.4, 0.06), mat_color(Color("#e8b018")))
+	flag.position = Vector3(0.38, 1.4, 0)
+	post.add_child(flag)
+	post.position = Vector3(hx + RACE_POST.x, 0, RACE_POST.y)
+	add_child(post)
+	rocks.append({"x": hx + RACE_POST.x, "z": RACE_POST.y, "r": 0.3})
+	var cols := [Color("#e84a4a"), Color("#4a8ae8"), Color("#e8c84a"), Color("#4ac87a")]
+	for p in RACE_WHEELS:
+		var g := Node3D.new()
+		var stick: MeshInstance3D = box(Vector3(0.1, 1.3, 0.1), wood)
+		stick.position = Vector3(0, 0.65, 0)
+		g.add_child(stick)
+		var hub := Node3D.new()
+		hub.name = "hub"
+		hub.position = Vector3(0, 1.35, 0.08)
+		g.add_child(hub)
+		for k in 4:
+			var blade: MeshInstance3D = box(Vector3(0.42, 0.16, 0.03), mat_color(cols[k]))
+			blade.position = Vector3(cos(k * PI / 2.0) * 0.22, sin(k * PI / 2.0) * 0.22, 0)
+			blade.rotation.z = k * PI / 2.0
+			hub.add_child(blade)
+		g.position = Vector3(hx + p.x, 0, p.y)
+		g.visible = false
+		add_child(g)
+		race_nodes.append(g)
+
+func race_key() -> bool:
+	if race_on or Vector2(player.x, player.z).distance_to(Vector2(HILL.HILL_X + RACE_POST.x, RACE_POST.y)) > 1.6:
+		return false
+	race_on = true
+	race_left = RACE_TIME
+	race_got = []
+	race_quest = ui.quest.text
+	for g in race_nodes:
+		g.visible = true
+	sfx(523, 0.12, "triangle", 0.2)
+	get_tree().create_timer(0.15).timeout.connect(func(): sfx(784, 0.2, "triangle", 0.2))
+	toast("바람개비 다섯 개를 지나자!")
+	return true
+
+func update_race(dt: float) -> void:
+	for g in race_nodes:
+		if g.visible:
+			g.get_node("hub").rotation.z += dt * 6.0
+	if not race_on:
+		return
+	if not in_hill or in_cloud() or in_castle():
+		end_race("경주를 그만두었다")
+		return
+	race_left -= dt
+	for i in race_nodes.size():
+		if i in race_got:
+			continue
+		var w := Vector2(HILL.HILL_X + RACE_WHEELS[i].x, RACE_WHEELS[i].y)
+		if Vector2(player.x, player.z).distance_to(w) < 1.0:
+			race_got.append(i)
+			race_nodes[i].visible = false
+			burst(Vector3(w.x, 1.3, w.y), Color("#f2ead8"), 14, 2.0)
+			sfx(660 + race_got.size() * 80, 0.12, "triangle", 0.2)
+	set_quest(tr("바람개비 경주 %d/5 · %d초") % [race_got.size(), int(ceil(race_left))])
+	if race_got.size() == RACE_WHEELS.size():
+		var secs := RACE_TIME - race_left
+		var first := not has_shoes
+		end_race(tr("바람개비 경주 성공! %.1f초") % secs)
+		if first:
+			has_shoes = true
+			show_story("", STORY.RACE_WIN)
+		else:
+			player.gold += 30
+		if race_best <= 0.0 or secs < race_best:
+			race_best = secs
+		save_game()
+	elif race_left <= 0.0:
+		end_race("시간이 다 됐다. 깃대에서 다시 해 보자")
+
+func end_race(msg: String) -> void:
+	race_on = false
+	for g in race_nodes:
+		g.visible = false
+	set_quest(race_quest)
+	toast(msg)
 
 func spawn_boss() -> void:
 	var spot := Vector2(16, 4)
@@ -2979,7 +3091,7 @@ func save_game() -> void:
 		"fly_q": fly_q, "flies": marsh.flies.map(func(f): return f.caught),
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
-		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best,
+		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "has_shoes": has_shoes,
 		"castle_q": castle_q, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -3105,6 +3217,8 @@ func load_game() -> void:
 		forest.freed[i] = bool(fr[i])
 	has_acorn = bool(d.get("has_acorn", false))
 	trial_best = float(d.get("trial_best", 0.0))
+	race_best = float(d.get("race_best", 0.0))
+	has_shoes = bool(d.get("has_shoes", false))
 	shrine_seen = bool(d.get("shrine_seen", false))
 	castle_q = int(d.get("castle_q", 0))
 	if castle_q == 2:
@@ -3526,6 +3640,8 @@ func crown_key() -> void:
 	if in_castle() and castle_key():
 		return
 	if in_lake and lake_key():
+		return
+	if in_hill and race_key():
 		return
 	if in_hill and hill_key():
 		return
@@ -5872,6 +5988,8 @@ func journal_lines() -> Array:
 		var nf: int = forest.freed.filter(func(f): return f).size()
 		side.call("갇힌 다람쥐", tr("끝") if has_acorn else tr("%d/5 구함") % nf)
 		side.call("숲의 달 순서 돌", tr("끝") if forest.chest_open else (tr("상자를 열자") if forest.solved else tr("숲 북서쪽 숲터")))
+	if hill_q >= 1:
+		side.call("바람개비 경주", tr("최고 기록 %.1f초") % race_best if race_best > 0.0 else tr("언덕 남서쪽 깃대에서"))
 	if hill_q >= 3:
 		side.call("구름 둔덕", tr("끝") if cloud_q >= 3 else tr("언덕 북쪽 바람구멍으로"))
 	if castle_q >= 1:
@@ -5888,6 +6006,7 @@ func journal_lines() -> Array:
 	if has_feather: keep.append(tr("바람 깃털"))
 	if has_acorn: keep.append(tr("다람쥐 도토리"))
 	if has_ring: keep.append(tr("수정 반지"))
+	if has_shoes: keep.append(tr("바람 신발"))
 	out.append("  " + (", ".join(keep) if not keep.is_empty() else tr("왕관 하나")))
 	return out
 
@@ -6037,7 +6156,7 @@ func _process(dt: float) -> void:
 	player.sp = maxf(0, player.sp - 22 * dt) if running else minf(100, player.sp + (27.0 if has_pearl else 18.0) * dt)
 	if skipping and on_water:
 		player.sp = maxf(player.sp, 1.0)
-	var speed := 6.2 if running else 3.6
+	var speed := (7.0 if has_shoes else 6.2) if running else 3.6
 	var tv := Vector2.ZERO
 	if mv.length() > 0:
 		mv = mv.normalized()
@@ -6215,6 +6334,7 @@ func _process(dt: float) -> void:
 	update_night(dt)
 	update_shrine(dt)
 	update_trial(dt)
+	update_race(dt)
 	if in_cave:
 		check_painting()
 	if in_cave and not has_skip and Vector2(player.x, player.z).distance_to(cave_marks.E) < 1.6 and toast_t <= 0.0:
@@ -6608,6 +6728,8 @@ func hurt_player(dmg: int, gy: float) -> void:
 
 # Sora faints: say so plainly, keep gold and level, heal the boss, and wake her at the start
 func faint() -> void:
+	if race_on:
+		end_race("경주 중에 쓰러졌다")
 	if trial_wave > 0:
 		end_trial("시련에서 쓰러졌다")
 	if in_garden:

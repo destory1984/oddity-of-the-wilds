@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -1510,6 +1510,42 @@ func run() -> void:
 		main.close_story()
 		main.in_cave = false
 		check("crystals", cr.size() == 4 and sword_rings and reset and done and reach and main.has_ring, "crystals=%d sword rings=%s wrong note resets=%s solved=%s chest reachable=%s ring=%s" % [cr.size(), sword_rings, reset, done, reach, main.has_ring])
+	if want.call("race"):
+		main.story_step = maxi(main.story_step, 10)
+		if main.intro:
+			main.start_game(false)
+		main.close_story()
+		main.in_village = false
+		main.in_hill = true
+		main.hill_q = maxi(main.hill_q, 1)
+		main.has_shoes = false
+		main.race_best = 0.0
+		calm_enemies(true)
+		await wait(0.2)
+		main.close_story()
+		var hx: float = main.HILL.HILL_X
+		var spots := true
+		for p in main.RACE_WHEELS + [main.RACE_POST + Vector2(1, 0)]:
+			spots = spots and main.walkable(hx + p.x, p.y)
+		reset_to(Vector2(hx + main.RACE_POST.x + 1.0, main.RACE_POST.y))
+		tap(KEY_E)
+		await wait(0.1)
+		var started: bool = main.race_on
+		for p in main.RACE_WHEELS:
+			reset_to(Vector2(hx + p.x, p.y))
+			await wait(0.1)
+		await wait(0.2)
+		main.close_story()
+		var won: bool = not main.race_on and main.has_shoes and main.race_best > 0.0
+		reset_to(Vector2(hx + main.RACE_POST.x + 1.0, main.RACE_POST.y))
+		tap(KEY_E)
+		await wait(0.1)
+		main.race_left = 0.05
+		await wait(0.2)
+		var timed_out: bool = not main.race_on
+		main.in_hill = false
+		calm_enemies(false)
+		check("race", spots and started and won and timed_out, "spots walkable=%s started=%s won shoes=%s (best %.1f s) runs out of time=%s" % [spots, started, won, main.race_best, timed_out])
 	calm_enemies(false)
 	var failed := results.count(false)
 	print("TESTS %d passed, %d failed" % [results.size() - failed, failed])
