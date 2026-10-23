@@ -234,6 +234,8 @@ func _ready() -> void:
 		TranslationServer.pseudolocalization_enabled = true # shows which text goes through the translation table
 	get_viewport().size_changed.connect(func(): if ui.has("story_cap"): fit_story())
 	rng.seed = 7
+	if not Array(OS.get_cmdline_user_args()).any(func(x): return x.begins_with("--test") or x.begins_with("--scene")):
+		load_settings() # tests and screenshots always run with the default settings
 	# Pretendard ships as unicode-range pieces; chain them as fallbacks so web builds (no system fonts) get Hangul
 	var sys := SystemFont.new()
 	sys.font_names = PackedStringArray(["Pretendard", "Malgun Gothic", "Noto Sans KR", "Apple SD Gothic Neo", "sans-serif"])
@@ -290,6 +292,9 @@ func _ready() -> void:
 	spawn_boss()
 	build_particles()
 	build_hud()
+	for l in [ui.story_text, ui.story_who, ui.journal_text, ui.journal_text2, ui.ways_text]:
+		scale_text(l)
+	apply_settings()
 	update_daylight(0.0)
 	var targs := OS.get_cmdline_user_args()
 	if targs.is_empty():
@@ -348,6 +353,7 @@ const SCENES := {
 	"cloudpath": {"play": true, "village": true, "cloud": true, "path": true, "hour": 11.0},
 	"ways": {"play": true, "ways": true, "hour": 16.0},
 	"walk_dr": {"play": true, "walk_dr": true, "at": Vector2(12, 14), "hour": 12.0},
+	"settings": {"play": true, "settings": true},
 	"scrap": {"play": true, "at": Vector2(42.5, 5.5), "hour": 17.0},
 }
 
@@ -607,6 +613,8 @@ func apply_test_args(args: PackedStringArray) -> void:
 	if sc.get("walk_dr", false): # walking toward the bottom right of the screen (5 o'clock)
 		fake_keys[KEY_S] = true
 		fake_keys[KEY_D] = true
+	if sc.get("settings", false):
+		toggle_settings(true)
 	if sc.get("opening", false):
 		begin_opening()
 	if sc.has("faint"):
@@ -674,6 +682,7 @@ func build_environment() -> void:
 	sm.shader = load("res://shaders/tiltshift.gdshader")
 	rect.material = sm
 	post.add_child(rect)
+	tilt_rect = rect
 
 # layout: a winding river from the north feeds a southern lake with an island;
 # a raised meadow in the north-east, a small pond in the north-west
@@ -2383,6 +2392,171 @@ func travel(i: int) -> void:
 		snap_mates()
 		save_game())
 
+const CHANGES := [
+	"2026-10-23 낮",
+	"· 설정 창을 더했다 (Esc 또는 왼쪽 아래 설정 단추).",
+	"· 밤이 여름처럼 짧아졌다: 21시에 어두워지고 4시면 밝아온다.",
+	"· 밤에 소라가 너무 어둡던 것을 고쳤다. 등불 곁에서는 환해진다.",
+	"· 보리 할머니도 E로 말을 건다. 5시 방향 걸음과 동료들의 방향을 바로잡았다.",
+	"· 물빛 동굴이 밝아지고, 나가는 계단과 내려가는 계단이 잘 보인다.",
+	"",
+	"2026-10-23 밤",
+	"· 새 지역: 섬 밑 물빛 동굴, 언덕 위 구름 둔덕, 가라앉은 달지기 성.",
+	"· 새 보스: 벽돌 게, 벽돌 허수아비, 벽돌 기사. 새 괴물: 벽돌 늑대, 벽돌 박쥐.",
+	"· 곁이야기: 지도 조각, 반딧불 병, 달 순서 돌, 다람쥐, 울림 수정, 바람개비 경주, 낚시, 달꽃, 집 안, 도란의 편지, 등불 축제, 서재의 책.",
+	"· 달빛 시련, 세 돌단, 일지(Q), 달빛 길돌, 도전 과제, 새 바퀴.",
+]
+
+# ---- settings (modelled on Space Oddity's 설정): opened by the 설정 button or Esc, the world waits while it is open.
+# Head: sound on/off and text size 가- / 가+. Tabs: 설정 (comfort and display), 도움말 (controls), 바뀐 것, 만든 이.
+# Saved apart from the game in user://settings.json, so F9 (start over) keeps them.
+const SETTINGS_PATH := "user://settings.json"
+const TEXT_SIZES := [0.85, 1.0, 1.15, 1.3]
+var cfg := {"text": 1, "shake": true, "tilt": true, "nums": true}
+var settings_open := false
+var set_tab := 0
+var tilt_rect: ColorRect
+var text_bases: Array = [] # [Label, base size] scaled by the text size setting
+
+func load_settings() -> void:
+	if not FileAccess.file_exists(SETTINGS_PATH):
+		return
+	var d = JSON.parse_string(FileAccess.get_file_as_string(SETTINGS_PATH))
+	if typeof(d) != TYPE_DICTIONARY:
+		return
+	for k in cfg:
+		if d.has(k):
+			cfg[k] = d[k]
+	cfg.text = clampi(int(cfg.text), 0, TEXT_SIZES.size() - 1)
+	muted = bool(d.get("muted", muted))
+
+func save_settings() -> void:
+	var d := cfg.duplicate()
+	d["muted"] = muted
+	var f := FileAccess.open(SETTINGS_PATH, FileAccess.WRITE)
+	if f:
+		f.store_string(JSON.stringify(d))
+
+func apply_settings() -> void:
+	if tilt_rect != null:
+		tilt_rect.visible = bool(cfg.tilt)
+	var k: float = TEXT_SIZES[int(cfg.text)]
+	for tb in text_bases:
+		(tb[0] as Label).add_theme_font_size_override("font_size", int(round(tb[1] * k)))
+	refresh_sound_btn()
+	if ui.has("set_rows"):
+		for key in ui.set_rows:
+			var b: Button = ui.set_rows[key]
+			var on: bool = (not muted) if key == "sound" else bool(cfg[key])
+			b.text = tr("켜짐") if on else tr("꺼짐")
+			b.modulate = Color.WHITE if on else Color(0.6, 0.6, 0.65)
+		ui.set_minus.disabled = int(cfg.text) <= 0
+		ui.set_plus.disabled = int(cfg.text) >= TEXT_SIZES.size() - 1
+
+func scale_text(l: Label) -> void:
+	text_bases.append([l, l.get_theme_font_size("font_size")])
+
+func set_button(parent: Control, text: String, pos: Vector2, size: Vector2, fn: Callable) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.add_theme_font_override("font", ui_font)
+	b.add_theme_font_size_override("font_size", 15)
+	b.position = pos
+	b.size = size
+	b.focus_mode = Control.FOCUS_NONE
+	b.pressed.connect(fn)
+	parent.add_child(b)
+	return b
+
+func build_settings(root: Control) -> void:
+	var sp := panel(root, Vector2(-330, -260), Vector2(660, 520), Control.PRESET_CENTER)
+	sp.mouse_filter = Control.MOUSE_FILTER_STOP
+	(sp.get_theme_stylebox("panel") as StyleBoxFlat).bg_color = Color("#0d1a3a")
+	label(sp, "설정", Vector2(20, 14), 22, Color("#f6d27a"))
+	ui.set_sound = set_button(sp, "효과음", Vector2(330, 14), Vector2(90, 30), func(): toggle_sound(); save_settings(); apply_settings())
+	ui.set_minus = set_button(sp, "가−", Vector2(430, 14), Vector2(56, 30), func(): cfg.text = maxi(0, int(cfg.text) - 1); save_settings(); apply_settings())
+	ui.set_plus = set_button(sp, "가+", Vector2(492, 14), Vector2(56, 30), func(): cfg.text = mini(TEXT_SIZES.size() - 1, int(cfg.text) + 1); save_settings(); apply_settings())
+	set_button(sp, "X", Vector2(616, 14), Vector2(30, 30), func(): toggle_settings(false))
+	var tabs := ["설정", "도움말", "바뀐 것", "만든 이"]
+	ui.set_tabs = []
+	ui.set_pages = []
+	for i in tabs.size():
+		var tb := set_button(sp, tabs[i], Vector2(20 + i * 156, 58), Vector2(150, 32), func(): show_set_tab(i))
+		ui.set_tabs.append(tb)
+		var page := Control.new()
+		page.position = Vector2(20, 104)
+		page.size = Vector2(620, 360)
+		page.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		sp.add_child(page)
+		ui.set_pages.append(page)
+	# 설정: comfort and display
+	ui.set_rows = {}
+	var rows := [["shake", "화면 흔들림", "벨 때와 보스가 내려찍을 때 화면이 흔들린다. 어지러우면 끄세요."],
+		["tilt", "미니어처 흐림", "화면 위아래를 흐리게 하고 색을 입혀 작은 정원처럼 보이게 한다. 흐린 게 불편하면 끄세요."],
+		["nums", "피해 숫자", "때리고 맞을 때 숫자를 띄운다. 공격 직전의 \"!\" 표시는 늘 보인다."],
+		["sound", "효과음", "M 키나 화면 왼쪽 아래 단추로도 켜고 끈다."]]
+	for i in rows.size():
+		var r: Array = rows[i]
+		var y := i * 74
+		var t := label(ui.set_pages[0], r[1], Vector2(0, y), 17, Color("#f6d27a"))
+		scale_text(t)
+		var dsc := label(ui.set_pages[0], r[2], Vector2(0, y + 26), 13, Color("#c9bfa6"))
+		dsc.size = Vector2(500, 40)
+		dsc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		var key: String = r[0]
+		ui.set_rows[key] = set_button(ui.set_pages[0], "켜짐", Vector2(530, y + 4), Vector2(86, 30), func():
+			if key == "sound":
+				toggle_sound()
+			else:
+				cfg[key] = not bool(cfg[key])
+			save_settings()
+			apply_settings())
+	var lang := label(ui.set_pages[0], "언어 · 한국어 (다른 언어는 번역 표만 준비되어 있다)", Vector2(0, 4 * 74 + 6), 13, Color("#a99d84"))
+	lang.size = Vector2(600, 20)
+	# 도움말: controls
+	var help_lines := ["WASD / 방향키 — 이동, Shift — 달리기 (물수제비 걸음을 얻으면 물 위도)", "J / 왼쪽 클릭 — 베기,  K / 오른쪽 클릭 — 구르기,  L — 막기",
+		"U I O / 1 2 3 — 기술,  4 — 회복약", "E — 왕관: 말 걸기, 등불, 벽돌 풀기, 길돌, 낚시",
+		"Space — 상자 열기, 집 들어가기", "Q — 일지,  H — 조작법,  M — 소리,  T — 3시간 보내기", "Z X / 휠 — 확대·축소,  F8 — 처음 자리로,  F9 — 처음부터",
+		"Esc — 이 설정 창 열고 닫기", "", "맞기 직전에 구르면 섬광 피하기, 막으면 섬광 막기. 괴물은 때리기 전에 빨갛게 부풀고 \"!\"가 뜬다."]
+	var hl := label(ui.set_pages[1], "\n".join(help_lines), Vector2(0, 0), 14, Color("#e9dfc4"))
+	hl.size = Vector2(620, 350)
+	hl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	scale_text(hl)
+	# 바뀐 것
+	var news := label(ui.set_pages[2], "\n".join(CHANGES), Vector2(0, 0), 13, Color("#e9dfc4"))
+	news.size = Vector2(620, 350)
+	news.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	scale_text(news)
+	# 만든 이
+	var about := label(ui.set_pages[3], "\n".join(["The Crown Oddity", "",
+		"만든 사람 · destory1984 (그림 주문, 기획), Claude (코드)", "그림 · GPT 이미지 생성. 소라의 쉬는 몸짓은 같은 작가의 우주 한량에서 가져왔다.",
+		"글꼴 · Pretendard (SIL 오픈 폰트 라이선스 1.1)", "코드 · MIT 라이선스. 소라 캐릭터와 제목 그림은 destory1984의 것이다."]), Vector2(0, 0), 14, Color("#e9dfc4"))
+	about.size = Vector2(620, 220)
+	about.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	scale_text(about)
+	set_button(ui.set_pages[3], "깃허브에서 보기", Vector2(0, 230), Vector2(170, 32), func(): OS.shell_open("https://github.com/destory1984/oddity-of-the-wilds"))
+	set_button(sp, "놀이로 돌아가기", Vector2(230, 472), Vector2(200, 34), func(): toggle_settings(false))
+	sp.visible = false
+	ui.settings = sp
+	show_set_tab(0)
+
+func show_set_tab(i: int) -> void:
+	set_tab = i
+	for k in ui.set_pages.size():
+		ui.set_pages[k].visible = k == i
+		var tb: Button = ui.set_tabs[k]
+		tb.add_theme_color_override("font_color", Color("#f6d27a") if k == i else Color("#c9bfa6"))
+		tb.modulate = Color.WHITE if k == i else Color(0.8, 0.8, 0.85)
+
+func toggle_settings(show: bool) -> void:
+	settings_open = show
+	ui.settings.visible = show
+	if show:
+		ui.help.visible = false
+		ui.journal.visible = false
+		show_set_tab(0)
+		apply_settings()
+
 func spawn_boss() -> void:
 	var spot := Vector2(16, 4)
 	for tries in 40:
@@ -2521,6 +2695,8 @@ func pillar(pos: Vector3) -> void:
 		n.scale = Vector3(1.0 + k, 1.0, 1.0 + k))
 
 func pop_num(pos: Vector3, text: String, color := Color.WHITE) -> void:
+	if not bool(cfg.nums) and text != "!" and text != "막음": # numbers can be switched off in the settings; warnings stay
+		return
 	var l := Label3D.new()
 	l.text = text
 	l.font = ui_font
@@ -3460,6 +3636,15 @@ func build_hud() -> void:
 	jbtn.pressed.connect(func(): toggle_journal(not ui.journal.visible))
 	root.add_child(jbtn)
 	ui.journal_btn = jbtn
+	var sbtn := Button.new()
+	sbtn.text = "설정"
+	sbtn.add_theme_font_override("font", ui_font)
+	place(sbtn, Control.PRESET_BOTTOM_LEFT, Vector2(368, -44), Vector2(76, 30))
+	sbtn.focus_mode = Control.FOCUS_NONE
+	sbtn.pressed.connect(func(): toggle_settings(not settings_open))
+	root.add_child(sbtn)
+	ui.settings_btn = sbtn
+	build_settings(root)
 
 	ui.toast = label(root, "", Vector2(0, 0), 20)
 	place(ui.toast, Control.PRESET_CENTER_BOTTOM, Vector2(-300, -220), Vector2(600, 30))
@@ -3605,7 +3790,7 @@ func build_hud() -> void:
 	for c in root.get_children():
 		if c != title:
 			c.visible = false
-	ui.hidden_for_intro = root.get_children().filter(func(c): return c != title and c != ui.help and c != ui.journal and c != ui.ways and c != ui.boss and c != ui.shop and c != ui.shop_hint and c != ui.slowmo_tint and c != ui.story and c != ui.quest and c != ui.legacy)
+	ui.hidden_for_intro = root.get_children().filter(func(c): return c != title and c != ui.help and c != ui.journal and c != ui.ways and c != ui.settings and c != ui.boss and c != ui.shop and c != ui.shop_hint and c != ui.slowmo_tint and c != ui.story and c != ui.quest and c != ui.legacy)
 	for k in ["zone", "stats"]:
 		pass
 
@@ -6810,6 +6995,7 @@ func close_story() -> void:
 
 func toggle_sound() -> void:
 	muted = not muted
+	save_settings()
 	toast("소리 끔" if muted else "소리 켬")
 	refresh_sound_btn()
 
@@ -6974,6 +7160,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			MOUSE_BUTTON_RIGHT: dodge()
 			MOUSE_BUTTON_WHEEL_UP: cam_dist = clampf(cam_dist - 1.2, 8, 26)
 			MOUSE_BUTTON_WHEEL_DOWN: cam_dist = clampf(cam_dist + 1.2, 8, 26)
+	if settings_open:
+		if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
+			toggle_settings(false)
+		return
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE and not way_open \
+			and not ui.journal.visible and not ui.help.visible:
+		toggle_settings(true)
+		return
 	if way_open and event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode >= KEY_1 and event.keycode <= KEY_6:
 			travel(event.keycode - KEY_1)
@@ -7011,6 +7205,8 @@ func _process(dt: float) -> void:
 		return
 	if shop_open: # the world waits while Sora shops: no clock, no monsters
 		ui.shop_hint.visible = false
+		return
+	if settings_open: # and while the settings are open
 		return
 	if story_open:
 		if ui.story_text.visible_characters != -1:
@@ -7298,8 +7494,8 @@ func _process(dt: float) -> void:
 	var pitch := 0.78
 	var target := Vector3(26, 0, 30) if intro else Vector3(player.x, gy + 0.6, player.z)
 	shake = maxf(0, shake - dt)
-	camera.position = target + Vector3(sin(cam_yaw) * cos(pitch) * cam_dist + rnd(-1, 1) * shake * 0.4,
-		sin(pitch) * cam_dist + rnd(-1, 1) * shake * 0.4, cos(cam_yaw) * cos(pitch) * cam_dist)
+	camera.position = target + Vector3(sin(cam_yaw) * cos(pitch) * cam_dist + rnd(-1, 1) * shake * 0.4 * (1.0 if cfg.shake else 0.0),
+		sin(pitch) * cam_dist + rnd(-1, 1) * shake * 0.4 * (1.0 if cfg.shake else 0.0), cos(cam_yaw) * cos(pitch) * cam_dist)
 	camera.look_at(target)
 	sun.global_transform = Transform3D(Basis(), target + Vector3(-12, 10 + sun_el * 14, -8)).looking_at(target)
 	motes.position = target

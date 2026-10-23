@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "mate_facing", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "mate_facing", "settings", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -2046,6 +2046,36 @@ func run() -> void:
 		var right := Vector2(cos(main.cam_yaw), -sin(main.cam_yaw))
 		var ok: bool = main.screen_left(-right) and not main.screen_left(right) and main.screen_left(Vector2(0, 1)) == (Vector2(0, 1).dot(right) < 0.0)
 		check("mate_facing", ok, "companions turn by screen direction, not world x=%s" % ok)
+	if want.call("settings"):
+		if main.intro:
+			main.start_game(false)
+		await wait(0.2)
+		main.close_story()
+		await wait(0.1)
+		tap(KEY_ESCAPE)
+		await wait(0.1)
+		var opened: bool = main.settings_open and main.ui.settings.visible
+		var h0: float = main.hour
+		await wait(0.5)
+		var paused: bool = main.hour == h0
+		main.ui.set_rows.tilt.emit_signal("pressed")
+		var tilt_off: bool = not main.tilt_rect.visible and not main.cfg.tilt
+		main.ui.set_rows.tilt.emit_signal("pressed")
+		main.ui.set_plus.emit_signal("pressed")
+		var bigger: bool = main.ui.story_text.get_theme_font_size("font_size") > 20
+		main.ui.set_minus.emit_signal("pressed")
+		main.ui.set_rows.nums.emit_signal("pressed")
+		var n0: int = main.get_child_count()
+		main.pop_num(Vector3(20, 1, 30), "12")
+		var hidden_nums: bool = main.get_child_count() == n0
+		main.ui.set_rows.nums.emit_signal("pressed")
+		main.show_set_tab(2)
+		var tab_ok: bool = main.ui.set_pages[2].visible and not main.ui.set_pages[0].visible
+		tap(KEY_ESCAPE)
+		await wait(0.1)
+		var closed: bool = not main.settings_open
+		check("settings", opened and paused and tilt_off and bigger and hidden_nums and tab_ok and closed,
+			"Esc opens=%s world waits=%s blur off=%s bigger text=%s numbers off=%s tabs=%s Esc closes=%s" % [opened, paused, tilt_off, bigger, hidden_nums, tab_ok, closed])
 	calm_enemies(false)
 	var failed := results.count(false)
 	print("TESTS %d passed, %d failed" % [results.size() - failed, failed])
