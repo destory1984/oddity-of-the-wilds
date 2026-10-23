@@ -2825,6 +2825,7 @@ const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 285분 / 목표 300분 (95%)",
 	"",
 	"2026-10-24 아침",
+	"· v0.0.24: 설정 창의 네 쪽 이름을 Settings, Help, Changes, About으로 바꿨다. 어느 언어에서도 영어로 보인다.",
 	"· v0.0.23: About 쪽에는 만든 사람(우주한량) 한 줄만 남기고 그림, 글꼴, 라이선스, 깃허브 단추를 뺐다.",
 	"· v0.0.22: 바뀐 것 목록이 100줄을 넘으면 최근 100줄만 보이고, 더 읽기 단추로 100줄씩 더 불러온다.",
 	"· v0.0.21: 일지(Q)와 조작법(H) 창에서 Esc를 누르면 창이 닫히고 놀이로 돌아간다. 전에는 아무 일도 없었다.",
@@ -2883,7 +2884,7 @@ const CHANGES := [
 ]
 
 # ---- settings (modelled on Space Oddity's 설정): opened by the 설정 button or Esc, the world waits while it is open.
-# Head: sound on/off and text size 가- / 가+. Tabs: 설정 (comfort and display), 도움말 (controls), 바뀐 것, About.
+# Head: sound on/off and text size 가- / 가+. Tabs: Settings (comfort and display), Help (controls), Changes, About.
 # Saved apart from the game in user://settings.json, so F9 (start over) keeps them.
 const SETTINGS_PATH := "user://settings.json"
 const TEXT_SIZES := [0.85, 1.0, 1.15, 1.3]
@@ -3161,12 +3162,14 @@ func build_settings(root: Control) -> void:
 	col.add_child(ui.set_sound)
 	ui.set_minus = set_button(col, "가−", Vector2(640 - 44 * 2 - 8, 0), Vector2(44, 40), func(): cfg.text = maxi(0, int(cfg.text) - 1); save_settings(); apply_settings())
 	ui.set_plus = set_button(col, "가+", Vector2(640 - 44, 0), Vector2(44, 40), func(): cfg.text = mini(TEXT_SIZES.size() - 1, int(cfg.text) + 1); save_settings(); apply_settings())
-	var tabs := ["설정", "도움말", "바뀐 것", "About"]
+	# the four tab names stay English in every language (the user asked), so tr() never touches them
+	var tabs := ["Settings", "Help", "Changes", "About"]
 	ui.set_tabs = []
 	ui.set_pages = []
 	var tw := (640.0 - 8 * 3) / 4.0
 	for i in tabs.size():
 		var tb := set_button(col, tabs[i], Vector2(i * (tw + 8), 54), Vector2(tw, 38), func(): show_set_tab(i))
+		tb.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 		ui.set_tabs.append(tb)
 		var holder := ScrollContainer.new() # a page taller than the sheet (big text) scrolls
 		holder.position = Vector2(0, 106)
