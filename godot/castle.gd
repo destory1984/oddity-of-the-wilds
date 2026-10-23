@@ -12,11 +12,11 @@ const W := 40
 const H := 28
 const ROWS := """########################################
 ########################################
-##########...........###################
+##########....b.b....###################
 ##########..L......j.###################
 ##########.j.........###################
 ##########.........L.###################
-##########...........###########.......#
+##########b.......b.b###########.......#
 ################..##############.L...L.#
 ##########...~~~......#####....#.......#
 ##########.L.~~~......#####..L.#.......#
@@ -54,6 +54,7 @@ var bar_nodes: Array = []
 var levers: Array = []                  # [{"pos": Vector2, "handle": Node3D, "up": bool}]
 var vault_chest: Node3D
 var vault_open := false
+var books: Array = []   # [{"pos": Vector2, "read": bool}] the library shelves (b), in reading order
 
 func _init() -> void:
 	for line in ROWS.split("\n"):
@@ -77,7 +78,7 @@ func blocked(x: float, z: float) -> bool:
 		return not door_open
 	if c in "123":
 		return not bars[int(c) - 1]
-	if c == "l" or c == "T":
+	if c == "l" or c == "T" or c == "b":
 		return true
 	return c == "#" or c == "~" or c == "_" or c == "j"
 
@@ -151,6 +152,22 @@ func build(m: Node) -> void:
 	m.add_child(throne)
 	m.rocks.append({"x": CASTLE_X + 37.5, "z": 9.0, "r": 0.9})
 	build_vault(m)
+	var wood: Material = m.mat_color(Color("#5a3a26"))
+	var spines := [Color("#a8322a"), Color("#2a5a9a"), Color("#3a8a4a"), Color("#c8962a")]
+	for z in H:
+		for x in W:
+			if grid[z][x] == "b":
+				var g := Node3D.new()
+				var shelf: MeshInstance3D = m.box(Vector3(0.9, 1.5, 0.5), wood)
+				shelf.position = Vector3(0, 0.75, 0)
+				g.add_child(shelf)
+				for k in 4:
+					var bk: MeshInstance3D = m.box(Vector3(0.16, 0.34, 0.4), m.mat_color(spines[k]))
+					bk.position = Vector3(-0.3 + k * 0.2, 1.05, 0.06)
+					g.add_child(bk)
+				g.position = Vector3(CASTLE_X + x, 0, z)
+				m.add_child(g)
+				books.append({"pos": Vector2(CASTLE_X + x, z), "read": false})
 
 func build_vault(m: Node) -> void:
 	var iron: Material = m.mat_color(Color("#4a4a56"))
@@ -267,6 +284,7 @@ func map_tex(width: int) -> ImageTexture:
 				"1", "2", "3": col = Color("#3a3630") if bars[int(c) - 1] else Color("#8a8a96")
 				"l": col = Color("#c8962a")
 				"T": col = Color("#e8c050")
+				"b": col = Color("#8a5a3a")
 				"L": col = Color("#ffd060")
 				"K": col = Color("#c8322a")
 			img.set_pixel(CASTLE_X + x, z, col)

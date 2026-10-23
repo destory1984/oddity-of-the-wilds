@@ -2216,7 +2216,7 @@ func festival_key() -> bool:
 # attack, max HP, gold, potions, keepsakes, the woken skill, feats and records. Monsters then take
 # 1/(1 + 0.5 x round) of the damage and deal (1 + 0.5 x round) times as much.
 const NG_KEEP := ["lv", "xp", "max_hp", "atk", "gold", "pots", "has_pearl", "has_feather", "has_acorn", "has_ring", "has_shoes",
-	"has_armour", "has_tea", "has_shard", "skill_up", "stats", "feats", "trial_best", "race_best", "fish"]
+	"has_armour", "has_tea", "has_shard", "has_bookmark", "skill_up", "stats", "feats", "trial_best", "race_best", "fish"]
 var ng := 0                 # how many rounds were finished before this one
 var ng_armed := 0.0         # seconds left to confirm with a second E
 
@@ -2666,6 +2666,8 @@ func damage_enemy(e: Dictionary, amt: float, from: Vector2, kb := 4.0, force_cri
 			gain_xp(12)
 
 func gain_xp(n: int) -> void:
+	if has_bookmark:
+		n = int(round(n * 1.2))
 	player.xp += n
 	while player.xp >= player.lv * 25:
 		player.xp -= player.lv * 25
@@ -3699,7 +3701,7 @@ func save_game() -> void:
 		"fly_q": fly_q, "flies": marsh.flies.map(func(f): return f.caught),
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
-		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "has_shard": has_shard, "shop_bought": shop_bought, "play_secs": play_secs, "ng": ng, "fest_gift": fest_gift, "mail_q": mail_q, "mail_got": mail_got, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes,
+		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "books": castle.books.map(func(b): return b.read), "has_bookmark": has_bookmark, "has_shard": has_shard, "shop_bought": shop_bought, "play_secs": play_secs, "ng": ng, "fest_gift": fest_gift, "mail_q": mail_q, "mail_got": mail_got, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes,
 		"seals": garden.seals.map(func(sl): return sl.open),
 		"castle_q": castle_q, "bars": castle.bars, "levers": castle.levers.map(func(lv): return lv.up), "vault": castle.vault_open, "has_armour": has_armour, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
@@ -3834,6 +3836,10 @@ func load_game() -> void:
 	has_acorn = bool(d.get("has_acorn", false))
 	trial_best = float(d.get("trial_best", 0.0))
 	race_best = float(d.get("race_best", 0.0))
+	var bks: Array = d.get("books", [])
+	for i in mini(bks.size(), castle.books.size()):
+		castle.books[i].read = bool(bks[i])
+	has_bookmark = bool(d.get("has_bookmark", false))
 	has_shard = bool(d.get("has_shard", false))
 	if has_shard:
 		cloud.shard_look()
@@ -3860,7 +3866,7 @@ func load_game() -> void:
 	for i in mini(fl.size(), marsh.picked.size()):
 		marsh.picked[i] = bool(fl[i])
 	has_tea = bool(d.get("has_tea", false))
-	for k in ["has_pearl", "has_feather", "has_acorn", "has_ring", "has_shoes", "has_armour", "has_tea", "has_shard"]:
+	for k in ["has_pearl", "has_feather", "has_acorn", "has_ring", "has_shoes", "has_armour", "has_tea", "has_shard", "has_bookmark"]:
 		set(k, bool(d.get(k, get(k))))
 	if bool(d.get("has_armour", false)) and not castle.vault_open: # a new round keeps the armour: the treasury stays empty
 		castle.open_vault_look()
@@ -4207,6 +4213,7 @@ var castle = CASTLE.new()   # 가라앉은 달지기 성 between the hill and th
 var castle_q := 0           # 0 never entered, 1 inside, 2 fighting the knight, 3 knight beaten (east gate open)
 var castle_spawned := false
 var has_armour := false
+var has_bookmark := false   # 달지기 책갈피 for reading all five library books: experience x1.2
 var has_tea := false        # 달꽃 차 from Bori: resting fills a pip in 6 s by a lantern (12 s with the jar)     # 달지기 갑옷 from the castle treasury: damage taken x0.85
 var cloud = CLOUD.new()     # 구름 둔덕 above the hill (Sora is still in_hill up there)
 var cloud_q := 0            # 0 never entered, 1 inside, 2 fighting the scarecrow, 3 scarecrow beaten
@@ -5489,6 +5496,30 @@ func castle_key() -> bool:
 		show_story("", STORY.ARMOUR)
 		save_game()
 		return true
+	var page_d := 99.0 # a diary page stand right beside a shelf wins when it is nearer
+	for pg in castle.pages:
+		page_d = minf(page_d, me.distance_to(pg.pos))
+	var near_i := -1 # the nearest shelf within reach
+	for i in castle.books.size():
+		var d: float = me.distance_to(castle.books[i].pos)
+		if d < 1.4 and d < page_d and (near_i < 0 or d < me.distance_to(castle.books[near_i].pos)):
+			near_i = i
+	for i in castle.books.size():
+		var bk: Dictionary = castle.books[i]
+		if i == near_i:
+			var first: bool = not bk.read
+			bk.read = true
+			show_story("", STORY.BOOKS[i])
+			if first:
+				sfx(523, 0.15, "triangle", 0.18)
+				var n: int = castle.books.filter(func(b): return b.read).size()
+				if n == castle.books.size():
+					has_bookmark = true
+					after_story = func(): show_story("", STORY.BOOKMARK)
+				else:
+					toast(tr("달지기 책 %d/5") % n)
+				save_game()
+			return true
 	for i in castle.pages.size():
 		var p: Dictionary = castle.pages[i]
 		if me.distance_to(p.pos) < 1.5:
@@ -6786,6 +6817,7 @@ func journal_lines() -> Array:
 		side.call("구름 둔덕", tr("끝") if cloud_q >= 3 else tr("언덕 북쪽 바람구멍으로"))
 	if castle_q >= 1:
 		side.call("한결의 일기", tr("%d/3 읽음") % castle.pages_read())
+		side.call("서재의 달지기 책", tr("끝") if has_bookmark else tr("%d/5 읽음") % castle.books.filter(func(b): return b.read).size())
 		side.call("성의 보물고", tr("끝") if castle.vault_open else (tr("상자를 열자") if castle.vault_solved() else tr("경비실의 지렛대 셋")))
 	if night_q >= 4:
 		side.call("달빛 시련", tr("최고 기록 %d분 %02d초") % [int(trial_best) / 60, int(trial_best) % 60] if trial_best > 0.0 else tr("마을 남서쪽 돌 둘레에서"))
@@ -6810,6 +6842,7 @@ func journal_lines() -> Array:
 	if has_armour: keep.append(tr("달지기 갑옷"))
 	if has_tea: keep.append(tr("달꽃 차"))
 	if has_shard: keep.append(tr("구름 조각"))
+	if has_bookmark: keep.append(tr("달지기 책갈피"))
 	out.append("  " + (", ".join(keep) if not keep.is_empty() else tr("왕관 하나")))
 	return out
 
