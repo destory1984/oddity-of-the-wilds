@@ -363,7 +363,7 @@ func run() -> void:
 		gob.z = 30.0
 		main.player.face = Vector2(1, 0)
 		main.fake_keys[KEY_L] = true
-		await wait(1.15)
+		await wait(1.5) # the cut needs 1 s of guard in game time; a slow machine runs behind
 		var hp2: float = gob.hp
 		main.player.atk_cd = 0.0
 		main.attack()

@@ -346,6 +346,7 @@ const SCENES := {
 	"village_night": {"play": true, "village": true, "hour": 22.0},
 	"market": {"play": true, "village": true, "vat": Vector2(38, 6), "hour": 14.0},
 	"house_designs": {"play": true, "village": true, "house_designs": true, "hour": 14.0},
+	"swing_designs": {"play": true, "village": true, "swing_designs": true, "hour": 14.0},
 	"pier": {"play": true, "village": true, "vat": Vector2(32, 29), "hour": 14.0},
 	"inn": {"play": true, "village": true, "vat": Vector2(8, 30), "hour": 14.0},
 	"forest": {"play": true, "village": true, "forest": true, "hour": 16.0},
@@ -439,6 +440,32 @@ func apply_test_args(args: PackedStringArray) -> void:
 			player.x = c.x + 1.0
 			player.z = c.y + 3.5
 			cam_dist = 22.0
+		if sc.get("swing_designs", false): # five sword-swing drafts frozen mid-swing in a row, same field as the houses
+			var right := Vector2(cos(cam_yaw), -sin(cam_yaw))
+			var c: Vector2 = village.marks.M + Vector2(0, -1.0)
+			for k in 5:
+				var sp := c + right * (k - 2.3) * 2.8
+				var g := swing_draft(k, 0.85, 1.8)
+				g.position = Vector3(sp.x, 0.5, sp.y)
+				g.rotation.y = cam_yaw + 0.4 # the arc sweeps across the view
+				add_child(g)
+				var t := Label3D.new()
+				t.text = "%d  %s" % [k + 1, tr(SWING_DRAFTS[k])]
+				t.font = ui_font
+				t.font_size = 40
+				t.pixel_size = 0.008
+				t.modulate = Color("#3a2414")
+				t.outline_size = 10
+				t.outline_modulate = Color("#f2ead8")
+				t.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+				t.no_depth_test = true
+				t.position = Vector3(sp.x, 1.9, sp.y)
+				add_child(t)
+			player.x = c.x
+			player.z = c.y + 2.6
+			cam_dist = 17.0
+			cfg.tilt = false # no blur: the drafts sit at the edge of the sharp band
+			apply_settings()
 		if sc.has("vat"): # a spot in village tiles
 			player.x = VILLAGE.VILLAGE_X + sc.vat.x
 			player.z = sc.vat.y
@@ -2630,6 +2657,7 @@ const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 256분 / 목표 300분 (85%)",
 	"",
 	"2026-10-23 저녁",
+	"· v0.0.7: 심지가 열셋째 등불을 마을 동쪽 문에 거는 장면에 삽화를 붙였다.",
 	"· v0.0.6: 벽돌왕을 쓰러뜨린 뒤의 저장을 불러오면 이야기가 동굴이 열린 때로 되돌아가고 할 일 줄이 \"땅 아래로 가는 동굴이 열렸다\"로 바뀌던 것을 고쳤다. 이미 되돌아간 저장은 한 일을 보고 제 단계로 되살린다.",
 	"· v0.0.5: 상점의 보리 할머니 그림을 440x600 → 220x300(넓이 1/4)으로 줄였다.",
 	"· v0.0.4: 설정 창 글자를 13 → 16px, 단추 글자를 13 → 15px로 키웠다. 긴 설명은 줄을 바꾸고, 글자를 키워 넘치면 굴려 본다. 조작법 창(H)이 글자 크기에 맞춰 넓어진다.",
@@ -3565,6 +3593,91 @@ func ring_mesh(r0: float, r1: float, a0: float, arc: float) -> ArrayMesh:
 		for k in [0, 1, 2, 0, 2, 3]:
 			st.add_vertex(p[k])
 	return st.commit()
+
+# ---- five drafts for a new sword swing (scene swing_designs), drawn as they look a little past mid-swing.
+# prog 0 -> 1 runs the swing: the arc grows from its start and its tail thins out.
+const SWING_DRAFTS := ["초승달 베기", "잔상 세 줄", "금빛 별가루", "셀 애니 붓 자국", "장난감 벽돌 조각"]
+
+# a strip along an arc whose inner and outer radius and colour change along it (u 0 at the tail, 1 at the edge)
+func arc_strip(arc: float, seg: int, shape: Callable) -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in seg:
+		var rows := []
+		for j in 2:
+			var u := float(i + j) / seg
+			var a := arc * u
+			var r: Array = shape.call(u) # [inner, outer, inner colour, outer colour]
+			rows.append([Vector3(cos(a) * r[0], 0, sin(a) * r[0]), Vector3(cos(a) * r[1], 0, sin(a) * r[1]), r[2], r[3]])
+		var q := [[rows[0][0], rows[0][2]], [rows[0][1], rows[0][3]], [rows[1][1], rows[1][3]], [rows[1][0], rows[1][2]]]
+		for k in [0, 1, 2, 0, 2, 3]:
+			st.set_color(q[k][1])
+			st.add_vertex(q[k][0])
+	return st.commit()
+
+func strip_mat(glow: float) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.vertex_color_use_as_albedo = true
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.albedo_color = Color(glow, glow, glow) # above 1 it blooms
+	return m
+
+func swing_draft(k: int, prog: float, span: float) -> Node3D:
+	var g := Node3D.new()
+	var arc := span * prog
+	var add_strip := func(shape: Callable, glow: float, y := 0.0):
+		var mi := MeshInstance3D.new()
+		mi.mesh = arc_strip(arc, 28, shape)
+		mi.material_override = strip_mat(glow)
+		mi.position.y = y
+		g.add_child(mi)
+	match k:
+		0: # a crescent: thick in the middle, sharp at both tips, white at the cutting edge fading to blue inside
+			add_strip.call(func(u: float) -> Array:
+				var w := pow(sin(PI * u), 0.8) * 0.55
+				return [1.4 - w, 1.4, Color(0.55, 0.85, 1.0, 0.0), Color(1, 1, 1, 0.95)], 2.2)
+		1: # three thin after-image lines, the outer one longest
+			for i in 3:
+				var r := 0.85 + i * 0.25
+				var cut := 0.35 - i * 0.12
+				add_strip.call(func(u: float) -> Array:
+					var a := 0.0 if u < cut else (1.0 - i * 0.25) * minf(1.0, (u - cut) * 4.0)
+					return [r - 0.035, r + 0.035, Color(0.75, 0.92, 1.0, a), Color(1, 1, 1, a)], 2.0, 0.01 * i)
+		2: # a thin gold line with diamond sparks flying off its outer side
+			add_strip.call(func(u: float) -> Array:
+				return [1.15, 1.25, Color(1.0, 0.66, 0.1, u), Color(1.0, 0.8, 0.3, u)], 1.1)
+			for i in 9:
+				var u := (i + 0.5) / 9.0
+				var a := arc * u
+				var r := 1.3 + 0.35 * fmod(i * 0.618, 1.0)
+				var d := box(Vector3.ONE * (0.07 + 0.07 * u), glow_mat(Color("#ffb21a") if i % 2 == 0 else Color("#ffe9a8"), 1.0))
+				d.position = Vector3(cos(a) * r, 0.05, sin(a) * r)
+				d.rotation = Vector3(PI / 4.0, a, PI / 4.0)
+				g.add_child(d)
+		3: # a cel-anime smear: a hard navy outline under a flat white blade of colour, no glow
+			add_strip.call(func(u: float) -> Array:
+				var w := pow(u, 0.6) * 0.95
+				return [1.48 - w, 1.48, Color("#1d2a6e"), Color("#1d2a6e")], 1.0)
+			add_strip.call(func(u: float) -> Array:
+				var w := pow(u, 0.6) * 0.75
+				return [1.38 - w, 1.38, Color.WHITE, Color.WHITE], 1.0, 0.02)
+		4: # little studded toy bricks popping out along the swing, red, yellow, blue, green
+			add_strip.call(func(u: float) -> Array:
+				return [1.0, 1.06, Color(1, 1, 1, u * 0.6), Color(1, 1, 1, u * 0.6)], 1.6)
+			var cols := [Color("#d8322a"), Color("#f2c230"), Color("#2f6fd8"), Color("#3aa84a")]
+			for i in 7:
+				var u := (i + 0.5) / 7.0
+				var a := arc * u
+				var bk := Node3D.new()
+				var mats: Array = []
+				brick(bk, mats, Vector3(0.26, 0.14, 0.16), Vector3.ZERO, cols[i % 4])
+				bk.position = Vector3(cos(a) * 1.2, 0.05 + u * 0.15, sin(a) * 1.2)
+				bk.rotation = Vector3(0.3 * i, -a, 0.2 * i)
+				bk.scale = Vector3.ONE * (0.6 + 0.6 * u)
+				g.add_child(bk)
+	return g
 
 func slash_fx(pos: Vector3, ang: float, big: bool, span := 1.8) -> void:
 	var m := MeshInstance3D.new()
@@ -6234,7 +6347,7 @@ func simji_lantern() -> void:
 	player.max_hp += 15
 	player.hp = float(player.max_hp)
 	player.gold += 150
-	show_story("", STORY.SIMJI_LANTERN)
+	show_story("res://art/story/13_thirteenth_lamp.jpg", STORY.SIMJI_LANTERN)
 	hang_thirteenth()
 	save_game()
 
