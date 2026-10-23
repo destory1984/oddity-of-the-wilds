@@ -4,8 +4,6 @@
 
 **지금 하기:** https://destory1984.github.io/the-crown-oddity/ (첫 로딩 약 45MB)
 
-처음 이름은 Oddity of the Wilds였다. 이야기가 왕관과 태엽 정원 쪽으로 커지면서 2026-10-23에 이름을 바꿨다. 저장소 주소는 그대로 둔다.
-
 ![제목 화면](docs/shots/title.jpg)
 
 ## 이야기
