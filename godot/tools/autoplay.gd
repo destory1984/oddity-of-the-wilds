@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -1836,6 +1836,36 @@ func run() -> void:
 		main.in_village = false
 		calm_enemies(false)
 		check("festival", quiet and on and gift, "no festival on a thin moon=%s full moon festival=%s rice cakes=%s" % [quiet, on, gift])
+	if want.call("new_round"):
+		main.ng = 1
+		var m: float = main.ng_mult()
+		calm_enemies(true)
+		reset_to(Vector2(20, 30))
+		main.spawn_enemy(Vector2(21, 30))
+		var e: Dictionary = main.enemies[main.enemies.size() - 1]
+		e.hp = 1000.0
+		main.damage_enemy(e, 100.0, Vector2(20, 30), 0.0, true)
+		var tougher: bool = e.hp > 1000.0 - 100.0 / m * 1.2 and e.hp < 1000.0 - 100.0 / m * 0.8
+		main.player.hp = 100.0
+		main.player.inv = 0.0
+		var armour: bool = main.has_armour
+		main.has_armour = false
+		main.hurt_player(10, 0.0)
+		var harder: bool = absf(main.player.hp - 85.0) < 0.01
+		main.has_armour = armour
+		main.player.hp = float(main.player.max_hp)
+		main.ng = 0
+		e.dead = true
+		e.node.queue_free()
+		e.shadow.queue_free()
+		calm_enemies(false)
+		main.has_pearl = true
+		main.skill_up = 2
+		var lv0: int = main.player.lv
+		main.write_new_round()
+		var sd = JSON.parse_string(FileAccess.get_file_as_string(main.SAVE_PATH))
+		var kept: bool = int(sd.get("story", -1)) == 0 and int(sd.get("ng", 0)) == 1 and int(sd.get("lv", 0)) == lv0 			and bool(sd.get("has_pearl", false)) and int(sd.get("skill_up", -1)) == 2 and not sd.has("lake_q") and not sd.has("chests")
+		check("new_round", tougher and harder and kept, "round 1: monsters take 1/1.5 damage=%s and deal 1.5x=%s, new-round save keeps level and keepsakes only=%s" % [tougher, harder, kept])
 	calm_enemies(false)
 	var failed := results.count(false)
 	print("TESTS %d passed, %d failed" % [results.size() - failed, failed])

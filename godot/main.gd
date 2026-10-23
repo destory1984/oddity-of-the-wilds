@@ -2176,6 +2176,44 @@ func festival_key() -> bool:
 	save_game()
 	return true
 
+# ---- a new round (새 바퀴) after the ending: E twice at the garden's heart starts the story over, keeping level,
+# attack, max HP, gold, potions, keepsakes, the woken skill, feats and records. Monsters then take
+# 1/(1 + 0.5 x round) of the damage and deal (1 + 0.5 x round) times as much.
+const NG_KEEP := ["lv", "xp", "max_hp", "atk", "gold", "pots", "has_pearl", "has_feather", "has_acorn", "has_ring", "has_shoes",
+	"has_armour", "has_tea", "skill_up", "stats", "feats", "trial_best", "race_best", "fish"]
+var ng := 0                 # how many rounds were finished before this one
+var ng_armed := 0.0         # seconds left to confirm with a second E
+
+func ng_mult() -> float:
+	return 1.0 + 0.5 * ng
+
+func ng_key() -> bool:
+	if not in_garden or garden_q < 5 or Vector2(player.x, player.z).distance_to(garden.marks.C) > 3.0:
+		return false
+	if ng_armed <= 0.0:
+		ng_armed = 10.0
+		show_story("", STORY.NEW_ROUND_ASK)
+		return true
+	new_round()
+	return true
+
+func new_round() -> void:
+	write_new_round()
+	get_tree().reload_current_scene()
+
+# the save a new round starts from: only what carries over, story back to 0
+func write_new_round() -> void:
+	save_game()
+	var d = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
+	var keep := {"ng": ng + 1, "story": 0}
+	for k in NG_KEEP:
+		if d.has(k):
+			keep[k] = d[k]
+	keep["hp"] = keep.get("max_hp", 100)
+	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	f.store_string(JSON.stringify(keep))
+	f.close()
+
 func spawn_boss() -> void:
 	var spot := Vector2(16, 4)
 	for tries in 40:
@@ -2428,7 +2466,7 @@ func damage_enemy(e: Dictionary, amt: float, from: Vector2, kb := 4.0, force_cri
 		stats.crits += 1
 	if (e.get("boss", false) or e.get("mole", false)) and e.get("stun", 0.0) > 0.0:
 		amt *= 1.5
-	var dmg := int(round(amt * rnd(0.85, 1.15) * (1.0 if force_crit else (1.8 if crit else 1.0))))
+	var dmg := int(round(amt / ng_mult() * rnd(0.85, 1.15) * (1.0 if force_crit else (1.8 if crit else 1.0))))
 	hitstop = maxf(hitstop, 0.09 if crit and stop < 0.09 else stop)
 	if e.get("wind", 0.0) > 0.0 and not e.get("boss", false):
 		e.wind = 0.0 # a hit interrupts a goblin's wind-up
@@ -3511,7 +3549,7 @@ func save_game() -> void:
 		"fly_q": fly_q, "flies": marsh.flies.map(func(f): return f.caught),
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
-		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "fest_gift": fest_gift, "mail_q": mail_q, "mail_got": mail_got, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes,
+		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "ng": ng, "fest_gift": fest_gift, "mail_q": mail_q, "mail_got": mail_got, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes,
 		"castle_q": castle_q, "bars": castle.bars, "levers": castle.levers.map(func(lv): return lv.up), "vault": castle.vault_open, "has_armour": has_armour, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read)}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -3641,6 +3679,7 @@ func load_game() -> void:
 	has_acorn = bool(d.get("has_acorn", false))
 	trial_best = float(d.get("trial_best", 0.0))
 	race_best = float(d.get("race_best", 0.0))
+	ng = int(d.get("ng", 0))
 	fest_gift = bool(d.get("fest_gift", false))
 	mail_q = int(d.get("mail_q", 0))
 	var mg: Array = d.get("mail_got", [])
@@ -3659,6 +3698,8 @@ func load_game() -> void:
 	for i in mini(fl.size(), marsh.picked.size()):
 		marsh.picked[i] = bool(fl[i])
 	has_tea = bool(d.get("has_tea", false))
+	for k in ["has_pearl", "has_feather", "has_acorn", "has_ring", "has_shoes", "has_armour", "has_tea"]:
+		set(k, bool(d.get(k, get(k))))
 	var fk: Array = d.get("fish", [])
 	for i in mini(fk.size(), fish_kinds.size()):
 		fish_kinds[i] = bool(fk[i])
@@ -4083,6 +4124,8 @@ func crown_key() -> void:
 			return
 		if try_unbrick():
 			return
+	if ng_key():
+		return
 	if in_garden and garden_q == 4:
 		final_wind()
 		return
@@ -5973,7 +6016,7 @@ func mold_breaks() -> void:
 	gain_xp(400)
 	story_step = 12
 	show_story("res://art/story/12_festival.jpg", STORY.ENDING)
-	set_quest("끝. 다시 돌기 시작한 정원을 마음껏 거닐자")
+	set_quest("끝. 다시 돌기 시작한 정원을 거닐자 (정원 한가운데서 E 두 번: 새 바퀴)")
 	save_game()
 
 # put the kid goblin where kid_q says: in the field with guards, or beside Kongal
@@ -6462,6 +6505,9 @@ func toggle_journal(show: bool) -> void:
 # one line per thing: the current quest, each side story once it has been found, and the keepsakes
 func journal_lines() -> Array:
 	var out: Array = []
+	if ng > 0:
+		out.append(tr("새 바퀴 %d (괴물이 %.1f배 단단하고 아프다)") % [ng, ng_mult()])
+		out.append("")
 	out.append(tr("지금 할 일"))
 	out.append("  " + (tr(ui.quest.text) if ui.quest.text != "" else tr("마음 가는 대로 둘러보자")))
 	out.append("")
@@ -6534,7 +6580,7 @@ func start_game(with_story := true) -> void:
 		return
 	intro = false
 	cam_yaw = CAM_YAW # the title screen orbits the camera; play always starts from the same angle
-	if with_story and not loaded:
+	if with_story and (not loaded or story_step == 0): # a new round loads with the story back at 0
 		show_story("res://art/story/01_wake.jpg", STORY.WAKE)
 	sfx(392, 0.3, "triangle", 0.25)
 	get_tree().create_timer(0.15).timeout.connect(func(): sfx(587, 0.5, "triangle", 0.25))
@@ -6851,6 +6897,7 @@ func _process(dt: float) -> void:
 	update_trial(dt)
 	update_race(dt)
 	update_fishing(dt)
+	ng_armed -= dt
 	update_festival(dt)
 	feat_t -= dt
 	if feat_t <= 0.0 and not intro:
@@ -7243,6 +7290,7 @@ func player_hit(dmg: int, src: Vector2, attacker: Dictionary) -> String:
 	return "hit"
 
 func hurt_player(dmg: int, gy: float) -> void:
+	dmg = int(round(dmg * ng_mult()))
 	if has_armour:
 		dmg = maxi(1, int(round(dmg * 0.85)))
 	player.hp -= dmg
