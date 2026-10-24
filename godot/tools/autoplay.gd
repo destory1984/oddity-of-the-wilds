@@ -10,7 +10,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "painting_once", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "esc_sheets", "news_more", "touch_controls", "folk_sleep", "hint_folk", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "mill", "post", "lake_south", "clock", "shore", "quarters", "oak", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "painting_once", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "esc_sheets", "news_more", "touch_controls", "folk_sleep", "folk_routine", "hint_folk", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "mill", "post", "lake_south", "clock", "shore", "quarters", "oak", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -121,6 +121,7 @@ func wait_for(cond: Callable, sec: float) -> bool:
 func run() -> void:
 	var want := func(n): return only == "all" or only == n
 	main.sleep_off = true # the villagers stay out at night here; folk_sleep turns their sleep back on
+	main.routine_off = true # and on their spots by day; folk_routine turns their rounds on
 	main.shore_q = 1 # the shore hint does not open over tests that wake Sora at the start; shore sets it itself
 	if only == "title_space": # the user's web save, then Space at the title, twice
 		var f := FileAccess.open(main.SAVE_PATH, FileAccess.WRITE)
@@ -1907,6 +1908,133 @@ func run() -> void:
 		back = back and hinted
 		check("folk_sleep", walks and gone and simji_out and in_bed and talks and back,
 			"at night walks home=%s gone in=%s Simji stays out=%s asleep in his house=%s E talks to him there=%s back out by day=%s" % [walks, gone, simji_out, in_bed, talks, back])
+	if want.call("folk_routine"):
+		# by day the villagers walk their rounds (the user, 2026-10-24): every leg is on open ground clear of doors,
+		# stalls and the others' spots; Tori leaves his spot and comes back, E talks to him mid-way, and at dusk he
+		# walks home from where he is
+		if main.intro:
+			main.start_game(false)
+		main.close_story()
+		await wait(0.1)
+		var keep := {"hour": main.hour, "fest": main.mail_got[1], "met": main.met.duplicate(), "seen": main.hf_seen.duplicate(true),
+			"turn": main.hf_turn.duplicate(), "gold": main.player.gold, "pots": main.player.pots, "bait": main.has_bait,
+			"px": main.player.x, "pz": main.player.z}
+		main.in_village = true
+		main.in_house = -1
+		main.in_lake = false
+		main.in_forest = false
+		main.in_hill = false
+		main.in_garden = false
+		main.in_cave = false
+		main.hour = 12.0
+		main.mail_got[1] = false # no festival tonight
+		main.update_folk_sleep(0.0)
+		main.update_folk_sleep(30.0)
+		# every leg: walkable (his own rock aside), 0.9 tiles clear of doors, stalls, the yard post and the others' spots
+		var vx := float(main.VILLAGE.VILLAGE_X)
+		var avoid: Array = main.village.doors.duplicate()
+		for key in ["1", "2", "3", "Q", "N", "f", "F", "M"]:
+			avoid.append(main.village.marks[key])
+		var bad := ""
+		for id in main.FOLK_ROUTES:
+			var pts: Array = main.FOLK_ROUTES[id]
+			var home: Vector2 = main.village.folk_pos[id]
+			if main.route_at(id, 0) != home:
+				bad += "%s starts off his spot; " % id
+			var own: Dictionary = main.folk_rocks[id]
+			var r0: float = own.r
+			own.r = 0.0
+			var others: Array = avoid.duplicate()
+			for o in main.FOLK_ROUTES:
+				if o != id:
+					others.append(main.village.folk_pos[o])
+			for i in pts.size():
+				var a: Vector2 = main.route_at(id, i)
+				var b: Vector2 = main.route_at(id, (i + 1) % pts.size())
+				var steps := int(a.distance_to(b) / 0.1) + 1
+				for s in steps + 1:
+					var p := a.lerp(b, float(s) / steps)
+					if not main.walkable(p.x, p.y):
+						bad += "%s blocked at %.1f,%.1f; " % [id, p.x - vx, p.y]
+						break
+					if p.distance_to(home) > 1.0 and others.any(func(q): return p.distance_to(q) < 0.9):
+						bad += "%s too near something at %.1f,%.1f; " % [id, p.x - vx, p.y]
+						break
+			own.r = r0
+		var legs_ok := bad == ""
+		main.routine_off = false
+		reset_to(main.village.marks.M + Vector2(0, 2)) # on the square, off everyone's way
+		var spr: Sprite3D = main.village.folk_node.tori
+		var home_t: Vector2 = main.village.folk_pos.tori
+		var r: Dictionary = main.folk_route_state("tori")
+		r.wait = 0.0
+		var left := false
+		for k in 200: # 20 s
+			main.update_folk_sleep(0.1)
+			if (r.pos as Vector2).distance_to(home_t) > 4.0:
+				left = true
+				break
+		var sprite_follows: bool = Vector2(spr.position.x, spr.position.z).distance_to(r.pos) < 0.01
+		# E mid-way: Sora a tile behind him; the walk stops while the talk is up
+		var mid: Vector2 = r.pos
+		var talk_at: bool = main.folk_talk_at("tori") == mid
+		reset_to(mid + Vector2(1.0, 0))
+		main.crown_key()
+		var talks: bool = main.story_open and main.ui.story_who.text.begins_with("토리")
+		await wait(0.3)
+		var held: bool = (r.pos as Vector2) == mid
+		main.close_story()
+		await wait(0.1)
+		reset_to(main.village.marks.M + Vector2(0, 2))
+		var came_back := false
+		for k in 2400: # up to 240 s round the loop
+			main.update_folk_sleep(0.1)
+			if r.i == 0 and (r.pos as Vector2).distance_to(home_t) < 0.01:
+				came_back = true
+				break
+		# dusk while he is out on his round: he walks back along it, then home to his door
+		r.wait = 0.0
+		for k in 200:
+			main.update_folk_sleep(0.1)
+			if (r.pos as Vector2).distance_to(home_t) > 4.0:
+				break
+		var out_at: Vector2 = r.pos
+		main.sleep_off = false
+		main.hour = 23.0
+		main.update_folk_sleep(0.0)
+		var going: bool = main.folk_state.tori == "going"
+		main.update_folk_sleep(0.5)
+		var from_there: bool = Vector2(spr.position.x, spr.position.z).distance_to(out_at) < 1.0 and (r.pos as Vector2).distance_to(home_t) < out_at.distance_to(home_t)
+		var gone_in := false
+		for k in 1200:
+			main.update_folk_sleep(0.1)
+			if main.folk_state.tori == "in":
+				gone_in = true
+				break
+		var walks_home: bool = going and from_there and gone_in and main.route_home("tori")
+		# put everything back: morning, everyone on his spot, the routines off again
+		main.hour = 12.0
+		main.update_folk_sleep(0.0)
+		main.update_folk_sleep(30.0)
+		main.routine_off = true
+		for k in 3000:
+			main.update_folk_sleep(0.1)
+			if main.FOLK_ROUTES.keys().all(func(id): return main.route_home(id)):
+				break
+		var all_home: bool = main.FOLK_ROUTES.keys().all(func(id): return main.route_home(id))
+		main.sleep_off = true
+		main.hour = keep.hour
+		main.mail_got[1] = keep.fest
+		main.met = keep.met
+		main.hf_seen = keep.seen
+		main.hf_turn = keep.turn
+		main.player.gold = keep.gold
+		main.player.pots = keep.pots
+		main.has_bait = keep.bait
+		reset_to(Vector2(keep.px, keep.pz))
+		main.in_village = false
+		check("folk_routine", legs_ok and left and sprite_follows and talk_at and talks and held and came_back and walks_home and all_home,
+			"legs clear=%s %s left his spot=%s sprite on him=%s talk where he is=%s E mid-way=%s stops while talked to=%s came back=%s walks home at dusk from his round=%s (going=%s from there=%s in=%s) all back on their spots=%s" % [legs_ok, bad, left, sprite_follows, talk_at, talks, held, came_back, walks_home, going, from_there, gone_in, all_home])
 	if want.call("hint_folk"):
 		# the six working villagers (v0.0.35): first lines, the last beat with its gift, a hint that follows an unfinished
 		# side quest and a different one on the next talk, and at night three to a house with E waking one

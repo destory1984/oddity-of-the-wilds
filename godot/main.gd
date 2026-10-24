@@ -429,6 +429,7 @@ const SCENES := {
 	"house": {"play": true, "village": true, "house": true, "hour": 15.0},
 	"sleep": {"play": true, "village": true, "sleep": true, "hour": 23.0, "day": 4}, # Doran asleep in his house
 	"folk6": {"play": true, "village": true, "vat": Vector2(38, 18), "folk6": true, "hour": 14.0}, # the six working villagers by day
+	"folk_day": {"play": true, "village": true, "vat": Vector2(38, 18), "folk6": true, "folk_day": true, "hour": 14.0}, # out on their rounds
 	"festival": {"play": true, "village": true, "festival": true, "hour": 22.0, "day": 4},
 	"cloudpath": {"play": true, "village": true, "cloud": true, "path": true, "hour": 11.0},
 	"ways": {"play": true, "ways": true, "hour": 16.0},
@@ -968,6 +969,11 @@ func apply_test_args(args: PackedStringArray) -> void:
 		cam_dist = 26.0
 	if sc.get("folk6", false): # far enough out to see all six
 		cam_dist = 24.0
+	if sc.get("folk_day", false): # 30 s into their day rounds
+		for id in FOLK_ROUTES:
+			folk_route_state(id).wait = randf_range(0.0, 4.0)
+		for k in 300:
+			update_folk_sleep(0.1)
 	if sc.get("swing", false): # a swing caught mid-sweep, just before the picture at 4 s
 		cam_dist = 11.0
 		player.face = Vector2(1, 0)
@@ -2789,7 +2795,113 @@ func folk_talk_at(id: String) -> Vector2:
 		"going", "coming":
 			var spr: Sprite3D = village.folk_node[id]
 			return Vector2(spr.position.x, spr.position.z)
+	if FOLK_ROUTES.has(id) and folk_route.has(id): # by day wherever his round has taken him
+		return folk_route[id].pos
 	return village.folk_pos[id]
+
+# ---- day routines (the user, 2026-10-24: the village still felt empty): by day each villager walks a short loop
+# between two or three spots tied to his life, waiting 6 - 14 s at each. Points are village tiles, true = a stop;
+# the first is his own spot and the loop closes back to it. Straight legs along walkable tiles (autoplay folk_routine).
+const FOLK_ROUTES := {
+	"doran": [[Vector2(14, 3), true], [Vector2(14, 4), false], [Vector2(21, 4), true], [Vector2(14, 4), false],
+		[Vector2(7, 4), true], [Vector2(14, 4), false]], # the post along the north houses
+	"kongal": [[Vector2(10, 15), true], [Vector2(12, 14), false], [Vector2(13, 12), true], [Vector2(12, 14), false]], # the square
+	"mulgyeol": [[Vector2(28, 21), true], [Vector2(29, 24), true]], # a look at the pond
+	"dusol": [[Vector2(43, 11), true], [Vector2(42, 9), true]], # woodpile and the forest road's edge
+	"chadol": [[Vector2(45, 20), true], [Vector2(46, 19), false], [Vector2(46, 9), false], [Vector2(44, 8), true],
+		[Vector2(46, 9), false], [Vector2(46, 19), false]], # ore cart and the market
+	"saecham": [[Vector2(38, 21), true], [Vector2(37, 23), false], [Vector2(35, 24), true], [Vector2(37, 23), false],
+		[Vector2(38, 21), true], [Vector2(33, 19), false], [Vector2(33, 9), false], [Vector2(33, 8), true],
+		[Vector2(33, 9), false], [Vector2(33, 19), false]], # field, pond edge, field, market
+	"yeoul": [[Vector2(32, 24), true], [Vector2(32, 23), false], [Vector2(25, 23), false], [Vector2(24, 28), true],
+		[Vector2(25, 23), false], [Vector2(32, 23), false]], # pond edge and the pier's foot
+	"darae": [[Vector2(36, 7), true], [Vector2(36, 9), false], [Vector2(25, 9), false], [Vector2(25, 22), false],
+		[Vector2(16, 22), false], [Vector2(16, 28), false], [Vector2(7, 28), true], [Vector2(16, 28), false],
+		[Vector2(16, 22), false], [Vector2(25, 22), false], [Vector2(25, 9), false], [Vector2(36, 9), false]], # stall and the inn door
+	"tori": [[Vector2(41, 7), true], [Vector2(39, 9), false], [Vector2(20, 9), false], [Vector2(19, 8), true],
+		[Vector2(20, 9), false], [Vector2(25, 9), false], [Vector2(25, 22), false], [Vector2(31, 22), true],
+		[Vector2(33, 19), false], [Vector2(33, 9), false], [Vector2(39, 9), false]], # market, square, the field
+}
+const ROUTE_WALK := 1.4     # tiles a second by day
+var routine_off := false    # the autoplay tests keep everyone on his spot (all but folk_routine)
+var folk_route := {}        # id -> {"i": point he heads to or stands on, "wait": s left there, "pos": Vector2, "back": bool, "dir": int}
+
+func route_at(id: String, i: int) -> Vector2:
+	var p: Vector2 = FOLK_ROUTES[id][i][0]
+	return Vector2(VILLAGE.VILLAGE_X + p.x, p.y)
+
+func folk_route_state(id: String) -> Dictionary:
+	if not folk_route.has(id):
+		folk_route[id] = {"i": 0, "wait": randf_range(6.0, 14.0), "pos": village.folk_pos[id], "back": false, "dir": 1}
+	return folk_route[id]
+
+func route_reset(id: String) -> void:
+	if FOLK_ROUTES.has(id):
+		var r := folk_route_state(id)
+		r.i = 0
+		r.pos = village.folk_pos[id]
+		r.back = false
+		r.wait = randf_range(6.0, 14.0)
+
+func route_home(id: String) -> bool:
+	return not FOLK_ROUTES.has(id) or (folk_route_state(id).pos as Vector2).distance_to(village.folk_pos[id]) < 0.01
+
+# an errand or a story waits for him on his spot
+func folk_busy(id: String) -> bool:
+	match id:
+		"kongal": return errand >= 3 and kid_q < 3        # crying for her kid goblin until he is home
+		"doran": return kid_q >= 3 and doran_q < 2        # the letter the crown should read
+		"mulgyeol": return doran_q >= 3 and mul_q < 3     # waiting for his oar
+	return false
+
+# head back to his spot by the shorter way round the loop
+func route_turn_home(id: String, r: Dictionary) -> void:
+	var n: int = FOLK_ROUTES[id].size()
+	r.back = true
+	r.dir = 1
+	if r.i == 0:
+		return
+	var on_point: bool = (r.pos as Vector2).distance_to(route_at(id, r.i)) < 0.01
+	if n - r.i <= r.i:
+		if on_point:
+			r.i = (r.i + 1) % n
+	else:
+		r.dir = -1
+		r.i -= 1
+
+# one step of his day; home_only walks him back to his spot (dusk, an errand, the tests). Returns whether he moved.
+func route_update(id: String, dt: float, home_only: bool, speed: float) -> bool:
+	var r := folk_route_state(id)
+	var pts: Array = FOLK_ROUTES[id]
+	var n := pts.size()
+	if home_only and not r.back and not route_home(id):
+		route_turn_home(id, r)
+	var to := route_at(id, r.i)
+	if (r.pos as Vector2).distance_to(to) < 0.01: # on a point
+		if r.back:
+			if r.i == 0:
+				r.back = false
+				r.wait = randf_range(6.0, 14.0)
+			else:
+				r.i = (r.i + r.dir + n) % n
+		elif home_only:
+			pass
+		elif pts[r.i][1] and r.wait > 0.0:
+			r.wait -= dt
+		else:
+			r.i = (r.i + 1) % n
+		return false
+	var d: Vector2 = to - r.pos
+	var dir := d.normalized()
+	if Vector2(player.x, player.z).distance_to(r.pos + dir * 0.5) < 0.9: # Sora is in the way: let her pass
+		return false
+	r.pos = (r.pos as Vector2) + dir * minf(dt * speed, d.length())
+	(village.folk_node[id] as Sprite3D).flip_h = screen_left(dir)
+	if (r.pos as Vector2).distance_to(to) < 0.01:
+		r.pos = to
+		if pts[r.i][1] and not r.back:
+			r.wait = randf_range(6.0, 14.0)
+	return true
 
 func update_folk_sleep(dt: float) -> void:
 	if village == null or village.doors.is_empty():
@@ -2815,28 +2927,40 @@ func update_folk_sleep(dt: float) -> void:
 			st = "going" if watching else "in"
 			if st == "in":
 				k = 1.0
+				route_reset(id)
 		elif not night and st in ["in", "going"]:
 			st = "coming" if watching else "out"
 			if st == "out":
 				k = 0.0
+				route_reset(id)
 		var step := dt * FOLK_WALK / maxf(1.0, home.distance_to(door))
-		if st == "going":
+		var roam := false # on his day round (or walking it back to his spot at dusk)
+		if st == "going" and not route_home(id): # dusk caught him out on his round: back along it first
+			roam = route_update(id, dt, true, FOLK_WALK)
+		elif st == "going":
 			k = minf(1.0, k + step)
 			if k >= 1.0:
 				st = "in"
+				route_reset(id)
 				if watching:
 					sfx(180, 0.15, "square", 0.08, -60) # the door shuts
 		elif st == "coming":
 			k = maxf(0.0, k - step)
 			if k <= 0.0:
 				st = "out"
+		elif st == "out" and FOLK_ROUTES.has(id):
+			roam = route_update(id, dt, routine_off or folk_busy(id) or is_night(), ROUTE_WALK)
 		var at := home.lerp(door, k)
-		spr.position = Vector3(at.x, 0, at.y)
+		if FOLK_ROUTES.has(id) and k <= 0.0 and st in ["out", "going"]:
+			at = folk_route_state(id).pos
+		spr.position = Vector3(at.x, 0.05 * absf(sin(t * 9.0)) if roam else 0.0, at.y) # a little bob in his step
 		spr.visible = st != "in"
-		if st in ["going", "coming"]:
+		if st in ["going", "coming"] and not roam:
 			spr.flip_h = screen_left(door - home) if st == "going" else screen_left(home - door)
-		if folk_rocks.has(id): # his standing spot blocks the way only while he stands on it
+		if folk_rocks.has(id): # he blocks the way where he stands, only while he is out
 			folk_rocks[id].r = 0.45 if st == "out" else 0.0
+			folk_rocks[id].x = at.x
+			folk_rocks[id].z = at.y
 		folk_state[id] = st
 		folk_walk_t[id] = k
 		if sleeper_nodes.has(id) and place_sleeper(id, st == "in" and in_house == folk_home(id)):
@@ -2857,9 +2981,8 @@ func update_folk_sleep(dt: float) -> void:
 	if kid_node != null and kid_q == 3:
 		var kst: String = folk_state.get("kongal", "out")
 		kid_node.visible = kst != "in"
-		if kst != "out":
-			var ks: Sprite3D = village.folk_node.kongal
-			kid_node.position = ks.position + Vector3(0.7, 0, 0.3)
+		var ks: Sprite3D = village.folk_node.kongal
+		kid_node.position = Vector3(ks.position.x + 0.7, 0, ks.position.z + 0.3)
 		if sleeper_nodes.has("kid") and place_sleeper("kid", kst == "in" and in_house == folk_home("kongal")):
 			rolls[folk_bed("kid")[1]] = true
 	elif sleeper_nodes.has("kid"):
@@ -3187,6 +3310,7 @@ const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 302분 / 목표 300분 (100%)",
 	"",
 	"2026-10-24 아침",
+	"· v0.0.42: 마을 사람들이 낮에 저마다 두세 곳을 오간다. 나무꾼 두솔은 장작더미와 숲길 가, 광부 차돌은 광석 수레와 장터, 농부 새참은 밭과 연못가와 장터, 어부 여울은 연못가와 나루 머리, 다래는 장터 자리와 여관 문 앞, 토리는 장터와 광장과 새참의 밭, 도란은 북쪽 집들 앞, 콩알은 광장(꼬마 고블린도 따라간다), 마을에 있을 때의 물결은 연못가를 오간다. 한 곳에서 6 → 14초 머물고 1초에 1.4칸 걷는다. 걷는 도중에도 E로 말을 걸 수 있고, 말하는 동안은 멈춘다. 소라가 앞길 0.9칸 안에 서 있으면 기다린다. 해가 지면 있던 자리에서 길을 되짚어 집으로 간다. 심부름이 걸린 사람(울고 있는 콩알, 편지를 든 도란, 노를 기다리는 물결)과 등불지기 심지는 제자리에 있다.",
 	"· v0.0.41: 휴대폰에서 할 일 줄, 알림, 대사에 남아 있던 키보드 말(Shift, (E), Space)을 터치 단추 이름(막대를 끝까지 밀어, 왕관 단추, 손 단추)으로 바꿔 보인다. 웹 판에서 나던 오류 하나(뒤로 단추 제목 찾기)도 고쳤다.",
 	"· v0.0.40: 휴대폰 화면에서 GPT 시험 놀이꾼이 찾은 여덟 가지를 고쳤다. 상점이 화면 안에 줄어 들어가고 제목이 잘리지 않으며, 상점·일지·설정·조작법이 열리면 메뉴 단추와 미니맵이 비켜난다. 상점은 왼쪽 위 단추로 닫는다. 돋보기 단추는 메뉴 단추 왼쪽으로 옮겨 보스 체력 막대를 가리지 않는다. 긴 할 일 줄은 동료 상태와 오른쪽 단추 사이에서 두 줄로 접힌다. 휴대폰 조작법은 이동 막대와 터치 단추 그림으로 설명하고, 기술 그림 밑에 이름이 붙는다. 동료 말풍선이 1.4배로 커지고 1초 더 머문다. 창의 뒤로 단추가 56px 이상이 되었다. 달지기 숙소는 벽 윗면을 옅은 청회색으로 덮고 바닥을 조금 밝혀 밤에도 벽과 바닥이 구별된다.",
 	"· v0.0.39: GPT 시험 놀이꾼이 두 번째로 찾은 네 가지를 고쳤다. 벽돌왕을 쓰러뜨린 뒤 할 일 줄이 '다음 장에서 계속' 대신 '열린 동굴 입구로 내려가자'를 보여 주고, 동굴 입구 위에 금빛 느낌표가 뜬다. 작은 돌숲에 들어서면 남쪽 나무들이 반쯤 비쳐 달 돌 앞 바닥과 안내판이 보인다. 밤 숲의 벽돌 벽 앞 바닥에 옅게 빛나는 테두리가 생겼다. 성 아래 등불 방은 물이 빠질 때 '물빛 등불 넷을 8초 안에 켜자'라고 알려 주고, 아직 꺼진 등불 위에 금빛 느낌표가 뜬다.",
@@ -9353,7 +9477,7 @@ func join_mate() -> void:
 	if village.folk_node.has("mulgyeol"):
 		village.folk_node.mulgyeol.visible = false
 		var at: Vector2 = village.folk_pos.mulgyeol
-		rocks = rocks.filter(func(r): return Vector2(r.x, r.z).distance_to(at) > 0.1)
+		rocks = rocks.filter(func(r): return r.get("folk", "") != "mulgyeol" and Vector2(r.x, r.z).distance_to(at) > 0.1)
 	snap_mate()
 
 func snap_mate() -> void:
