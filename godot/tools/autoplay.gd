@@ -1831,8 +1831,14 @@ func run() -> void:
 		await wait(0.1)
 		var desk: bool = main.ui.help_rows == main.ui.help_keys_rows and main.ui.quest.offset_left == -300.0 and main.ui.boss.offset_left == -220.0 \
 			and not main.ui.shop_back.visible and main.ui.shop_board.scale == Vector2.ONE and main.ui.hint.visible
+		var q0: String = main.ui.quest.text
+		main.touch_ui = true # on phones the keyboard words read as the touch keys
+		main.set_quest("벽돌 벽을 풀자 (E)")
+		var words_ok: bool = "왕관 단추" in main.ui.quest.text and not "(E)" in main.ui.quest.text
+		main.touch_ui = false
+		main.ui.quest.text = q0
 		calm_enemies(false)
-		check("touch_controls", moved > 1.5 and runs and swung and stopped and guards and unguards and no_swing and clear and backs and touch_help and shop_ok and keys_back and desk,
+		check("touch_controls", words_ok and moved > 1.5 and runs and swung and stopped and guards and unguards and no_swing and clear and backs and touch_help and shop_ok and keys_back and desk,
 			"stick walked %.1f tiles, runs at the rim=%s sword while walking=%s let go stops=%s shield held/let go=%s/%s a tap on the world does not swing=%s; layout clear=%s (quest %s boss %s) back keys 56=%s touch help=%s shop fits, keys aside=%s back after=%s desktop again=%s" % [moved, runs, swung, stopped, guards, unguards, no_swing, clear, quest_r, boss_r, backs, touch_help, shop_ok, keys_back, desk])
 	if want.call("folk_sleep"):
 		# after dark the villagers walk home and go in (Simji stays out); in his house Doran sleeps and E still talks to

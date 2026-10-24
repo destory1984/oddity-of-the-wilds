@@ -3187,6 +3187,7 @@ const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 302분 / 목표 300분 (100%)",
 	"",
 	"2026-10-24 아침",
+	"· v0.0.41: 휴대폰에서 할 일 줄, 알림, 대사에 남아 있던 키보드 말(Shift, (E), Space)을 터치 단추 이름(막대를 끝까지 밀어, 왕관 단추, 손 단추)으로 바꿔 보인다. 웹 판에서 나던 오류 하나(뒤로 단추 제목 찾기)도 고쳤다.",
 	"· v0.0.40: 휴대폰 화면에서 GPT 시험 놀이꾼이 찾은 여덟 가지를 고쳤다. 상점이 화면 안에 줄어 들어가고 제목이 잘리지 않으며, 상점·일지·설정·조작법이 열리면 메뉴 단추와 미니맵이 비켜난다. 상점은 왼쪽 위 단추로 닫는다. 돋보기 단추는 메뉴 단추 왼쪽으로 옮겨 보스 체력 막대를 가리지 않는다. 긴 할 일 줄은 동료 상태와 오른쪽 단추 사이에서 두 줄로 접힌다. 휴대폰 조작법은 이동 막대와 터치 단추 그림으로 설명하고, 기술 그림 밑에 이름이 붙는다. 동료 말풍선이 1.4배로 커지고 1초 더 머문다. 창의 뒤로 단추가 56px 이상이 되었다. 달지기 숙소는 벽 윗면을 옅은 청회색으로 덮고 바닥을 조금 밝혀 밤에도 벽과 바닥이 구별된다.",
 	"· v0.0.39: GPT 시험 놀이꾼이 두 번째로 찾은 네 가지를 고쳤다. 벽돌왕을 쓰러뜨린 뒤 할 일 줄이 '다음 장에서 계속' 대신 '열린 동굴 입구로 내려가자'를 보여 주고, 동굴 입구 위에 금빛 느낌표가 뜬다. 작은 돌숲에 들어서면 남쪽 나무들이 반쯤 비쳐 달 돌 앞 바닥과 안내판이 보인다. 밤 숲의 벽돌 벽 앞 바닥에 옅게 빛나는 테두리가 생겼다. 성 아래 등불 방은 물이 빠질 때 '물빛 등불 넷을 8초 안에 켜자'라고 알려 주고, 아직 꺼진 등불 위에 금빛 느낌표가 뜬다.",
 	"· v0.0.38: GPT 시험 놀이꾼이 찾은 다섯 가지를 고쳤다. 좁은 틈에서는 물결과 노을이 소라 뒤에 한 줄로 따라오고, 소라가 멈추면 서로 떨어진 빈자리에 선다(다람쥐 나무 입구에서 셋이 겹쳐 보였다). 밤 아랫못의 열린 창살 길에 빛나는 다리 가장자리와 작은 등불을 달았다. 깨어난 물가에서 강가 길부터 다리 서쪽 끝까지 갈대를 걷어 한 칸 길을 냈다. 자는 주민이 깔개와 침대 위에 비스듬히 눕고 밑에 그림자가 생겼다. 달지기 숙소 안에서는 다음에 할 일(셈판, 작업대, 멈춘 문지기, 장부) 위에 금빛 느낌표가 뜬다.",
@@ -3369,7 +3370,7 @@ func size_back_keys(c: Control) -> void:
 		var s := ceilf(56.0 / c.scale.x) if touch_ui else 44.0
 		b.position = Vector2(4, 2) if touch_ui else Vector2(8, 8)
 		b.size = Vector2(s, s)
-		var title: Label = b.get_meta("title", null)
+		var title: Label = b.get_meta("title") if b.has_meta("title") else null # a null default still errors
 		if title != null:
 			title.position.x = b.position.x + s + 8.0 if touch_ui else 62.0
 
@@ -11834,8 +11835,20 @@ func leave_cave() -> void:
 	if first:
 		show_story("", STORY.CAVE_EXIT)
 
+# on phones the keyboard words in quest lines, toasts and story lines become the touch keys' names
+const TOUCH_WORDS := [["Shift를 누르고 달리면", "막대를 끝까지 밀어 달리면"], ["Shift를 누르고", "막대를 끝까지 밀고"],
+	["Shift를 누른 채", "막대를 끝까지 민 채"], ["Shift로 달리며 J", "막대를 끝까지 밀며 칼 단추"], ["Shift로", "막대를 끝까지 밀어"],
+	["(E)", "(왕관 단추)"], ["E로", "왕관 단추로"], ["Space", "손 단추"]]
+
+func touch_words(t: String) -> String:
+	if not touch_ui:
+		return t
+	for w in TOUCH_WORDS:
+		t = t.replace(w[0], w[1])
+	return t
+
 func set_quest(text: String) -> void:
-	ui.quest.text = text
+	ui.quest.text = touch_words(tr(text))
 	ui.quest.visible = text != ""
 var story_lines: Array = []
 
@@ -11884,7 +11897,7 @@ func show_line(line: String) -> void:
 		ui.story_face.texture = null # the portrait already shows who is talking
 	ui.story_text.position.x = 140.0 if ui.story_face.texture else 40.0
 	ui.story_tab.visible = parts[0] != ""
-	ui.story_text.text = tr(parts[2]) # translated here so the typewriter counts the shown text
+	ui.story_text.text = touch_words(tr(parts[2])) # translated here so the typewriter counts the shown text
 	ui.story_text.visible_characters = 0
 	typing = 0.0
 
@@ -12099,7 +12112,7 @@ func journal_lines() -> Array:
 	return out
 
 func toast(msg: String) -> void:
-	ui.toast.text = msg
+	ui.toast.text = touch_words(tr(msg))
 	ui.toast.modulate.a = 1.0
 	toast_t = 2.2
 
