@@ -489,7 +489,21 @@ func run() -> void:
 			var ok: bool = main.story_step == 5 and main.story_open and main.cave_pos.x > 0
 			main.close_story()
 			await wait(0.6)
-			check("boss_opens_cave", ok, "boss down -> story step %d, cave at %s" % [main.story_step, main.cave_pos])
+			var quest: String = main.ui.quest.text
+			var said: bool = quest == main.CAVE_QUEST and not quest.contains("다음 장에서 계속")
+			var mark: bool = main.quarters_mark != null and main.quarters_mark.visible and Vector2(main.step_target().x, main.step_target().z).distance_to(main.cave_pos) < 1.0
+			# an old save still holding the demo's text loads with the new line
+			main.save_game()
+			var sv = JSON.parse_string(FileAccess.get_file_as_string(main.SAVE_PATH))
+			var old_ok := false
+			if sv != null:
+				sv["quest"] = "땅 아래로 가는 동굴이 열렸다 (다음 장에서 계속)"
+				var fw := FileAccess.open(main.SAVE_PATH, FileAccess.WRITE)
+				fw.store_string(JSON.stringify(sv))
+				fw.close()
+				main.load_game()
+				old_ok = main.ui.quest.text == main.CAVE_QUEST
+			check("boss_opens_cave", ok and said and mark and old_ok, "boss down -> story step %d, cave at %s, quest=%s mark over the cave=%s old save -> new line=%s" % [main.story_step, main.cave_pos, quest, mark, old_ok])
 
 	if want.call("save_load"):
 		main.player.lv = 4
@@ -967,12 +981,14 @@ func run() -> void:
 		await wait(0.2)
 		var w0: Dictionary = main.forest.walls[0]
 		var shut: bool = not main.walkable(w0.pos.x, w0.pos.y)
+		var edges: bool = w0.glow.visible and w0.glow.get_child_count() >= 4
 		main.crown_pips = 8
 		reset_to(w0.pos + Vector2(-1.0, 0))
 		main.player.inv = 9.0
 		tap(KEY_E)
 		await wait(0.2)
 		var opened: bool = w0.open and main.walkable(w0.pos.x, w0.pos.y) and main.crown_pips == 6
+		var edges_gone: bool = not w0.glow.visible
 		reset_to(main.forest.marks.N + Vector2(-4.0, 0))
 		main.player.inv = 9.0
 		await wait(0.3)
@@ -984,8 +1000,8 @@ func run() -> void:
 			main.damage_enemy(duel[0], 10000.0, Vector2(main.player.x, main.player.z))
 			await wait(1.4)
 		main.close_story()
-		check("forest", entered and shut and opened and met and duel.size() == 1 and main.forest_q == 3,
-			"entered=%s wall shut=%s opened=%s met Noeul=%s duel=%d forest_q=%d" % [entered, shut, opened, met, duel.size(), main.forest_q])
+		check("forest", entered and shut and opened and met and duel.size() == 1 and main.forest_q == 3 and edges and edges_gone,
+			"entered=%s wall shut=%s opened=%s met Noeul=%s duel=%d forest_q=%d night edges at the wall=%s gone once open=%s" % [entered, shut, opened, met, duel.size(), main.forest_q, edges, edges_gone])
 		for e in main.enemies.filter(func(e): return not e.dead and e.x > 170.0):
 			e.dead = true
 			e.node.visible = false
@@ -1155,6 +1171,8 @@ func run() -> void:
 		var fx0: int = main.FOREST.FOREST_X
 		var shut: bool = not main.player_can(main.forest.marks.V.x, main.forest.marks.V.y)
 		reset_to(Vector2(fx0 + 2, 5)) # by the tablet
+		await wait(0.6)
+		var faded: bool = main.forest.fade_groups[0].a < 0.5
 		tap(KEY_E)
 		await wait(0.2)
 		var read: bool = main.story_open
@@ -1174,9 +1192,12 @@ func run() -> void:
 		await wait(0.2)
 		main.close_story()
 		var opened: bool = main.forest.chest_open and main.player.max_hp == hp0 + 15
+		reset_to(Vector2(fx0 + 15, 4)) # out of the grove the crowns come back
+		await wait(0.8)
+		var back: bool = main.forest.fade_groups[0].a >= 1.0
 		main.in_forest = false
 		calm_enemies(false)
-		check("forest_grove", shut and read and solved and opened, "wall shut=%s tablet read=%s solved=%s phases=%s chest=%s" % [shut, read, solved, main.forest.stones.map(func(s): return s.phase), opened])
+		check("forest_grove", shut and read and solved and opened and faded and back, "wall shut=%s tablet read=%s solved=%s phases=%s chest=%s south crowns faded by the tablet=%s back outside=%s" % [shut, read, solved, main.forest.stones.map(func(s): return s.phase), opened, faded, back])
 	if want.call("firefly_errand"):
 		main.errand = 3
 		main.kid_q = 3
@@ -2768,6 +2789,7 @@ func run() -> void:
 			main.start_game(false)
 		await wait(0.2)
 		main.close_story()
+		park_mates(true) # a companion's hit can fell a woken brick before it is counted
 		main.in_village = false
 		main.in_forest = false
 		main.in_lake = false
@@ -2830,6 +2852,7 @@ func run() -> void:
 		main.doran_q = dq
 		calm_enemies(false)
 		main.in_cave = false
+		park_mates(false)
 		check("post", dry and wet and told and woke == 5 and gate and card and bori and kept,
 			"no skip, no way=%s skip crosses (not the shallow pool)=%s by the stream=%s woke=%d of 5 crystals lowest first sink the grate=%s postcard=%s Bori gets it=%s saved=%s" % [dry, wet, told, woke, gate, card, bori, kept])
 	if want.call("lake_south"):
@@ -4032,6 +4055,9 @@ func run() -> void:
 		tap(KEY_E)
 		await wait(0.1)
 		var drained: bool = main.under.drained and main.player_can(ux + 15, 9) and main.crown_pips == pips0 - main.unbrick_cost()
+		var told: bool = main.ui.toast.text.contains("8초")
+		var tg: Vector3 = main.step_target()
+		var marked: bool = tg != Vector3.INF and main.quarters_mark != null and main.quarters_mark.visible and main.under.lamps.any(func(l): return not l.lit and Vector2(tg.x, tg.z).distance_to(l.pos) < 0.1)
 		var l0: Dictionary = main.under.lamps[0]
 		reset_to(l0.pos + Vector2(0, 1.2))
 		tap(KEY_E)
@@ -4045,6 +4071,7 @@ func run() -> void:
 			tap(KEY_E)
 			await wait(0.1)
 		var door: bool = main.under.door_open and main.player_can(ux + 4.5, 13)
+		var unmarked: bool = main.step_target() == Vector3.INF and not main.quarters_mark.visible
 		reset_to(Vector2(ux + 4.5, 11.0))
 		await wait(0.3)
 		var guards: bool = main.under_guards.size() == 2 and not main.player_can(ux + 4.5, 13)
@@ -4068,8 +4095,8 @@ func run() -> void:
 		await wait(1.2)
 		var back: bool = main.in_castle()
 		calm_enemies(false)
-		check("undercroft", skipped and blown and down_in and flooded and drained and out and door and guards and won and chest and kept and back,
-			"skip=%s vent=%s stair down=%s flooded/drained=%s/%s lamps go out after 8 s=%s four lamps open the door=%s guardians shut it=%s beaten=%s chest +20/+3=%s saved=%s way back up=%s" % [skipped, blown, down_in, flooded, drained, out, door, guards, won, chest, kept, back])
+		check("undercroft", skipped and blown and down_in and flooded and drained and out and door and guards and won and chest and kept and back and told and marked and unmarked,
+			"skip=%s vent=%s stair down=%s flooded/drained=%s/%s lamps go out after 8 s=%s four lamps open the door=%s guardians shut it=%s beaten=%s chest +20/+3=%s saved=%s way back up=%s goal toast=%s ! over an unlit lamp=%s gone with the door=%s" % [skipped, blown, down_in, flooded, drained, out, door, guards, won, chest, kept, back, told, marked, unmarked])
 	if want.call("village_market"):
 		if main.intro:
 			main.start_game(false)

@@ -843,6 +843,7 @@ func apply_test_args(args: PackedStringArray) -> void:
 				enter_under()
 				close_story()
 				under.drain()
+				under_goal_toast(8.0)
 				player.x = UNDER.UNDER_X + 6.0
 				player.z = 16.5
 			if sc.has("stairs"):
@@ -3184,6 +3185,7 @@ const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 302분 / 목표 300분 (100%)",
 	"",
 	"2026-10-24 아침",
+	"· v0.0.39: GPT 시험 놀이꾼이 두 번째로 찾은 네 가지를 고쳤다. 벽돌왕을 쓰러뜨린 뒤 할 일 줄이 '다음 장에서 계속' 대신 '열린 동굴 입구로 내려가자'를 보여 주고, 동굴 입구 위에 금빛 느낌표가 뜬다. 작은 돌숲에 들어서면 남쪽 나무들이 반쯤 비쳐 달 돌 앞 바닥과 안내판이 보인다. 밤 숲의 벽돌 벽 앞 바닥에 옅게 빛나는 테두리가 생겼다. 성 아래 등불 방은 물이 빠질 때 '물빛 등불 넷을 8초 안에 켜자'라고 알려 주고, 아직 꺼진 등불 위에 금빛 느낌표가 뜬다.",
 	"· v0.0.38: GPT 시험 놀이꾼이 찾은 다섯 가지를 고쳤다. 좁은 틈에서는 물결과 노을이 소라 뒤에 한 줄로 따라오고, 소라가 멈추면 서로 떨어진 빈자리에 선다(다람쥐 나무 입구에서 셋이 겹쳐 보였다). 밤 아랫못의 열린 창살 길에 빛나는 다리 가장자리와 작은 등불을 달았다. 깨어난 물가에서 강가 길부터 다리 서쪽 끝까지 갈대를 걷어 한 칸 길을 냈다. 자는 주민이 깔개와 침대 위에 비스듬히 눕고 밑에 그림자가 생겼다. 달지기 숙소 안에서는 다음에 할 일(셈판, 작업대, 멈춘 문지기, 장부) 위에 금빛 느낌표가 뜬다.",
 	"· v0.0.37: 5장에 다람쥐 나무(약 2분). 다람쥐 다섯을 구하고 회색 문을 연 뒤에는 숲 한가운데 회색 나무 틈 앞에 큰 다람쥐가 앉아 있다. 말을 걸면 굳은 나무 한 그루가 비켜서고, 안쪽 숨은 빈터에 숲에서 가장 늙은 도토리나무가 서 있다. 이 나무 뿌리가 아직 살아서 남쪽 골짜기 개울을 데우고 있었다. 나무 곁 3.2칸 안에서는 낮에도 켜진 등불 곁처럼 쉬어 눈금이 찬다(칸마다 6초). 뿌리를 묶은 벽돌 매듭 셋을 왕관으로 풀면(눈금 1칸씩) 뿌리가 하나씩 나무 쪽으로 당겨 붙고, 둘째 매듭 뒤에는 벽돌 고슴도치 2마리가 굴러 나온다. 마지막 매듭 뒤 1.5초 동안은 대사 없이 나무가 한 번 숨 쉬고 낮은 가지의 잎 둘이 처음 흔들린다. 그 뒤 나무가 초록이 되고, 구해 준 다람쥐 다섯이 돌아와 가지에 앉는다. 싹 튼 도토리(회복약 65 → 75, 새 바퀴에도 남는다), 최대 체력 +10, 금화 60을 받는다. 마을 나무꾼 두솔의 다람쥐 틈 실마리도 켰다. 대사와 소품은 GPT의 의견으로 다듬었다.",
 	"· v0.0.36: 7장에 달지기 숙소(약 4분). 벽돌 기사를 쓰러뜨린 자리에 녹슨 태엽이 남고, 그 태엽으로 옥좌의 방 남쪽 벽의 태엽 문을 연다. 식당과 바구니 방에서 벽돌 6마리와 싸우고, 바구니 셈판에서 한결이 마지막으로 가져간 등불 바구니를 찾는다. 일방 태엽대의 깡통 문지기를 왕관으로 감으면(눈금 1칸) 침방까지 걸어가는데, 식당의 벽돌 더미 셋이 문지기에게 달려든다(닿으면 태엽이 튕겨 나와 곁에서 E로 다시 걷는다). 침방 장부의 한결 다음 칸에 소라의 이름을 적으면 문지기가 백 년 만에 제 의자에 앉아 작은 놋 방패를 건넨다(섬광 막기 0.12초 → 0.16초, 새 바퀴에도 남음). 궤짝에서 최대 체력 +10, 회복약 2, 금화 80. 대사와 소품은 GPT와 의논해 다듬었다.",
@@ -5548,6 +5550,11 @@ func clear_vegetation(at: Vector2, r: float) -> void:
 			if Vector2(o.x, o.z).distance_to(at) < r:
 				mm.set_instance_transform(i, Transform3D(Basis().scaled(Vector3.ONE * 0.001), o))
 
+# the quest line after the Brick King (GPT playtest 2: the old demo's "next chapter" text made players stop at an
+# open cave); saves holding the old text get the new one on load
+const CAVE_QUEST := "열린 동굴 입구로 내려가자"
+const OLD_CAVE_QUEST := "땅 아래로 가는 동굴이 열렸다"
+
 func open_cave(at: Vector2, with_story := true) -> void:
 	story_step = maxi(story_step, 5) # loading a later save rebuilds the cave mouth too: never wind the story back
 	cave_pos = at + Vector2(0, -1.5)
@@ -5592,7 +5599,7 @@ func open_cave(at: Vector2, with_story := true) -> void:
 	shake = 0.4
 	save_game()
 	show_story("res://art/story/05_brick_king.jpg", STORY.BOSS_FALLS)
-	set_quest("땅 아래로 가는 동굴이 열렸다 (다음 장에서 계속)")
+	set_quest(CAVE_QUEST)
 
 # ---------------------------------------------------------------- save
 # Saved to user://save.json (on the web this lives in the browser's IndexedDB) every 5 s
@@ -5988,10 +5995,10 @@ func load_game() -> void:
 	if story_step >= 6: # later chapters: the quest line as it was saved (older saves keep what the zone set)
 		if d.has("quest"):
 			set_quest(String(d.quest))
-		if ui.quest.text.begins_with(tr("땅 아래로 가는 동굴이 열렸다")): # written by the bug below: the main road's last step instead
+		if ui.quest.text.begins_with(OLD_CAVE_QUEST) or ui.quest.text == CAVE_QUEST: # written by the bug below: the main road's last step instead
 			set_quest(main_road_quest())
 	else:
-		set_quest(["", "왕관을 만져 보자 (E)", "서쪽 오두막으로 가 보자", "북쪽 벽돌왕이 늪의 물길을 막고 있다", "", "땅 아래로 가는 동굴이 열렸다"][clampi(story_step, 0, 5)])
+		set_quest(["", "왕관을 만져 보자 (E)", "서쪽 오두막으로 가 보자", "북쪽 벽돌왕이 늪의 물길을 막고 있다", "", CAVE_QUEST][clampi(story_step, 0, 5)])
 
 # Until v0.0.5 every load with the Brick King down rebuilt the cave mouth with story_step = 5, so the story and the
 # quest line wound back to "the cave opened" (the user, 2026-10-23, level 21 at the cave mouth). The step comes
@@ -7069,6 +7076,7 @@ func cage_hit(e: Dictionary) -> void:
 	save_game()
 
 func update_forest() -> void:
+	forest.update_looks(Vector2(player.x, player.z), is_night())
 	update_hollow()
 	update_oak()
 	if forest_q == 1 and not story_open and Vector2(player.x, player.z).distance_to(forest.marks.N) < 6.0:
@@ -9071,8 +9079,17 @@ func quarters_target() -> Vector3:
 			return Vector3(mk.o.x, 1.9, mk.o.y)
 	return Vector3.INF
 
-func update_quarters_mark() -> void:
+# the shared gold "!": the quarters' steps, else the lamp hall's next lamp, else the cave mouth after the Brick King
+func step_target() -> Vector3:
 	var at := quarters_target()
+	if at == Vector3.INF:
+		at = under_target()
+	if at == Vector3.INF and story_step == 5 and cave_pos.x > 0 and in_marsh() and not intro:
+		at = Vector3(cave_pos.x, 1.5, cave_pos.y + 0.6) # over the steps, nearer the camera's focus
+	return at
+
+func update_quarters_mark() -> void:
+	var at := step_target()
 	if at == Vector3.INF:
 		if quarters_mark != null:
 			quarters_mark.visible = false
@@ -13170,6 +13187,24 @@ func leave_under(to_castle := true) -> void:
 	snap_mates()
 	save_game()
 
+# side stories keep the quest line on the main road, so the lamp trial says its goal in a longer toast
+func under_goal_toast(hold := 4.0) -> void:
+	toast("마개가 풀리고 물이 빠졌다. 물빛 등불 넷을 8초 안에 켜자")
+	toast_t = hold
+
+# the gold "!" in the lamp hall: over the unlit lamp nearest Sora while the trial is open
+func under_target() -> Vector3:
+	if under == null or not in_under() or not under.drained or under.door_open:
+		return Vector3.INF
+	var me := Vector2(player.x, player.z)
+	var best := Vector3.INF
+	var bd := INF
+	for l in under.lamps:
+		if not l.lit and me.distance_to(l.pos) < bd:
+			bd = me.distance_to(l.pos)
+			best = Vector3(l.pos.x, 2.75, l.pos.y)
+	return best
+
 func under_journal() -> String:
 	if under_chest_open:
 		return tr("끝")
@@ -13261,7 +13296,7 @@ func under_key() -> bool:
 				burst(Vector3(UNDER.UNDER_X + 19.5, 0.3, 9.5), Color("#9fd4ff"), 40, 4.0)
 				shake = 0.3
 				sfx(150, 0.8, "noise", 0.2, -60)
-				toast("마개가 풀리고, 잠긴 바닥의 물이 빠졌다")
+				under_goal_toast()
 				ui.mini.map_tex = under_map()
 				save_game()
 				return true

@@ -85,6 +85,10 @@ var oak_green := false
 var oak_gap: Node3D
 var oak: Node3D            # metas: crown (Node3D), crown_parts, bark, leaf, branch, twigs
 var knots: Array = []      # [{"pos", "node", "root", "seam", "clamps", "open"}] west, east, south
+# crowns that fade while Sora stands behind them (GPT playtest 2: the grove's south row hid the stones' floor and
+# the tablet): trees in "trees" (forest tiles) go see-through while she is inside "near" (forest tiles)
+const FADES := [{"trees": Rect2i(1, 6, 10, 3), "near": Rect2(0.5, 1.5, 10.0, 4.2)}]
+var fade_groups: Array = [] # [{"mat", "near", "a"}], one per FADES entry
 var oak_hogs: Array = []   # world Vector2 where two brick hedgehogs roll out from under the roots (j, north half)
 var warm: Array = []       # narrow glowing seams between the roots, shown once the gap is open
 
@@ -141,6 +145,9 @@ func door_at(x: float, z: float) -> Dictionary:
 
 func build(m: Node) -> void:
 	var blocks: Array = [] # [Transform3D, Color]
+	var fade_blocks: Array = [] # one list per FADES entry
+	for f in FADES:
+		fade_blocks.append([])
 	var lamp_spots: Array = []
 	for z in H:
 		for x in W:
@@ -173,12 +180,16 @@ func build(m: Node) -> void:
 			blocks.append([Transform3D(Basis().scaled(Vector3(1, hgt, 1)), Vector3(w.x, hgt / 2.0 - 0.4, w.y)), col])
 			if c == "T":
 				# a tree hardened into toy brick: a dark trunk and a blocky grey crown; a few keep a little green
+				var tree: Array = blocks
+				for k in FADES.size():
+					if (FADES[k].trees as Rect2i).has_point(Vector2i(x, z)):
+						tree = fade_blocks[k]
 				var top: float = m.rnd(1.0, 1.5)
-				blocks.append([Transform3D(Basis().scaled(Vector3(0.3, 0.9, 0.3)), Vector3(w.x, 0.45, w.y)), Color("#4a4038")])
+				tree.append([Transform3D(Basis().scaled(Vector3(0.3, 0.9, 0.3)), Vector3(w.x, 0.45, w.y)), Color("#4a4038")])
 				var crown := Color("#9a9ca4") if m.rng.randf() < 0.8 else Color("#6f8f5e")
 				var cs: float = m.rnd(0.8, 1.05)
-				blocks.append([Transform3D(Basis().scaled(Vector3(cs, 0.7, cs)), Vector3(w.x + m.rnd(-0.08, 0.08), top, w.y + m.rnd(-0.08, 0.08))), crown.lightened(m.rnd(0, 0.1))])
-				blocks.append([Transform3D(Basis().scaled(Vector3(cs * 0.55, 0.35, cs * 0.55)), Vector3(w.x, top + 0.5, w.y)), crown.darkened(0.08)])
+				tree.append([Transform3D(Basis().scaled(Vector3(cs, 0.7, cs)), Vector3(w.x + m.rnd(-0.08, 0.08), top, w.y + m.rnd(-0.08, 0.08))), crown.lightened(m.rnd(0, 0.1))])
+				tree.append([Transform3D(Basis().scaled(Vector3(cs * 0.55, 0.35, cs * 0.55)), Vector3(w.x, top + 0.5, w.y)), crown.darkened(0.08)])
 			elif x >= 16 and x <= 26 and z >= 7 and z <= 13:
 				for k in 6: # the clearing was trees: draw as many numbers so everything built after looks as before
 					m.rnd()
@@ -207,6 +218,26 @@ func build(m: Node) -> void:
 		mmi.multimesh = mm
 		mmi.material_override = cm
 		m.add_child(mmi)
+	for k in FADES.size(): # each fade group is its own mesh with its own material, so only it goes see-through
+		var fm := StandardMaterial3D.new()
+		fm.vertex_color_use_as_albedo = true
+		fm.roughness = 0.9
+		fm.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
+		var list: Array = fade_blocks[k]
+		var fmm := MultiMesh.new()
+		fmm.transform_format = MultiMesh.TRANSFORM_3D
+		fmm.use_colors = true
+		fmm.mesh = BoxMesh.new()
+		fmm.instance_count = list.size()
+		for i in list.size():
+			fmm.set_instance_transform(i, list[i][0])
+			fmm.set_instance_color(i, (list[i][1] as Color).srgb_to_linear())
+		var fmi := MultiMeshInstance3D.new()
+		fmi.multimesh = fmm
+		fmi.material_override = fm
+		m.add_child(fmi)
+		var near: Rect2 = FADES[k].near
+		fade_groups.append({"mat": fm, "near": Rect2(near.position + Vector2(FOREST_X, 0), near.size), "a": 1.0})
 	var post_mat: Material = m.mat_color(Color("#3b2a1e"))
 	var glass: Material = m.glow_mat(Color("#ffc46a"), 4.0)
 	glass.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
@@ -217,7 +248,7 @@ func build(m: Node) -> void:
 		for x in W:
 			if grid[z][x] == "W":
 				var p := Vector2(FOREST_X + x, z)
-				walls.append({"pos": p, "node": brick_wall(m, p), "open": false})
+				walls.append({"pos": p, "node": brick_wall(m, p), "open": false, "glow": approach_glow(m, x, z)})
 	build_grove(m)
 	build_hollow(m, post_mat, glass)
 	build_oak(m)
@@ -509,6 +540,48 @@ func brick_wall(m: Node, at: Vector2, col_a := Color("#a8322a"), col_b := Color(
 	g.position = Vector3(at.x, 0, at.y)
 	m.add_child(g)
 	return g
+
+# night edges on the floor in front of a brick wall (GPT playtest 2: the approach sank into black at night): a sill
+# at the wall's foot, pale edges along the two tiles leading up and a faint pool on the first; self-lit, no lights
+func approach_glow(m: Node, x: int, z: int) -> Node3D:
+	var g := Node3D.new()
+	var edge: Material = m.glow_mat(Color("#f0d49a"), 0.9)
+	edge.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
+	edge.blend_mode = BaseMaterial3D.BLEND_MODE_MIX
+	var pool: Material = m.glow_mat(Color(1.0, 0.85, 0.55, 0.14), 0.5)
+	for d in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
+		var n: Vector2i = Vector2i(x, z) + d
+		if n.x < 0 or n.y < 0 or n.x >= W or n.y >= H or grid[n.y][n.x] in "T#W~":
+			continue
+		var along := Vector3(d.x, 0, d.y)
+		var side := Vector3(d.y, 0, d.x) # perpendicular on the floor
+		var sill: MeshInstance3D = m.box(side.abs() * 0.86 + along.abs() * 0.07 + Vector3(0, 0.03, 0), edge)
+		sill.position = along * 0.52 + Vector3(0, 0.02, 0)
+		g.add_child(sill)
+		for s in [-0.43, 0.43]:
+			var e: MeshInstance3D = m.box(along.abs() * 2.0 + side.abs() * 0.07 + Vector3(0, 0.03, 0), edge)
+			e.position = along * 1.5 + side * s + Vector3(0, 0.02, 0)
+			g.add_child(e)
+		var p: MeshInstance3D = m.box(Vector3(0.84, 0.01, 0.84), pool)
+		p.position = along + Vector3(0, 0.015, 0)
+		g.add_child(p)
+	g.position = Vector3(FOREST_X + x, 0, z)
+	g.visible = false
+	m.add_child(g)
+	return g
+
+# per frame: wall edges only at night while the wall stands; fade groups ease toward see-through near Sora
+func update_looks(me: Vector2, night: bool) -> void:
+	for w in walls:
+		w.glow.visible = night and not w.open
+	for f in fade_groups:
+		var want: float = 0.3 if (f.near as Rect2).has_point(me) else 1.0
+		if f.a == want:
+			continue
+		f.a = move_toward(f.a, want, 0.06)
+		var mat: StandardMaterial3D = f.mat
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED if f.a >= 1.0 else BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.albedo_color = Color(1, 1, 1, f.a)
 
 func open_wall(w: Dictionary) -> void:
 	w.open = true
