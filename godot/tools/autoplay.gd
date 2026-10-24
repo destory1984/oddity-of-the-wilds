@@ -10,7 +10,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "painting_once", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "esc_sheets", "news_more", "touch_controls", "folk_sleep", "hint_folk", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "mill", "post", "lake_south", "clock", "shore", "quarters", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "painting_once", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "esc_sheets", "news_more", "touch_controls", "folk_sleep", "hint_folk", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "mill", "post", "lake_south", "clock", "shore", "quarters", "oak", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -3612,6 +3612,169 @@ func run() -> void:
 		main.save_game()
 		check("quarters", shut and toast_only and spring and opened and six and told and once and stand and no_pip and wound and walks and three and knocked and rewalk and waits and bunk and signed and sat and hushed and toasted and guard_ok and chest and kept and mid and round_ok,
 			"shut=%s toast only=%s spring=%s opened=%s six=%s told=%s once=%s stand=%s no pip=%s wound 1 pip=%s walks=%s bits 3=%s knocked=%s E walks on=%s waits=%s bunk open=%s ledger=%s sat+buckler=%s hush=%s toast=%s guard %s/%s=%s chest=%s saved=%s mid-walk load=%s new round=%s" % [shut, toast_only, spring, opened, six, told, once, stand, no_pip, wound, walks, three, knocked, rewalk, waits, bunk, signed, sat, hushed, toasted, r1, r2, guard_ok, chest, kept, mid, round_ok])
+	if want.call("oak"):
+		# 다람쥐 나무 (DESIGN.md): the big squirrel by the gap once the squirrels are free and the gate is open, the gap,
+		# the clearing's lines once, resting by the oak by day, three knots (1 pip each, the hedgehogs after the second),
+		# the 1.5 s hush, the sprout's 75, saves and a new round. Everything changed here is put back at the end
+		main.story_step = maxi(main.story_step, 10)
+		if main.intro:
+			main.start_game(false)
+		await wait(0.2)
+		main.close_story()
+		await wait(0.1)
+		var keep := {"night_q": main.night_q, "lake_q": main.lake_q, "forest_q": main.forest_q, "hollow_q": main.hollow_q,
+			"acorn": main.has_acorn, "q": main.oak_q, "knots": main.forest.knots.map(func(k): return k.open), "sprout": main.has_sprout,
+			"hour": main.hour, "pips": main.crown_pips, "tea": main.has_tea, "lv": main.player.lv, "xp": main.player.xp,
+			"atk": main.player.atk, "max": main.player.max_hp, "gold": main.player.gold, "pots": main.player.pots,
+			"v": main.in_village, "f": main.in_forest, "l": main.in_lake, "h": main.in_hill, "g": main.in_garden, "c": main.in_cave,
+			"x": main.player.x, "z": main.player.z}
+		main.in_village = false
+		main.in_lake = false
+		main.in_hill = false
+		main.in_garden = false
+		main.in_cave = false
+		main.in_house = -1
+		main.night_q = 4
+		main.lake_q = 4
+		main.forest_q = 3
+		main.hollow_q = 0 # entering with the gate shut keeps the valley asleep for the hollow test
+		main.has_acorn = false
+		main.has_tea = false
+		main.hour = 12.0
+		main.load_oak({})
+		main.enter_forest()
+		main.hollow_q = 1
+		await wait(0.2)
+		main.close_story()
+		calm_enemies(true)
+		# 1. no acorn: no big squirrel; with it, he sits by the shut gap
+		var none: bool = main.big_squirrel == null or not main.big_squirrel.visible
+		main.has_acorn = true
+		main.place_big_squirrel()
+		var sq: Node3D = main.big_squirrel
+		var waits: bool = sq != null and sq.visible and Vector2(sq.position.x, sq.position.z).distance_to(Vector2(195, 12)) < 0.1 \
+			and not main.player_can(196, 12) and main.hint_open("oak")
+		# 2. E beside him: his lines, then the gap opens
+		reset_to(Vector2(195.5, 12))
+		main.crown_key()
+		await wait(0.1)
+		var call: bool = main.story_open and main.story_lines == STORY.OAK_CALL.slice(1)
+		main.close_story()
+		await wait_for(func(): return main.oak_q == 1, 1.0)
+		var gap: bool = main.oak_q == 1 and main.walkable(196, 12) and main.forest.oak_open
+		# 3. into the clearing: its lines once
+		reset_to(Vector2(198, 12))
+		await wait_for(func(): return main.story_open, 1.0)
+		var told: bool = main.story_open and main.story_lines == STORY.OAK_IN.slice(1)
+		main.close_story()
+		await wait(0.3)
+		reset_to(Vector2(196, 12))
+		await wait(0.3)
+		reset_to(Vector2(198, 12))
+		await wait(0.5)
+		var once: bool = not main.story_open
+		main.close_story()
+		# 4. noon, no pips: by the oak a pip in 6.5 s; by the clearing's lantern (3.5 tiles off) none by day
+		main.hour = 12.0
+		main.crown_pips = 0
+		release()
+		reset_to(Vector2(199, 12))
+		main.rest_t = 0.0
+		await wait(6.5)
+		var warm: bool = main.crown_pips == 1
+		reset_to(Vector2(204, 12.4))
+		main.rest_t = 0.0
+		await wait(6.5)
+		var lamp_day: bool = main.crown_pips == 1
+		# 5. the west knot (1 pip), the east one (the hedgehogs roll out), the south one waits for them
+		main.crown_pips = 8
+		main.player.inv = 99.0
+		var kn: Array = main.forest.knots
+		reset_to(kn[0].pos + Vector2(-0.9, 0))
+		main.player.inv = 99.0
+		main.crown_key()
+		await wait(0.1)
+		var west: bool = main.crown_pips == 7 and kn[0].open and main.walkable(199, 10) and main.oak_hogs_alive().is_empty() and main.story_lines == STORY.OAK_KNOT1.slice(1)
+		main.close_story()
+		await wait(0.2)
+		reset_to(kn[1].pos + Vector2(0.9, 0))
+		main.player.inv = 99.0
+		main.crown_key()
+		await wait(0.1)
+		main.close_story()
+		await wait_for(func(): return main.oak_hogs_alive().size() == 2, 2.0)
+		var hogs: Array = main.oak_hogs_alive()
+		var east: bool = main.crown_pips == 6 and kn[1].open and hogs.size() == 2 and hogs.all(func(e): return e.hog and e.cave)
+		reset_to(kn[2].pos + Vector2(0, 0.9))
+		main.player.inv = 99.0
+		main.crown_key()
+		await wait(0.1)
+		var held: bool = main.crown_pips == 6 and not kn[2].open and main.oak_q == 1
+		# 6. the hedgehogs down: the last knot, the hush, then the lines with the sprout
+		for e in hogs:
+			e.dead = true
+			e.node.queue_free()
+			e.shadow.queue_free()
+		var mx: int = main.player.max_hp
+		var gold: int = main.player.gold
+		var lv0: int = main.player.lv
+		main.crown_key()
+		await wait(0.1)
+		var green: bool = main.crown_pips == 5 and main.oak_q == 2 and main.has_sprout and main.player.gold == gold + 60 \
+			and main.player.max_hp == mx + 10 + 12 * (main.player.lv - lv0)
+		await wait(0.6)
+		var hushed: bool = not main.story_open and not main.forest.oak_green
+		await wait_for(func(): return main.story_open, 2.0)
+		var lines: bool = main.story_open and main.story_lines == STORY.OAK_GREEN.slice(1) and main.forest.oak_green \
+			and main.oak_kin.all(func(s): return s.visible)
+		main.close_story()
+		await wait(0.3)
+		# 7. a potion heals 75 now
+		main.player.hp = float(main.player.max_hp - 100)
+		main.player.pots = maxi(main.player.pots, 1)
+		main.player.cds[3] = 0.0
+		main.drink_potion()
+		var pot: bool = absf(main.player.hp - float(main.player.max_hp - 25)) < 0.5
+		# 8. saves keep it; a new round keeps only the sprout
+		main.save_game()
+		main.load_oak(JSON.parse_string(FileAccess.get_file_as_string(main.SAVE_PATH)))
+		await wait(0.1)
+		var kept: bool = main.oak_q == 2 and main.forest.knots.all(func(k): return k.open) and main.has_sprout and main.walkable(196, 12) and main.forest.oak_green
+		main.write_new_round()
+		var ng = JSON.parse_string(FileAccess.get_file_as_string(main.SAVE_PATH))
+		var round_ok: bool = ng != null and not ng.has("oak_q") and bool(ng.get("has_sprout", false))
+		main.load_oak(ng)
+		await wait(0.1)
+		round_ok = round_ok and main.oak_q == 0 and main.forest.knots.all(func(k): return not k.open) and main.has_sprout \
+			and not main.walkable(196, 12) and not main.forest.oak_green
+		# leave it as it was for the other tests
+		main.night_q = keep.night_q
+		main.lake_q = keep.lake_q
+		main.forest_q = keep.forest_q
+		main.hollow_q = keep.hollow_q
+		main.has_acorn = keep.acorn
+		main.load_oak({"oak_q": keep.q, "oak_knots": keep.knots, "has_sprout": keep.sprout})
+		main.hour = keep.hour
+		main.crown_pips = keep.pips
+		main.has_tea = keep.tea
+		main.player.lv = keep.lv
+		main.player.xp = keep.xp
+		main.player.atk = keep.atk
+		main.player.max_hp = keep.max
+		main.player.hp = float(keep.max)
+		main.player.gold = keep.gold
+		main.player.pots = keep.pots
+		main.in_village = keep.v
+		main.in_forest = keep.f
+		main.in_lake = keep.l
+		main.in_hill = keep.h
+		main.in_garden = keep.g
+		main.in_cave = keep.c
+		reset_to(Vector2(keep.x, keep.z))
+		calm_enemies(false)
+		main.save_game()
+		check("oak", none and waits and call and gap and told and once and warm and lamp_day and west and east and held and green and hushed and lines and pot and kept and round_ok,
+			"no acorn=%s waits by the gap=%s call=%s gap open=%s clearing told=%s once=%s rests by day=%s lantern by day=%s west 1 pip=%s east+hogs=%s south held=%s green+sprout=%s hush=%s lines=%s potion 75=%s saved=%s new round=%s" % [none, waits, call, gap, told, once, warm, lamp_day, west, east, held, green, hushed, lines, pot, kept, round_ok])
 	if want.call("trial_repeat"):
 		# after the first clear, the trial's foes give nothing (the field is where gold and XP come from)
 		var best0: float = main.trial_best

@@ -6,6 +6,7 @@
 # South valley (rows 22 - 39, after Noeul joins): the grey gate G under her clearing, a live stream (~) crossed
 # with the water skip, three memory lamps (o), the empty cloak at C, and three picture doors (B) unwound with
 # the crown onto the squirrels' store (m), Noeul's hollow (h) and Hangyeol's pack (k).
+# Centre: the old acorn oak (O) behind the squirrel gap (Q), its roots tied by three brick knots (K).
 extends RefCounted
 
 const FOREST_X := 180
@@ -18,13 +19,13 @@ const ROWS := """####################################
 #T.1.2.3.4...........T........TTTTT#
 #T.t....L.T...TTTTTTTTTTTTT...TTTTT#
 #TTTTTTTTTT...TTTTTTTTTTTTT...TTTTT#
-#TTTTTTTTTT...TTTTTTTTTTTTT...TTTTT#
-#TTTTTTTT.......TTTTTTTTTTT.g.TTTTT#
-#TTTTTTTT.L....gTTTTTTTTTTT...TTTTT#
-#.......T.......TTTTTTTTTTT.L.TTTTT#
-S=======W....g..TTTTTTTTTTT...TTTTT#
-#.......T.......TTTTTTTTTTT...TTTTT#
-#TTTTTTTT.....L.TTTTTTTTTTT...TTTTT#
+#TTTTTTTTTT...TTTTT.....TTT...TTTTT#
+#TTTTTTTT.......TT.......TT.g.TTTTT#
+#TTTTTTTT.L....gTT..OOO..TT...TTTTT#
+#.......T.......TT.KOOOK.TT.L.TTTTT#
+S=======W....g..TT..OOO..TT...TTTTT#
+#.......T.......Q....K..LTT...TTTTT#
+#TTTTTTTT.....L.TTT.j.j.TTT...TTTTT#
 #TTTTTTTT.......TTTTTTTTTTT...TTTTT#
 #TTTTTTTTT...TTTTTTTTTTTTTTTWTTTTTT#
 #TTTTTTTTT...TTTTTTTTTTT.....w....T#
@@ -72,6 +73,20 @@ var mem_lamps: Array = []  # [{"pos", "light", "glass", "lit"}] west-north, west
 var doors: Array = []      # [{"pos", "node", "open", "pic"}] squirrel, sunset, moon (west to east)
 var boxes: Array = []      # [{"pos", "node", "open"}] the squirrels' store, Noeul's hollow, Hangyeol's pack
 const DOOR_PICS := ["다람쥐 꼬리 그림", "해 지는 그림", "초승달 그림"]
+# the hidden clearing (DESIGN.md "다람쥐 나무"): the gap tree steps aside, the oak's knots come loose one by one
+const OAK_C := Vector2(201, 10)
+const SQUIRREL_AT := Vector2(195, 12)
+const GAP_SHIFT := Vector3(0, 0, -0.62) # the gap tree leans north, off the one-tile path (GPT's note)
+const GAP_TILT := -0.25
+const ROOT_IN := 0.62                   # a loose root's bar slides this far in toward the trunk
+const OAK_SEATS := [Vector2(-1.35, 0.95), Vector2(-0.45, 1.45), Vector2(0.45, 1.45), Vector2(1.35, 0.95), Vector2(1.45, -0.25)] # on the crown's rim
+var oak_open := false
+var oak_green := false
+var oak_gap: Node3D
+var oak: Node3D            # metas: crown (Node3D), crown_parts, bark, leaf, branch, twigs
+var knots: Array = []      # [{"pos", "node", "root", "seam", "clamps", "open"}] west, east, south
+var oak_hogs: Array = []   # world Vector2 where two brick hedgehogs roll out from under the roots (j, north half)
+var warm: Array = []       # narrow glowing seams between the roots, shown once the gap is open
 
 func _init() -> void:
 	for line in ROWS.split("\n"):
@@ -103,7 +118,19 @@ func blocked(x: float, z: float) -> bool:
 	if c == "B":
 		var dr := door_at(x, z)
 		return dr.is_empty() or not dr.open
-	return c == "#" or c == "T" or c in "1234tc~omhk"
+	if c == "Q":
+		return not oak_open
+	if c == "K":
+		var k := knot_at(x, z)
+		return k.is_empty() or not k.open
+	return c == "#" or c == "T" or c in "1234tc~omhkO"
+
+func knot_at(x: float, z: float) -> Dictionary:
+	var p := Vector2(round(x), round(z))
+	for k in knots:
+		if k.pos == p:
+			return k
+	return {}
 
 func door_at(x: float, z: float) -> Dictionary:
 	var p := Vector2(round(x), round(z))
@@ -119,7 +146,7 @@ func build(m: Node) -> void:
 		for x in W:
 			var c: String = grid[z][x]
 			var w := Vector2(FOREST_X + x, z)
-			if c in "SNEVtcGCmhk":
+			if c in "SNEVtcGCmhkQ":
 				marks[c] = w
 			if z > 21 and c in "gwasj": # the valley wakes later, with the grey gate
 				south.append({"pos": w, "kind": c})
@@ -127,6 +154,8 @@ func build(m: Node) -> void:
 				goblins.append(w)
 			elif c == "w":
 				wolves.append(w)
+			elif c == "j":
+				oak_hogs.append(w)
 			if c == "L":
 				lamp_spots.append(w)
 			var col := Color("#6f7a62") # moss gone dull, half turned to stone
@@ -150,6 +179,9 @@ func build(m: Node) -> void:
 				var cs: float = m.rnd(0.8, 1.05)
 				blocks.append([Transform3D(Basis().scaled(Vector3(cs, 0.7, cs)), Vector3(w.x + m.rnd(-0.08, 0.08), top, w.y + m.rnd(-0.08, 0.08))), crown.lightened(m.rnd(0, 0.1))])
 				blocks.append([Transform3D(Basis().scaled(Vector3(cs * 0.55, 0.35, cs * 0.55)), Vector3(w.x, top + 0.5, w.y)), crown.darkened(0.08)])
+			elif x >= 16 and x <= 26 and z >= 7 and z <= 13:
+				for k in 6: # the clearing was trees: draw as many numbers so everything built after looks as before
+					m.rnd()
 	# chunked 6x6 so each chunk sees only its nearby lanterns (the web renderer lights a mesh with at most 8)
 	var chunks := {}
 	for bl in blocks:
@@ -188,6 +220,7 @@ func build(m: Node) -> void:
 				walls.append({"pos": p, "node": brick_wall(m, p), "open": false})
 	build_grove(m)
 	build_hollow(m, post_mat, glass)
+	build_oak(m)
 
 # the south valley: grey gate, stream face, memory lamps (dark until the crown wakes them), picture doors, boxes
 func build_hollow(m: Node, post_mat: Material, glass: Material) -> void:
@@ -230,6 +263,147 @@ func build_hollow(m: Node, post_mat: Material, glass: Material) -> void:
 				doors.append({"pos": w, "node": node, "open": false, "pic": DOOR_PICS[k]})
 			elif c in "mhk":
 				boxes.append({"pos": w, "node": make_box(m, w, Color("#c8783a") if c == "m" else (Color("#ff8a4a") if c == "h" else Color("#e8d27a"))), "open": false})
+
+# the clearing: the gap tree, the old oak (thick trunk, grey brick bark, a wide low crown in two layers, a low branch),
+# three root knots (a grey root bar clamped by two bricks with red studs), dirt slabs on the way in, warm seams
+func build_oak(m: Node) -> void:
+	var part := func(size: Vector3, pos: Vector3, mat: Material, parent: Node) -> MeshInstance3D:
+		var b: MeshInstance3D = m.box(size, mat)
+		b.position = pos
+		parent.add_child(b)
+		return b
+	var trunk_col := Color("#4a4038")
+	var grey := Color("#8a8a90")
+	oak_gap = Node3D.new()
+	part.call(Vector3(0.3, 0.9, 0.3), Vector3(0, 0.45, 0), m.mat_color(tree_col(trunk_col)), oak_gap)
+	part.call(Vector3(0.95, 0.7, 0.95), Vector3(0, 1.25, 0), m.mat_color(tree_col(Color("#9a9ca4"))), oak_gap)
+	part.call(Vector3(0.52, 0.35, 0.52), Vector3(0, 1.75, 0), m.mat_color(tree_col(Color("#8e9098"))), oak_gap)
+	oak_gap.position = Vector3(marks.Q.x, 0, marks.Q.y)
+	m.add_child(oak_gap)
+	oak = Node3D.new()
+	oak.position = Vector3(OAK_C.x, 0, OAK_C.y)
+	m.add_child(oak)
+	part.call(Vector3(2.0, 1.8, 2.0), Vector3(0, 0.9, 0), m.mat_color(tree_col(trunk_col)), oak)
+	var bark_mat: Material = m.mat_color(tree_col(grey))
+	var bark: Array = []
+	for b in [[Vector3(2.08, 0.62, 0.5), Vector3(0, 1.32, 0.8)], [Vector3(2.08, 0.7, 0.5), Vector3(0, 1.4, -0.8)],
+			[Vector3(0.5, 0.56, 1.3), Vector3(0.8, 1.48, 0.1)], [Vector3(0.5, 0.66, 1.3), Vector3(-0.8, 1.38, -0.1)]]:
+		bark.append(part.call(b[0], b[1], bark_mat, oak))
+	var crown := Node3D.new()
+	crown.position = Vector3(0, 2.0, 0) # its base: it breathes by scaling from here
+	oak.add_child(crown)
+	var low: MeshInstance3D = part.call(Vector3(3.4, 0.6, 3.4), Vector3(0, 0.3, 0), m.mat_color(tree_col(Color("#9a9ca4"))), crown)
+	var top: MeshInstance3D = part.call(Vector3(2.2, 0.3, 2.2), Vector3(0, 0.75, 0), m.mat_color(tree_col(Color("#8e9098"))), crown)
+	var leaf: MeshInstance3D = part.call(Vector3(0.2, 0.1, 0.2), Vector3(0.55, 1.0, 1.06), m.mat_color(tree_col(Color("#9ad46a"))), oak)
+	leaf.visible = false
+	var branch := Node3D.new()
+	branch.position = Vector3(0.75, 1.1, 0.85)
+	branch.rotation.y = atan2(0.6, 0.8) # reaching south-east, toward the camera
+	oak.add_child(branch)
+	part.call(Vector3(0.16, 0.16, 1.3), Vector3(0, 0, 0.65), m.mat_color(tree_col(trunk_col)), branch)
+	var twigs: Array = []
+	for k in 2: # two hardened leaves at the tip; they stir after the last knot
+		twigs.append(part.call(Vector3(0.22, 0.06, 0.16), Vector3(-0.1 + k * 0.2, 0.08, 1.22), m.mat_color(tree_col(Color("#8a9a80"))), branch))
+	oak.set_meta("crown", crown)
+	oak.set_meta("crown_parts", [low, top])
+	oak.set_meta("bark", bark)
+	oak.set_meta("leaf", leaf)
+	oak.set_meta("branch", branch)
+	oak.set_meta("twigs", twigs)
+	var seam_mat: Material = m.glow_mat(Color("#ffb070"), 0.25)
+	for z in H:
+		for x in W:
+			if grid[z][x] != "K":
+				continue
+			var p := Vector2(FOREST_X + x, z)
+			var to := (OAK_C - p).normalized()
+			var g := Node3D.new()
+			g.position = Vector3(p.x, 0, p.y)
+			g.rotation.y = atan2(to.x, to.y) # local +z points at the trunk
+			m.add_child(g)
+			var root: MeshInstance3D = part.call(Vector3(0.22, 0.2, 1.4), Vector3(0, 0.1, 0.35), m.mat_color(grey), g)
+			var seam: MeshInstance3D = part.call(Vector3(0.07, 0.02, 1.1), Vector3(0.17, 0.012, 0.4), seam_mat, g)
+			seam.visible = false
+			var clamps: Array = []
+			for cz in [-0.18, 0.24]:
+				clamps.append(part.call(Vector3(0.66, 0.42, 0.3), Vector3(0, 0.21, cz), m.mat_color(grey), g))
+				clamps.append(part.call(Vector3(0.14, 0.08, 0.14), Vector3(0, 0.46, cz), m.mat_color(Color("#a8322a")), g))
+			knots.append({"pos": p, "node": g, "root": root, "seam": seam, "clamps": clamps, "open": false})
+	# narrow broken seams of warmth between the roots, out to the edge of where Sora rests (not one wide plate)
+	for a in [40.0, 135.0, 180.0, 225.0, 320.0]:
+		var d := Vector2(sin(deg_to_rad(a)), cos(deg_to_rad(a)))
+		for seg in [[1.25, 1.95], [2.25, 2.95]]:
+			var r: float = (seg[0] + seg[1]) / 2.0
+			var s: MeshInstance3D = part.call(Vector3(0.07, 0.02, seg[1] - seg[0]), Vector3(OAK_C.x + d.x * r, 0.012, OAK_C.y + d.y * r), seam_mat, m)
+			s.rotation.y = deg_to_rad(a)
+			s.visible = false
+			warm.append(s)
+	# low dirt slabs from the gap to the tree, their tops faintly self-lit so the way shows at night
+	var dirt := StandardMaterial3D.new()
+	dirt.albedo_color = Color("#827653")
+	dirt.roughness = 1.0
+	dirt.emission_enabled = true
+	dirt.emission = Color("#827653")
+	dirt.emission_energy_multiplier = 0.12
+	for s in [Vector2(197.1, 12.0), Vector2(197.9, 12.1), Vector2(198.6, 11.7), Vector2(198.3, 10.9), Vector2(199.7, 12.5),
+			Vector2(200.6, 12.8), Vector2(202.3, 12.6), Vector2(203.1, 11.8), Vector2(203.6, 10.8)]:
+		part.call(Vector3(0.46, 0.03, 0.34), Vector3(s.x, 0.015, s.y), dirt, m)
+
+# the forest's trees are multimesh vertex colours, which read as linear: the oak's own boxes match them this way
+func tree_col(c: Color) -> Color:
+	return c.srgb_to_linear()
+
+# the clearing's whole look, for loading and tests: the gap stepped aside or not, which knots are loose, green or grey
+func oak_look(open: bool, loose: Array, green: bool) -> void:
+	oak_open = open
+	oak_gap.position = Vector3(marks.Q.x, 0, marks.Q.y) + (GAP_SHIFT if open else Vector3.ZERO)
+	oak_gap.rotation.x = GAP_TILT if open else 0.0
+	for i in knots.size():
+		set_knot(knots[i], bool(loose[i]))
+	for s in warm:
+		s.visible = open
+	(oak.get_meta("leaf") as Node3D).visible = loose.has(true)
+	var crown: Node3D = oak.get_meta("crown")
+	crown.scale = Vector3.ONE
+	set_green(green)
+
+func set_knot(k: Dictionary, loose: bool) -> void:
+	k.open = loose
+	for c in k.clamps:
+		c.visible = not loose
+	var root: MeshInstance3D = k.root
+	(root.material_override as StandardMaterial3D).albedo_color = Color("#6a4a32") if loose else Color("#8a8a90")
+	root.position.z = ROOT_IN if loose else 0.35
+	k.seam.visible = loose
+
+# a knot comes loose: the bricks go, the root turns brown (main slides it in toward the trunk)
+func untie(i: int) -> MeshInstance3D:
+	var k: Dictionary = knots[i]
+	set_knot(k, true)
+	var root: MeshInstance3D = k.root
+	root.position.z = 0.35
+	return root
+
+func show_leaf() -> void:
+	(oak.get_meta("leaf") as Node3D).visible = true
+
+func set_green(green: bool) -> void:
+	oak_green = green
+	for b in oak.get_meta("bark"):
+		b.visible = not green
+	var parts: Array = oak.get_meta("crown_parts")
+	(parts[0].material_override as StandardMaterial3D).albedo_color = tree_col(Color("#6f8f5e") if green else Color("#9a9ca4"))
+	(parts[1].material_override as StandardMaterial3D).albedo_color = tree_col(Color("#7fa86a") if green else Color("#8e9098"))
+	for tw in oak.get_meta("twigs"):
+		(tw.material_override as StandardMaterial3D).albedo_color = tree_col(Color("#9ad46a") if green else Color("#8a9a80"))
+		tw.rotation.z = 0.0
+	(oak.get_meta("branch") as Node3D).rotation.x = -0.12 if green else 0.0
+
+# see-through crown while Sora stands north of the trunk
+func crown_fade(a: float) -> void:
+	for p in oak.get_meta("crown_parts"):
+		if p.transparency != a:
+			p.transparency = a
 
 func make_box(m: Node, at: Vector2, lid_col: Color) -> Node3D:
 	var b := Node3D.new()
@@ -347,6 +521,8 @@ func map_tex(width: int) -> ImageTexture:
 		for x in W:
 			var c: String = grid[z][x]
 			var col := Color("#1e2a24")
+			if x >= 16 and x <= 26 and z >= 7 and z <= 13 and not oak_open:
+				c = "T" # the hidden clearing is not on the map until the gap opens
 			match c:
 				"#", "T": col = Color(0, 0, 0, 0)
 				"=": col = Color("#3a4a44")
@@ -360,5 +536,8 @@ func map_tex(width: int) -> ImageTexture:
 				"G": col = Color("#9a9aa0")
 				"B": col = Color("#c8322a")
 				"o": col = Color("#ffd060")
+				"Q": col = Color("#c8783a")
+				"O": col = Color("#6f8f5e") if oak_green else Color("#5d6352")
+				"K": col = Color("#1e2a24") if knot_at(FOREST_X + x, z).get("open", false) else Color("#c8322a")
 			img.set_pixel(FOREST_X + x, z, col)
 	return ImageTexture.create_from_image(img)

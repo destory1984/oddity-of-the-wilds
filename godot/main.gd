@@ -452,6 +452,8 @@ const SCENES := {
 	"quarters": {"play": true, "village": true, "castle": true, "quarters": 2, "hour": 21.0},      # 달지기 숙소: the dining hall's bricks up
 	"quarters_doll": {"play": true, "village": true, "castle": true, "quarters": 3, "hour": 21.0}, # the doorkeeper walking, three bits at him
 	"quarters_rest": {"play": true, "village": true, "castle": true, "quarters": 5, "hour": 21.0}, # he rests in his chair, the ledger signed
+	"oak": {"play": true, "village": true, "forest": true, "oak": 1, "hour": 14.0},       # 다람쥐 나무: the clearing open, the west knot loose
+	"oak_green": {"play": true, "village": true, "forest": true, "oak": 2, "hour": 14.0}, # the oak green again, five squirrels in it
 }
 
 func apply_test_args(args: PackedStringArray) -> void:
@@ -574,6 +576,27 @@ func apply_test_args(args: PackedStringArray) -> void:
 				spawn_hollow()
 				player.x = forest.marks.C.x - 3.0
 				player.z = forest.marks.C.y + 1.0
+			if sc.has("oak"): # 다람쥐 나무 (DESIGN.md): 1 the gap open and the west knot loose, 2 the oak green
+				close_story()
+				lake_q = 4
+				forest_q = 3
+				join_mate()
+				join_noeul()
+				hollow_q = 1
+				forest.open_gate_look()
+				for e in enemies.filter(func(c): return c.has("cage") and not c.dead):
+					e.dead = true
+					e.node.queue_free()
+					e.shadow.queue_free()
+				for i in forest.freed.size():
+					forest.freed[i] = true
+				has_acorn = true
+				load_oak({"oak_q": int(sc.oak), "oak_knots": [true, false, false]})
+				oak_told = true
+				squirrel_seen = true
+				player.x = 198.4 # a step north-west of (199, 12) so the big squirrel by the knot shows
+				player.z = 11.4
+				snap_mates()
 		if sc.get("mill", false): # the sparrows' mill below the wind hills, the big windmill wound
 			night_q = 4
 			lake_q = 4
@@ -2980,7 +3003,7 @@ func festival_key() -> bool:
 # attack, max HP, gold, potions, keepsakes, the woken skill, feats and records. Monsters then take
 # 1/(1 + 0.5 x round) of the damage and deal (1 + 0.5 x round) times as much.
 const NG_KEEP := ["lv", "xp", "max_hp", "atk", "gold", "pots", "has_pearl", "has_feather", "has_acorn", "has_ring", "has_shoes",
-	"has_armour", "has_tea", "has_shard", "has_bookmark", "has_lamp", "has_medal", "has_oar_ring", "has_whistle", "has_oil", "has_cushion", "has_bait", "has_buckler", "skill_up", "stats", "feats", "trial_best", "race_best", "fish"]
+	"has_armour", "has_tea", "has_shard", "has_bookmark", "has_lamp", "has_medal", "has_oar_ring", "has_whistle", "has_oil", "has_cushion", "has_bait", "has_buckler", "has_sprout", "skill_up", "stats", "feats", "trial_best", "race_best", "fish"]
 var ng := 0                 # how many rounds were finished before this one
 var ng_armed := 0.0         # seconds left to confirm with a second E
 
@@ -3126,9 +3149,10 @@ func travel(i: int) -> void:
 
 const CHANGES_PAGE := 100 # lines of 바뀐 것 shown before the 더 읽기 button
 const CHANGES := [
-	"개발 상황: 놀 수 있는 분량 약 300분 / 목표 300분 (100%)",
+	"개발 상황: 놀 수 있는 분량 약 302분 / 목표 300분 (100%)",
 	"",
 	"2026-10-24 아침",
+	"· v0.0.37: 5장에 다람쥐 나무(약 2분). 다람쥐 다섯을 구하고 회색 문을 연 뒤에는 숲 한가운데 회색 나무 틈 앞에 큰 다람쥐가 앉아 있다. 말을 걸면 굳은 나무 한 그루가 비켜서고, 안쪽 숨은 빈터에 숲에서 가장 늙은 도토리나무가 서 있다. 이 나무 뿌리가 아직 살아서 남쪽 골짜기 개울을 데우고 있었다. 나무 곁 3.2칸 안에서는 낮에도 켜진 등불 곁처럼 쉬어 눈금이 찬다(칸마다 6초). 뿌리를 묶은 벽돌 매듭 셋을 왕관으로 풀면(눈금 1칸씩) 뿌리가 하나씩 나무 쪽으로 당겨 붙고, 둘째 매듭 뒤에는 벽돌 고슴도치 2마리가 굴러 나온다. 마지막 매듭 뒤 1.5초 동안은 대사 없이 나무가 한 번 숨 쉬고 낮은 가지의 잎 둘이 처음 흔들린다. 그 뒤 나무가 초록이 되고, 구해 준 다람쥐 다섯이 돌아와 가지에 앉는다. 싹 튼 도토리(회복약 65 → 75, 새 바퀴에도 남는다), 최대 체력 +10, 금화 60을 받는다. 마을 나무꾼 두솔의 다람쥐 틈 실마리도 켰다. 대사와 소품은 GPT의 의견으로 다듬었다.",
 	"· v0.0.36: 7장에 달지기 숙소(약 4분). 벽돌 기사를 쓰러뜨린 자리에 녹슨 태엽이 남고, 그 태엽으로 옥좌의 방 남쪽 벽의 태엽 문을 연다. 식당과 바구니 방에서 벽돌 6마리와 싸우고, 바구니 셈판에서 한결이 마지막으로 가져간 등불 바구니를 찾는다. 일방 태엽대의 깡통 문지기를 왕관으로 감으면(눈금 1칸) 침방까지 걸어가는데, 식당의 벽돌 더미 셋이 문지기에게 달려든다(닿으면 태엽이 튕겨 나와 곁에서 E로 다시 걷는다). 침방 장부의 한결 다음 칸에 소라의 이름을 적으면 문지기가 백 년 만에 제 의자에 앉아 작은 놋 방패를 건넨다(섬광 막기 0.12초 → 0.16초, 새 바퀴에도 남음). 궤짝에서 최대 체력 +10, 회복약 2, 금화 80. 대사와 소품은 GPT와 의논해 다듬었다.",
 	"· v0.0.35: 마을에 일하는 사람 여섯이 생겼다. 나무꾼 두솔, 광부 차돌, 농부 새참, 낚시꾼 여울(두솔의 동생), 바구니 짜는 다래 할머니와 손자 토리. 저마다 일터(장작더미, 광석 수레, 굳은 밭, 연못가, 장터)에 서 있고, 말을 걸면 아직 못 끝낸 곁이야기의 실마리를 하나씩 들려준다. 이야기가 나아갈 때마다 하는 말이 바뀌고, 마지막 이야기에서 선물(회복약 1, 금화 30, 또는 물고기가 30% 빨리 무는 미끼 주머니)을 준다. 밤에는 집에 들어가 자며 한 집에 셋까지 잔다. 대사와 그림은 GPT와 함께 만들었다.",
 	"· v0.0.34: 1장에 깨어난 물가(약 4분). 보리 할머니를 만난 뒤, 소라가 깨어난 자리에서 물가로 눌린 갈대 줄이 이어지고 그 끝 진흙에 갈대 바구니가 묻혀 있다. 왕관으로 진흙을 풀면(눈금 1칸) 벽돌 두 무리(고블린 2, 고블린 1과 활 1)가 일어나고, 바구니에서 금화 30과 회복약 1이 나온다. 보리 할머니는 달지기 등불 바구니를 알아보고 백 년 동안 켜지 않은 자기 등불과 회복약 1을 준다. 벽돌왕을 넘어뜨린 뒤 밤에 물가에서 등불 바구니를 띄우면(눈금 1칸) 물길 약 20칸을 따라 흘러가고, 벽돌 걸림 셋(고블린 2, 2, 고블린 1과 활 1)을 풀어 주면 늪 호수 섬 앞에 머문다(최대 체력 +10). 보리 할머니께 알리면 갈대 방석을 준다(밤에 켜진 등불 곁에서 쉬면 체력이 초당 4씩 찬다). 대사와 소품은 GPT와 의논해 다듬었다.",
@@ -3759,6 +3783,7 @@ func story_talk_ok(key: String) -> bool:
 		"clock_done": return clock_q >= 5
 		"shore_done": return shore_q >= 4
 		"quarters_done": return quarters_q >= 5
+		"oak_done": return oak_q >= 2
 		"mill_hint": return hill_q >= 3 and mill_q == 0
 		"mill_done": return mill_q >= 5
 		"pearl": return grotto_q >= 4
@@ -4751,7 +4776,7 @@ func drink_potion() -> void:
 		return
 	player.pots -= 1
 	player.cds[3] = 2.0
-	var h := minf(player.max_hp - player.hp, 65.0 if has_acorn else 45.0)
+	var h := minf(player.max_hp - player.hp, 75.0 if has_sprout else (65.0 if has_acorn else 45.0))
 	player.hp += h
 	if has_oil:
 		player.mp = minf(player.max_mp, player.mp + 20.0)
@@ -5563,6 +5588,7 @@ func save_game() -> void:
 		"stairs_wall": stairs.wall_open, "stairs_lamps": stairs.lamps.map(func(l): return l.lit),
 		"castle_q": castle_q, "bars": castle.bars, "levers": castle.levers.map(func(lv): return lv.up), "vault": castle.vault_open, "has_armour": has_armour, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read),
 		"quarters_q": quarters_q, "quarters_box": quarters_box, "has_buckler": has_buckler, "quarters_again": quarters_again,
+		"oak_q": oak_q, "oak_knots": forest.knots.map(func(k): return k.open), "has_sprout": has_sprout,
 		"under_drained": under.drained, "under_door": under.door_open, "under_guards": under_guards_done, "under_chest": under_chest_open,
 		"under_side": under_side_open, "under_diary": under_diary_read, "has_lamp": has_lamp}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
@@ -5788,6 +5814,7 @@ func load_game() -> void:
 	if bool(d.get("castle_gate", false)):
 		castle.open_gate()
 	load_quarters(d)
+	load_oak(d)
 	road_q = int(d.get("road_q", 0))
 	mill_q = int(d.get("mill_q", 0))
 	post_q = int(d.get("post_q", 0))
@@ -6337,6 +6364,8 @@ func crown_key() -> void:
 	if in_cave and shrine_key():
 		return
 	if in_forest:
+		if oak_key():
+			return
 		if hollow_key():
 			return
 		if grove_key():
@@ -6506,7 +6535,8 @@ func hint_open(key: String) -> bool:
 		"stairs": return castle_q >= 3 and not stairs.door_open
 		"clock": return garden_q >= 5 and not clock_box
 		"quarters": return castle_q >= 3 and quarters_q < 5
-	return false # oak: not in the game yet
+		"oak": return oak_ready() and oak_q < 2
+	return false
 
 func hint_folk_talk(id: String) -> void:
 	var f: Dictionary = STORY.HINT_FOLK[id]
@@ -6873,6 +6903,7 @@ func enter_forest() -> void:
 			spawn_wolf(w)
 		show_story("", STORY.FOREST_IN)
 	spawn_cages()
+	place_big_squirrel()
 	if hollow_q == 1:
 		spawn_hollow()
 	if forest_q < 3:
@@ -6972,11 +7003,7 @@ func spawn_cages() -> void:
 		brick(g, mats, Vector3(0.8, 0.1, 0.8), Vector3(0, 0.85, 0), Color("#a8322a"))
 		for k in 4: # bars at the corners
 			brick(g, mats, Vector3(0.1, 0.7, 0.1), Vector3(-0.35 + (k % 2) * 0.7, 0.45, -0.35 + (k / 2) * 0.7), Color("#8a8a90"), false)
-		var fur := mat_color(Color("#c8783a")) # the squirrel inside, sitting up with its tail curled
-		for part in [[Vector3(0.22, 0.26, 0.2), Vector3(0, 0.25, 0)], [Vector3(0.18, 0.16, 0.18), Vector3(0, 0.45, 0.04)], [Vector3(0.14, 0.34, 0.12), Vector3(0, 0.36, -0.18)]]:
-			var b := box(part[0], fur)
-			b.position = part[1]
-			g.add_child(b)
+		g.add_child(squirrel_model(1.0)) # the squirrel inside, sitting up with its tail curled
 		add_child(root)
 		root.position = Vector3(at.x, 0, at.y)
 		enemies.append({"x": at.x, "z": at.y, "hp": 3.0, "max_hp": 3, "node": root, "shadow": blob(0.6), "t": 0.0,
@@ -7002,6 +7029,7 @@ func cage_hit(e: Dictionary) -> void:
 	var n: int = forest.freed.filter(func(f): return f).size()
 	if n >= forest.freed.size():
 		has_acorn = true
+		place_big_squirrel()
 		show_story("", STORY.SQUIRRELS_DONE)
 	else:
 		toast(tr("다람쥐를 구했다 %d/5") % n)
@@ -7009,6 +7037,7 @@ func cage_hit(e: Dictionary) -> void:
 
 func update_forest() -> void:
 	update_hollow()
+	update_oak()
 	if forest_q == 1 and not story_open and Vector2(player.x, player.z).distance_to(forest.marks.N) < 6.0:
 		forest_q = 2
 		show_story("", STORY.NOEUL_DUEL2)
@@ -7039,6 +7068,7 @@ func hollow_key() -> bool:
 		sfx(220, 0.5, "triangle", 0.3, -80)
 		show_story("", STORY.HOLLOW_GATE)
 		spawn_hollow()
+		place_big_squirrel()
 		save_game()
 		return true
 	for l in forest.mem_lamps:
@@ -7252,6 +7282,306 @@ func update_hog(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
 		m.emission = Color("#ff3a2a") if rolled and e.hurt <= 0.0 else Color.WHITE
 		m.emission_energy_multiplier = 0.9
 	e.shadow.position = Vector3(e.x, 0.02, e.z)
+
+# ---- 다람쥐 나무 (chapter 5, DESIGN.md): with the five squirrels free and the grey gate open, the big squirrel
+# scratches at a gap in the trees in the middle of the forest; E there and a tree steps aside onto a hidden clearing
+# with the forest's oldest acorn oak. Its living roots warm the valley's stream, and Sora rests by it even by day.
+# Three brick knots on its roots come loose with the crown (1 pip each, each root drawing in toward the trunk; two
+# brick hedgehogs roll out after the second); after the last, 1.5 s with no lines while the tree breathes once, then
+# it greens and the five squirrels come back to sit in it. Lines, props and colours reworked with GPT's notes.
+const OAK_HP := 10
+var oak_q := 0                # 0 the gap shut, 1 open, 2 the oak green again
+var has_sprout := false       # 싹 튼 도토리: potions heal 75, kept into a new round
+var oak_told := false         # the clearing's lines this session (not saved)
+var squirrel_seen := false    # the big squirrel's first toast this session (not saved)
+var oak_hush := false         # the 1.5 s after the last knot
+var big_squirrel: Node3D = null
+var oak_kin: Array = []       # the other four squirrels, in the crown once it is green
+var steam_t := 0.0
+
+func oak_ready() -> bool:
+	return has_acorn and hollow_q >= 1
+
+# by the old oak's warm roots Sora rests as by a lit lantern at night, day or night
+func oak_warm() -> bool:
+	return in_forest and oak_q >= 1 and Vector2(player.x, player.z).distance_to(FOREST.OAK_C) < 3.2
+
+func forest_map() -> ImageTexture:
+	return forest.map_tex(FOREST.FOREST_X + FOREST.W)
+
+func oak_hogs_alive() -> Array:
+	return enemies.filter(func(e): return e.get("oak", false) and not e.dead)
+
+func oak_loose() -> int:
+	return forest.knots.filter(func(k): return k.open).size()
+
+# a squirrel sitting up with its tail curled (the cages' one; x1.3 for the big one); "body" bobs as it breathes
+func squirrel_model(s: float) -> Node3D:
+	var root := Node3D.new()
+	var g := Node3D.new()
+	g.name = "body"
+	root.add_child(g)
+	var fur := mat_color(Color("#c8783a"))
+	for part in [[Vector3(0.22, 0.26, 0.2), Vector3(0, 0.25, 0)], [Vector3(0.18, 0.16, 0.18), Vector3(0, 0.45, 0.04)], [Vector3(0.14, 0.34, 0.12), Vector3(0, 0.36, -0.18)]]:
+		var b := box(part[0], fur)
+		b.position = part[1]
+		g.add_child(b)
+	root.scale = Vector3.ONE * s
+	return root
+
+func oak_seat(i: int) -> Vector3:
+	var s: Vector2 = FOREST.OAK_SEATS[i]
+	return Vector3(FOREST.OAK_C.x + s.x, 2.6, FOREST.OAK_C.y + s.y)
+
+# where the squirrels are for oak_q: by the gap, by a knot, or all five in the green crown
+func place_big_squirrel() -> void:
+	if big_squirrel == null:
+		big_squirrel = squirrel_model(1.3)
+		add_child(big_squirrel)
+		for k in 4:
+			var s := squirrel_model(1.0)
+			add_child(s)
+			oak_kin.append(s)
+	var on := oak_ready()
+	big_squirrel.visible = on
+	for s in oak_kin:
+		s.visible = on and oak_q >= 2
+	if not on:
+		return
+	match oak_q:
+		0:
+			big_squirrel.position = Vector3(FOREST.SQUIRREL_AT.x, 0, FOREST.SQUIRREL_AT.y)
+			big_squirrel.rotation.y = PI / 2.0 # at the gap, its tail to the path
+		1:
+			big_squirrel.position = Vector3(199.5, 0, 12.5)
+			big_squirrel.rotation.y = 0.6
+		_:
+			big_squirrel.position = oak_seat(0)
+			big_squirrel.rotation.y = 0.0
+			for k in 4:
+				oak_kin[k].position = oak_seat(k + 1)
+				oak_kin[k].rotation.y = 0.0
+
+# E in the forest, before the valley's keys: the big squirrel, a root knot, or the green oak
+func oak_key() -> bool:
+	if not oak_ready():
+		return false
+	var me := Vector2(player.x, player.z)
+	if oak_q == 0:
+		if me.distance_to(FOREST.SQUIRREL_AT) < 1.6:
+			show_story("", STORY.OAK_CALL)
+			after_story = open_oak_gap
+			return true
+		return false
+	var near := -1
+	for i in forest.knots.size():
+		var k: Dictionary = forest.knots[i]
+		if not k.open and me.distance_to(k.pos) < 1.6 and (near < 0 or me.distance_to(k.pos) < me.distance_to(forest.knots[near].pos)):
+			near = i
+	if near >= 0:
+		untie_knot(near)
+		return true
+	if oak_q >= 2 and not oak_hush and me.distance_to(FOREST.OAK_C) < 2.8:
+		show_story("", STORY.OAK_AFTER)
+		return true
+	return false
+
+# the squirrel slips into the gap and a hardened tree creaks aside (0.6 s); it runs on to sit by a knot
+func open_oak_gap() -> void:
+	if big_squirrel == null:
+		place_big_squirrel()
+	oak_q = 1
+	forest.oak_open = true
+	var gp: Node3D = forest.oak_gap
+	var tw := create_tween().set_parallel()
+	tw.tween_property(gp, "position", gp.position + FOREST.GAP_SHIFT, 0.6).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(gp, "rotation:x", FOREST.GAP_TILT, 0.6).set_trans(Tween.TRANS_SINE)
+	for s in forest.warm:
+		s.visible = true
+	burst(Vector3(gp.position.x, 0.8, gp.position.z), Color("#9a9aa0"), 16, 1.5)
+	sfx(150, 0.5, "triangle", 0.18, -40)
+	var sq := big_squirrel
+	sq.rotation.y = PI / 2.0
+	var run := create_tween()
+	run.tween_property(sq, "position", Vector3(196.6, 0, 12), 0.5)
+	run.tween_property(sq, "position", Vector3(199.5, 0, 12.5), 1.1)
+	run.tween_callback(func(): sq.rotation.y = 0.6)
+	ui.mini.map_tex = forest_map()
+	toast("다람쥐를 따라 나무 틈 안쪽으로 가자")
+	save_game()
+
+# E by a tied knot: 1 pip, the bricks crumble to soil and the brown root draws in toward the trunk
+func untie_knot(i: int) -> void:
+	var done := oak_loose()
+	if done == 2 and not oak_hogs_alive().is_empty():
+		toast("고슴도치부터 막자")
+		return
+	if not spend_pips(1):
+		return
+	var k: Dictionary = forest.knots[i]
+	var root: MeshInstance3D = forest.untie(i)
+	create_tween().tween_property(root, "position:z", FOREST.ROOT_IN, 0.5).set_trans(Tween.TRANS_SINE)
+	burst(Vector3(k.pos.x, 0.4, k.pos.y), Color("#8a6a4a"), 24, 2.5)
+	burst(Vector3(k.pos.x, 0.3, k.pos.y), Color("#f2ead8"), 6, 0.9)
+	burst(Vector3(player.x, 1.6, player.z), Color("#9fd4ff"), 12, 1.5)
+	sfx(330, 0.4, "sine", 0.3, 200)
+	ui.mini.map_tex = forest_map()
+	done += 1
+	match done:
+		1:
+			forest.show_leaf()
+			show_story("", STORY.OAK_KNOT1)
+			after_story = func(): toast(tr("벽돌 뿌리 매듭이 풀렸다 %d/3") % 1)
+		2:
+			show_story("", STORY.OAK_HOGS)
+			after_story = func(): toast(tr("벽돌 뿌리 매듭이 풀렸다 %d/3") % 2)
+			get_tree().create_timer(0.8).timeout.connect(oak_hogs_out)
+		_:
+			oak_green()
+	save_game()
+
+# the two hedgehogs roll out from under the roots (once; they do not come back)
+func oak_hogs_out() -> void:
+	if not in_forest or oak_q != 1 or oak_loose() != 2 or not oak_hogs_alive().is_empty():
+		return
+	for at in forest.oak_hogs:
+		spawn_hog(at)
+		enemies[enemies.size() - 1].oak = true
+		burst(Vector3(at.x, 0.4, at.y), Color("#8a6a4a"), 14, 2.0)
+	sfx(140, 0.25, "square", 0.15, -40)
+
+# the last knot: the reward is kept at once, the lines wait 1.5 s while the tree breathes (GPT's note)
+func oak_green() -> void:
+	oak_q = 2
+	oak_hush = true
+	var first := not has_sprout
+	if first:
+		has_sprout = true
+		player.max_hp += OAK_HP
+		player.hp = minf(float(player.max_hp), player.hp + OAK_HP)
+	player.gold += 60
+	gain_xp(60)
+	var lines: Array = STORY.OAK_GREEN.duplicate()
+	if not first: # a new round: the sprout came along
+		lines[lines.size() - 1] = STORY.OAK_GREEN_ROUND
+	oak_breathe()
+	get_tree().create_timer(1.5).timeout.connect(oak_greened.bind(lines))
+
+func oak_greened(lines: Array) -> void:
+	oak_hush = false
+	forest.set_green(true)
+	burst(Vector3(FOREST.OAK_C.x, 1.5, FOREST.OAK_C.y + 1.0), Color("#8a6a4a"), 30, 2.5) # the grey bark falls as soil
+	oak_kin_come()
+	if in_forest:
+		ui.mini.map_tex = forest_map()
+		show_story("", lines)
+		after_story = show_sprout
+
+# one breath in and out: the crown lifts a little and settles, the low branch rises, its two leaves stir for the
+# first time, one cream puff of steam from the roots; only a creak and a hush of water to hear
+func oak_breathe() -> void:
+	var crown: Node3D = forest.oak.get_meta("crown")
+	var tw := create_tween()
+	tw.tween_property(crown, "scale", Vector3(1.03, 1.14, 1.03), 0.6).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(crown, "scale", Vector3.ONE, 0.7).set_trans(Tween.TRANS_SINE)
+	var br: Node3D = forest.oak.get_meta("branch")
+	create_tween().tween_property(br, "rotation:x", -0.12, 0.9).set_trans(Tween.TRANS_SINE)
+	var twigs: Array = forest.oak.get_meta("twigs")
+	for k in twigs.size():
+		var tw2: MeshInstance3D = twigs[k]
+		var st := create_tween()
+		st.tween_interval(0.35 + 0.2 * k)
+		st.tween_callback(func(): (tw2.material_override as StandardMaterial3D).albedo_color = forest.tree_col(Color("#9ad46a")))
+		for a in [0.35, -0.3, 0.2, 0.0]:
+			st.tween_property(tw2, "rotation:z", a if k == 0 else -a, 0.16)
+	burst(Vector3(FOREST.OAK_C.x, 0.15, FOREST.OAK_C.y + 1.1), Color("#f2ead8"), 10, 1.2)
+	sfx(120, 0.6, "triangle", 0.08, 30)
+	water_hush(3)
+
+# the four other squirrels come back through the gap and climb up beside the big one
+func oak_kin_come() -> void:
+	if big_squirrel == null:
+		place_big_squirrel()
+	var bt := create_tween()
+	bt.tween_property(big_squirrel, "position", oak_seat(0), 0.5)
+	bt.tween_callback(func(): big_squirrel.rotation.y = 0.0)
+	for k in oak_kin.size():
+		var s: Node3D = oak_kin[k]
+		s.visible = true
+		s.position = Vector3(196.4, 0, 12)
+		s.rotation.y = PI / 2.0
+		var tw := create_tween()
+		tw.tween_interval(0.25 * k)
+		tw.tween_property(s, "position", Vector3(199.2, 0, 12.7), 0.7)
+		tw.tween_property(s, "position", oak_seat(k + 1), 0.45)
+		tw.tween_callback(func(): s.rotation.y = 0.0)
+
+# the sprouted acorn held up over Sora for a moment: brown body, dark cap, a slanted stem, two flat leaves
+func show_sprout() -> void:
+	var g := Node3D.new()
+	for p in [[Vector3(0.2, 0.24, 0.2), Vector3(0, 0, 0), mat_color(Color("#996039"))],
+			[Vector3(0.26, 0.08, 0.26), Vector3(0, 0.15, 0), mat_color(Color("#5a4030"))],
+			[Vector3(0.04, 0.2, 0.04), Vector3(0.03, 0.28, 0), mat_color(Color("#9ad46a"))],
+			[Vector3(0.16, 0.03, 0.08), Vector3(-0.05, 0.37, 0), mat_color(Color("#9ad46a"))],
+			[Vector3(0.16, 0.03, 0.08), Vector3(0.12, 0.4, 0), mat_color(Color("#9ad46a"))],
+			[Vector3(0.05, 0.05, 0.05), Vector3(0.05, 0.4, 0), glow_mat(Color("#c8f09a"), 0.6)]]:
+		var b := box(p[0], p[2])
+		b.position = p[1]
+		g.add_child(b)
+	g.scale = Vector3.ONE * 1.6
+	g.position = Vector3(player.x, ground_y + 2.3, player.z)
+	add_child(g)
+	var tw := create_tween()
+	tw.tween_property(g, "position:y", g.position.y + 0.3, 2.0)
+	tw.tween_callback(g.queue_free)
+
+func update_oak() -> void:
+	if big_squirrel != null and big_squirrel.visible and oak_q < 2: # breathing, 0.04 up and down every 0.6 s
+		(big_squirrel.get_node("body") as Node3D).position.y = 0.04 * absf(sin(t * PI / 0.6))
+	if not oak_ready():
+		return
+	var me := Vector2(player.x, player.z)
+	var inside: bool = me.x > 197.5 and me.x < 206.5 and me.y > 6.5 and me.y < 13.5
+	forest.crown_fade(0.5 if inside and me.y < 9.5 else 0.0)
+	if story_open or fade_rect.color.a > 0.0:
+		return
+	if oak_q == 0 and not squirrel_seen and me.distance_to(FOREST.SQUIRREL_AT) < 6.0:
+		squirrel_seen = true
+		toast("큰 다람쥐가 회색 나무 틈을 앞발로 긁고 있다")
+	if oak_q == 1 and inside and not oak_told and oak_loose() == 0:
+		oak_told = true
+		show_story("", STORY.OAK_IN)
+		after_story = func(): toast("나무 곁에서는 낮에도 눈금이 찬다")
+
+func oak_journal() -> String:
+	match oak_q:
+		0: return tr("큰 다람쥐를 찾아서")
+		1: return tr("뿌리 매듭 %d/3") % oak_loose()
+	return tr("끝")
+
+# load the clearing (old saves: the gap shut, the big squirrel by it if the gate is open); hogs left over go
+func load_oak(d: Dictionary) -> void:
+	oak_q = int(d.get("oak_q", 0))
+	has_sprout = bool(d.get("has_sprout", false))
+	var loose: Array = [false, false, false]
+	var ks: Array = d.get("oak_knots", [])
+	for i in mini(ks.size(), 3):
+		loose[i] = bool(ks[i])
+	if oak_q >= 2:
+		loose = [true, true, true]
+	elif oak_q == 0:
+		loose = [false, false, false]
+	oak_told = false
+	squirrel_seen = false
+	oak_hush = false
+	for e in oak_hogs_alive():
+		e.dead = true
+		e.node.queue_free()
+		e.shadow.queue_free()
+	forest.oak_look(oak_q >= 1, loose, oak_q >= 2)
+	place_big_squirrel()
+	if in_forest:
+		ui.mini.map_tex = forest_map()
 
 func noeul_turned() -> void:
 	forest_q = 3
@@ -10712,7 +11042,8 @@ var rest_need := 6.0         # seconds of rest for the next pip (lantern 6, jar 
 
 func update_pips(dt: float) -> void:
 	pip_flash -= dt
-	var night_now := is_night() or in_clock() # underground the clock room rests as at night
+	var by_oak := oak_warm()
+	var night_now := is_night() or in_clock() or by_oak # underground the clock room rests as at night, and by the old oak's warm roots
 	var heal: bool = has_cushion and night_now and player.hp < player.max_hp
 	if (crown_pips >= 8 or not night_now) and not heal:
 		rest_t = 0.0
@@ -10722,6 +11053,7 @@ func update_pips(dt: float) -> void:
 	for l in lanterns:
 		if not l.get_meta("dark", false) and l != dark_lamp and Vector2(l.position.x - me.x, l.position.z - me.z).length() < 2.0:
 			near_lamp = true
+	near_lamp = near_lamp or by_oak
 	var calm := true
 	for e in enemies:
 		if not e.dead and Vector2(e.x - me.x, e.z - me.z).length() < 6.0:
@@ -10741,6 +11073,11 @@ func update_pips(dt: float) -> void:
 	rest_need = (6.0 if near_lamp else 12.0) * (0.6 if has_tea else 1.0)
 	if (near_lamp or jar) and calm and still:
 		rest_t += dt
+		if by_oak: # warm steam off the roots while she rests there
+			steam_t += dt
+			if steam_t >= 1.0:
+				steam_t = 0.0
+				burst(Vector3(FOREST.OAK_C.x, 0.2, FOREST.OAK_C.y + 1.3), Color("#f2ead8"), 4, 0.6)
 		if rest_t >= rest_need:
 			rest_t = 0.0
 			crown_pips += 1
@@ -11376,6 +11713,8 @@ func journal_lines() -> Array:
 	if forest_q >= 1:
 		var nf: int = forest.freed.filter(func(f): return f).size()
 		side.call("갇힌 다람쥐", tr("끝") if has_acorn else tr("%d/5 구함") % nf)
+		if oak_ready():
+			side.call("다람쥐 나무", oak_journal())
 		side.call("숲의 달 순서 돌", tr("끝") if forest.chest_open else (tr("상자를 열자") if forest.solved else tr("숲 북서쪽 숲터")))
 	if post_q >= 1:
 		side.call("물길 끝 굴", [tr(""), tr("섬 수정을 낮은 소리부터"), tr("물길 끝의 쓸려 온 더미"), tr("보리 할머니께 엽서를") if doran_q >= 3 else tr("한결이 누구일까"), tr("끝")][post_q])
@@ -11418,7 +11757,7 @@ func journal_lines() -> Array:
 	if fly_q >= 3: keep.append(tr("반딧불 병"))
 	if has_pearl: keep.append(tr("물빛 진주"))
 	if has_feather: keep.append(tr("바람 깃털"))
-	if has_acorn: keep.append(tr("다람쥐 도토리"))
+	if has_acorn: keep.append(tr("싹 튼 도토리") if has_sprout else tr("다람쥐 도토리"))
 	if hollow_q == 3: keep.append(tr("열셋째 등불"))
 	if has_ring: keep.append(tr("수정 반지"))
 	if has_shoes: keep.append(tr("바람 신발"))

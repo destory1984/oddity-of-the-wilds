@@ -1726,6 +1726,50 @@ const QUARTERS_BOX_AGAIN := [
 	"||궤짝 안에 회복약 하나와 금화 몇 닢이 남아 있다. 회복약 1, 금화 40.",
 ]
 
+# 다람쥐 나무 (chapter 5, v0.0.37). With GPT's notes: at the gap only the warmth is felt, the clearing ties it to
+# the stream once after the steam is seen, the hundred years of buried acorns come at the end; the new leaves bud
+# in front of Sora; the hedgehogs are only something to stop before they reach the roots
+const OAK_CALL := [
+	"||도토리를 준 그 큰 다람쥐다. 회색 나무 두 그루 사이 좁은 틈을 앞발로 긁고 있다.",
+	"||주머니 속 도토리가 손난로처럼 따뜻해졌다.",
+	"물결|mulgyeol|따라오래. 저 틈, 다람쥐만 다니는 길인가 봐.",
+	"노을|jae|……개울에서도 이런 온기가 났어.",
+	"소라|calm|조금만 비켜 줄래? 우리도 지나갈게.",
+	"||다람쥐가 틈으로 쏙 들어가자, 굳은 나무 한 그루가 삐걱 하고 옆으로 비켜섰다.",
+]
+const OAK_IN := [
+	"||회색 나무에 둘러싸인 작은 빈터. 한가운데 숲에서 가장 굵은 나무가 서 있다.",
+	"||껍질은 벽돌로 굳었는데, 뿌리께에서 김이 희미하게 오른다.",
+	"노을|jae|개울이 안 굳은 까닭이 이거였어. 이 뿌리가 아직 살아서 물을 데우고 있어.",
+	"||뿌리 세 갈래가 벽돌 매듭으로 꽁꽁 묶여 있다. 다람쥐가 매듭 곁에 앉아 꼬리를 친다.",
+	"노을|jae_smirk|여기 따뜻하네. 낮인데도 왕관 눈금이 차겠어.",
+	"소라|determined|매듭을 하나씩 풀어 주자. 나무가 숨 쉬게.",
+]
+const OAK_KNOT1 := [
+	"||매듭이 흙으로 풀리자, 뿌리가 나무 쪽으로 스르르 당겨 붙고 따뜻한 김이 훅 올랐다.",
+	"||소라의 눈앞에서, 굳은 껍질 틈으로 연두색 새잎 하나가 돋았다.",
+	"물결|mulgyeol|잎이다! 방금 돋았어!",
+]
+const OAK_HOGS := [
+	"||두 번째 뿌리도 나무 쪽으로 당겨 붙었다. 그 바람에 뿌리 밑 흙이 들썩이더니 벽돌 고슴도치 둘이 데굴데굴 굴러 나왔다.",
+	"물결|mulgyeol|굴러온다! 소라, 발 조심해!",
+	"소라|determined|뿌리 쪽으로는 못 가게 막자!",
+]
+# shown 1.5 s after the last knot, once the tree has breathed (GPT's note)
+const OAK_GREEN := [
+	"||마지막 뿌리가 나무 쪽으로 당겨 붙자, 땅 밑 멀리에서 물 흐르는 소리가 한층 커졌다.",
+	"||회색 껍질이 한 겹씩 흙이 되어 떨어지고, 가지 끝마다 새잎이 돋았다.",
+	"||구해 준 다람쥐 다섯 마리가 돌아와, 고맙다는 듯 가지 위에 나란히 앉았다.",
+	"물결|mulgyeol|뿌리 곁이 온통 도토리 껍질이야. 다람쥐들이 백 년 동안 여기 묻어 왔나 봐.",
+	"노을|jae|……여긴 초록이 돌아왔네.",
+	"소라|laugh|봐, 주머니 속 도토리에 싹이 났어!",
+	"||싹 튼 도토리. 회복약이 체력을 65가 아니라 75 채운다. 최대 체력 +10, 금화 60.",
+]
+const OAK_GREEN_ROUND := "||금화 60을 얻었다." # a new round: the sprout came along
+const OAK_AFTER := [
+	"||다람쥐 다섯이 가지 위에 나란히 앉아 소라를 내려다본다. 꼬리가 하나씩 살랑였다.",
+]
+
 const REST_TALK_STORY := [
 	["mul_new", [["mulgyeol", "섬 밖에서 이렇게 오래 있어 본 건 처음이야."], ["sora", "할아버지 생각 나?"], ["mulgyeol", "응. 그래도 할아버지라면 가라고 했을 거야."]]],
 	["noeul_new", [["noeul", "……내가 같이 가도 괜찮은 거야? 마을 등불을 끈 건 나였는데."], ["mulgyeol", "그건 이제 다 갚았잖아."], ["sora", "응. 지금은 우리 편이야."], ["noeul", "……고마워."]]],
@@ -1737,6 +1781,7 @@ const REST_TALK_STORY := [
 	["clock_done", [["noeul", "그 닳은 손잡이 봤어?"], ["sora", "응. 이제 여덟 개 다 닳겠지."], ["mulgyeol", "그만큼 자주 오자는 거지?"]]],
 	["shore_done", [["mulgyeol", "늪 호수에 등불 하나 떠 있던데."], ["sora", "보리 할머니 등불이야. 내가 띄웠어."], ["noeul", "……그 바구니 엮음새, 한결 솜씨지?"]]],
 	["quarters_done", [["mulgyeol", "그 꼬마 문지기, 또 감아 주러 오자."], ["sora", "응. 장부에 이름도 적었는걸."], ["noeul", "백 년 만의 교대였네. 다음 칸엔 우리 셋 이름 다 적자."]]],
+	["oak_done", [["noeul", "그 늙은 나무, 새잎이 더 났을까."], ["mulgyeol", "다람쥐들이 또 도토리를 묻어 주겠지."], ["sora", "다음엔 나도 하나 묻어야지."]]],
 	["mill_hint", [["mulgyeol", "언덕 남쪽 담에 참새들이 모여 있더라."], ["sora", "매 속에서 나온 애들?"], ["noeul", "뭘 찾나 봐."]]],
 	["mill_done", [["noeul", "장터 달빛 가루, 그 방앗간에서 빻던 거래."], ["mulgyeol", "그 가루 배로 실어 날랐겠지."], ["sora", "언젠가 그 배 고쳐서 셋이 타 보자."]]],
 	["scare", [["mulgyeol", "구름 위를 걸었다고 하면 아무도 안 믿을걸."], ["noeul", "바람 깃털이 증거지."], ["sora", "구르는 게 훨씬 가벼워졌어."]]],
