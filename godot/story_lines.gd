@@ -1636,6 +1636,96 @@ const ROAD_PAGE_BASKET := "소라|calm|물가에 걸려 있던 그 갈대 바구
 const POST_BORI_LAMP := "보리 할머니|bori|등불은 내가 챙긴다고 썼었지. 그 등불은 네가 띄워 줬고."
 const POST_BORI_LAMP_HELD := "보리 할머니|bori|등불은 내가 챙긴다고 썼었지. 그 등불이 지금 네 손에 있구나."
 
+# ---- 달지기 숙소 (chapter 7): the moonkeepers' quarters under the throne room. Lines reworked with GPT's notes
+# (2026-10-24): Hangyeol's name on the tally board and the note on the stand come first and Noeul points out one link
+# only; reading the ledger and writing Sora's name are one beat, then the doorkeeper sits; Sora says only the promise
+# she makes now; the buckler's numbers come after the moment, as a toast.
+const QUARTERS_SPRING := [
+	"||기사가 무릎 꿇었던 자리에 녹슨 태엽 하나가 남아 있다. 손바닥만 하다.",
+	"물결|mulgyeol|아직 조금 따뜻해. 이게 그 기사의 심장이었나 봐.",
+	"노을|jae|태엽 머리에 열쇠 무늬가 새겨져 있어. 어딘가의 문지기 태엽이야.",
+	"소라|calm|가져가자. 혼자 두기엔 너무 오래 지켰어.",
+	"||옥좌의 방 남쪽 벽에서 작은 톱니 소리가 따라 울렸다.",
+]
+
+const QUARTERS_DOOR := [
+	"||열쇠 무늬에 녹슨 태엽을 대자, 문 속 톱니가 따라 돌며 문이 옆으로 밀려났다.",
+	"노을|jae|달지기 숙소야. 달지기들이 여기서 먹고 잤대.",
+]
+
+const QUARTERS_IN := [
+	"||긴 식탁에 그릇들이 엎어져 있다. 식탁 곁에서 벽돌들이 덜그럭 일어선다.",
+	"물결|mulgyeol|밥상 앞에서 싸우는 건 예의가 아닌데.",
+]
+
+const QUARTERS_BASKET := [
+	"||시렁마다 갈대로 엮은 둥근 등불 바구니가 걸려 있다. 바닥에 마른 갈대 다발이 쌓여 있다.",
+	"노을|jae|다 감은 밤마다 여기서 하나씩 꺼내 갔나 봐.",
+]
+const QUARTERS_BASKET_BORI := "소라|calm|보리 할머니가 창가에서 기다리던 불빛…… 여기서 떠났구나." # Bori told her the custom (shore_q 3 on)
+const QUARTERS_BASKET_SORA := "소라|calm|등불을 담는 바구니야. 어디로 띄웠을까."
+
+const QUARTERS_TALLY := [
+	"||벽의 셈판에 감은 밤마다 그은 금이 빼곡하다. 금 하나 곁에 바구니 고리 하나.",
+	"||맨 끝 금만 다른 손으로 그었고, 그 곁 고리가 비어 있다. 「마지막 바구니. 한결」",
+]
+const QUARTERS_TALLY_SHORE := [ # the basket from where Sora woke is out of the mud (shore_q 2 on)
+	"소라|surprised|내가 깨어난 갈대숲에 걸려 있던 바구니…… 여기서 간 거였어.",
+	"물결|mulgyeol|감지 못한 밤에도 바구니는 띄웠구나. 등불 대신 왕관을 담아서.",
+]
+const QUARTERS_TALLY_NOSHORE := [
+	"소라|surprised|마지막 바구니는 어디로 갔을까. ……늪으로 흐르는 물길이라면, 내가 깨어난 곳이야.",
+]
+
+const QUARTERS_STAND := [
+	"||일방 구석 태엽대에 작은 깡통 인형이 서 있다. 가슴의 태엽 구멍이 비었고, 한쪽 손이 열쇠 모양이다.",
+	"||태엽대에 쪽지가 묶여 있다. 「문지기 태엽은 옥좌의 방 기사 갑옷에 옮긴다. 다음 아이가 올 때까지 동쪽 문을 지켜라. 한결」",
+	"노을|jae|그 큰 갑옷 안에…… 이 작은 태엽이 들어 있었네.",
+	"노을|jae|……나도 그랬으니까.",
+	"소라|determined|태엽을 돌려주자. 왕관으로 감아 줄게.",
+]
+
+const QUARTERS_WAKE := [
+	"||태엽을 끼우고 왕관을 대자, 깡통 문지기가 끼익 고개를 들었다. 소라를 보더니 열쇠 손을 들어 인사한다.",
+	"||문지기가 뒤뚱뒤뚱 걸어 나간다.",
+]
+
+const QUARTERS_BUNK := [
+	"||문지기가 열쇠 손을 문에 꽂고 한 바퀴 돌렸다. 침방 문이 열렸다.",
+	"||침상이 줄지어 있다. 이불은 반듯하게 개어져 있고, 베개마다 먼지가 소복하다.",
+	"물결|mulgyeol|다들 금방 돌아올 것처럼 개어 놨네.",
+]
+
+# reading the ledger and writing her name are one beat; the doorkeeper sits right after (GPT's note)
+const QUARTERS_LOG := [
+	"||문 곁에 장부가 펼쳐져 있다. 「문지기 감는 날」. 칸마다 감은 사람의 이름이 돌아가며 적혀 있다.",
+	"||마지막 이름은 한결이다. 다음 칸에는 먼지만 내려앉았다.",
+	"||소라는 먼지를 손끝으로 털고, 장부 곁에 매인 숯 막대로 그 칸에 이름을 적었다.",
+	"소라|calm|오늘은 내가 감았으니까. 여기, 소라.",
+]
+const QUARTERS_LOG_AGAIN := [
+	"||장부의 한결 다음 칸에 소라의 이름이 적혀 있다.",
+]
+
+const QUARTERS_REST := [
+	"||문지기가 제 의자로 가 앉더니, 팔에 달린 작은 놋 방패를 떼어 소라에게 내밀었다.",
+	"소라|calm|고마워. 다음에도 감으러 올게.",
+	"||문지기는 고개를 한 번 끄덕였다. 태엽 소리가 천천히 잦아들었다.",
+	"노을|jae|……오늘 칸은 찼네.",
+]
+const QUARTERS_REST_AGAIN := "||문지기가 제 의자로 가 앉더니, 열쇠 손을 들어 인사했다." # a new round: the buckler came along
+const QUARTERS_SEAT := [
+	"||문지기가 제 의자에 앉아 쉬고 있다. 눈빛이 희미하게 한 번 깜빡였다.",
+]
+
+const QUARTERS_BOX := [
+	"||침방 끝 궤짝. 마른 갈대 한 다발과 회복약, 금화가 들어 있다.",
+	"||최대 체력 +10, 회복약 2, 금화 80.",
+]
+const QUARTERS_BOX_AGAIN := [
+	"||궤짝 안에 회복약 하나와 금화 몇 닢이 남아 있다. 회복약 1, 금화 40.",
+]
+
 const REST_TALK_STORY := [
 	["mul_new", [["mulgyeol", "섬 밖에서 이렇게 오래 있어 본 건 처음이야."], ["sora", "할아버지 생각 나?"], ["mulgyeol", "응. 그래도 할아버지라면 가라고 했을 거야."]]],
 	["noeul_new", [["noeul", "……내가 같이 가도 괜찮은 거야? 마을 등불을 끈 건 나였는데."], ["mulgyeol", "그건 이제 다 갚았잖아."], ["sora", "응. 지금은 우리 편이야."], ["noeul", "……고마워."]]],
@@ -1646,6 +1736,7 @@ const REST_TALK_STORY := [
 	["south_done", [["mulgyeol", "물이 다시 한 바퀴 도니까 물고기들이 돌아와."], ["sora", "할아버지 소식도 흘러올까?"], ["mulgyeol", "물결이 전해 주겠지. 내 이름처럼."]]],
 	["clock_done", [["noeul", "그 닳은 손잡이 봤어?"], ["sora", "응. 이제 여덟 개 다 닳겠지."], ["mulgyeol", "그만큼 자주 오자는 거지?"]]],
 	["shore_done", [["mulgyeol", "늪 호수에 등불 하나 떠 있던데."], ["sora", "보리 할머니 등불이야. 내가 띄웠어."], ["noeul", "……그 바구니 엮음새, 한결 솜씨지?"]]],
+	["quarters_done", [["mulgyeol", "그 꼬마 문지기, 또 감아 주러 오자."], ["sora", "응. 장부에 이름도 적었는걸."], ["noeul", "백 년 만의 교대였네. 다음 칸엔 우리 셋 이름 다 적자."]]],
 	["mill_hint", [["mulgyeol", "언덕 남쪽 담에 참새들이 모여 있더라."], ["sora", "매 속에서 나온 애들?"], ["noeul", "뭘 찾나 봐."]]],
 	["mill_done", [["noeul", "장터 달빛 가루, 그 방앗간에서 빻던 거래."], ["mulgyeol", "그 가루 배로 실어 날랐겠지."], ["sora", "언젠가 그 배 고쳐서 셋이 타 보자."]]],
 	["scare", [["mulgyeol", "구름 위를 걸었다고 하면 아무도 안 믿을걸."], ["noeul", "바람 깃털이 증거지."], ["sora", "구르는 게 훨씬 가벼워졌어."]]],

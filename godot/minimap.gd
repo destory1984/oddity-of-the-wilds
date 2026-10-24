@@ -51,6 +51,14 @@ func _draw() -> void:
 	if main.marsh.float_node.visible: # Bori's lantern, floating or off the island
 		var lp: Vector3 = main.marsh.float_node.position
 		draw_rect(Rect2(lp.x - 0.1, lp.z - 0.1, 1.2, 1.2), Color("#ffd060"))
+	if main.in_castle() and main.castle_q >= 3: # 달지기 숙소: the knight's spring, then the doorkeeper
+		if main.castle.spring_node.visible:
+			var sp: Vector3 = main.castle.spring_node.position
+			draw_rect(Rect2(sp.x - 0.1, sp.z - 0.1, 1.2, 1.2), Color("#ffc46a"))
+		if main.quarters_q >= 3:
+			var dp: Vector3 = main.castle.doll.position
+			draw_rect(Rect2(dp.x - 0.2, dp.z - 0.2, 1.4, 1.4), Color("#263440"))
+			draw_rect(Rect2(dp.x + 0.05, dp.z + 0.05, 0.9, 0.9), Color("#9fb4c8"))
 	draw_set_transform_matrix(Transform2D())
 	# the ways down (violet) and up (gold) as small upright stairs of three steps, drawn on screen over their tile
 	for st: Array in map_tex.get_meta("stairs", []):

@@ -10,7 +10,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "painting_once", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "esc_sheets", "news_more", "touch_controls", "folk_sleep", "hint_folk", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "mill", "post", "lake_south", "clock", "shore", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "painting_once", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "esc_sheets", "news_more", "touch_controls", "folk_sleep", "hint_folk", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "mill", "post", "lake_south", "clock", "shore", "quarters", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -79,6 +79,16 @@ func shore_foes() -> Array:
 
 func knock_shore() -> void: # down without gold or XP, so level-ups do not muddle the max HP check
 	for e in shore_foes():
+		e.dead = true
+		e.node.queue_free()
+		e.shadow.queue_free()
+
+# 달지기 숙소: the six bricks in the dining hall and the basket room, and the heaps' bits
+func quarter_foes() -> Array:
+	return main.enemies.filter(func(e): return e.get("quarters", false) and not e.dead)
+
+func knock_quarters() -> void: # down without gold or XP
+	for e in quarter_foes() + main.doll_bits():
 		e.dead = true
 		e.node.queue_free()
 		e.shadow.queue_free()
@@ -3396,6 +3406,212 @@ func run() -> void:
 		main.save_game()
 		check("shore", quiet and hint and blocks and seen and woke and pack1 and pack2 and out and once and bori and dam and day and floated and lit and flows and snags_ok and held and hushed and landed and silent and after and cushion and page and card and rested and by_day and kept and taken and round_ok,
 			"quiet before Bori=%s hint=%s blocks=%s basket lines=%s woke 1 pip=%s pack 2=%s pack 1+archer=%s out +30 +1=%s once=%s Bori lamp+pot=%s dam=%s day=%s floated 1 pip=%s lit=%s flows=%s snags=%s %s held/waits=%s shots gone=%s landed +10=%s hush=%s then toast=%s cushion=%s page=%s card=%s rest hp %.1f=%s by day=%s saved=%s float taken back=%s new round=%s" % [quiet, hint, blocks, seen, woke, pack1, pack2, out, once, bori, dam, day, floated, lit, flows, snags_ok, str(counts), held, hushed, landed, silent, after, cushion, page, card, hp_night, rested, by_day, kept, taken, round_ok])
+	if want.call("quarters"):
+		# 달지기 숙소 (DESIGN.md): the knight's spring, the clockwork door, the six bricks once, the doorkeeper wound and
+		# seen to the bunk room past the heaps' bits, the ledger, the buckler's wider flash guard, the chest, saves and a
+		# new round. State is set directly and waits poll (slow machines); everything changed here is put back at the end
+		if main.intro:
+			main.start_game(false)
+		await wait(0.2)
+		main.close_story()
+		await wait(0.1)
+		var keep := {"castle_q": main.castle_q, "hill_q": main.hill_q, "step": main.story_step, "hour": main.hour,
+			"pips": main.crown_pips, "max": main.player.max_hp, "q": main.quarters_q, "box": main.quarters_box,
+			"buckler": main.has_buckler, "again": main.quarters_again}
+		main.in_village = false
+		main.in_forest = false
+		main.in_lake = false
+		main.in_garden = false
+		main.in_cave = false
+		main.in_house = -1
+		main.hill_q = 3
+		main.castle_q = 3
+		main.hour = 13.0 # by day: resting by the quarters' lamps fills no pips here
+		main.story_step = maxi(main.story_step, 10)
+		main.enter_castle()
+		await wait(0.2)
+		main.close_story()
+		await wait(0.1)
+		calm_enemies(true)
+		knock_quarters()
+		main.load_quarters({})
+		main.quarters_spawned = false
+		main.stand_seen = false
+		# 1. the door shut, the castle's own foes as before, the spring where the knight knelt
+		reset_to(Vector2(465, 14))
+		await wait(0.1)
+		var shut: bool = main.castle.char_at(465, 22) == "Q" and not main.player_can(465, 22) and main.castle.foes.size() == 8 \
+			and quarter_foes().is_empty() and main.castle.spring_node.visible
+		# 2. E at the door: only a toast; E at the spring; then the door opens
+		reset_to(Vector2(465, 21))
+		main.crown_key()
+		await wait(0.1)
+		var toast_only: bool = main.quarters_q == 0 and not main.story_open and not main.player_can(465, 22)
+		reset_to(main.castle.marks.K + Vector2(0.5, 0.6))
+		main.crown_key()
+		await wait(0.1)
+		var spring: bool = main.quarters_q == 1 and main.story_open and not main.castle.spring_node.visible
+		main.close_story()
+		await wait(0.3)
+		reset_to(Vector2(465, 21))
+		main.crown_key()
+		await wait(0.1)
+		var opened: bool = main.quarters_q == 2 and main.player_can(465, 22) and main.player_can(465, 24)
+		main.close_story()
+		await wait(0.6)
+		# 3. into the dining hall: six bricks (2 goblins, a shield goblin, an archer, 2 bats), once
+		reset_to(Vector2(465, 28))
+		main.player.inv = 120.0
+		await wait_for(func(): return quarter_foes().size() == 6, 2.0)
+		var qf: Array = quarter_foes()
+		var six: bool = qf.size() == 6 and qf.all(func(e): return e.cave) and qf.filter(func(e): return e.get("bat", false)).size() == 2 \
+			and qf.filter(func(e): return e.get("archer", false)).size() == 1 and qf.filter(func(e): return e.has("shield")).size() == 1
+		var told: bool = main.story_open
+		main.close_story()
+		await wait(0.3)
+		reset_to(Vector2(465, 21))
+		await wait(0.3)
+		reset_to(Vector2(465, 28))
+		main.player.inv = 120.0
+		await wait(0.5)
+		var once: bool = quarter_foes().size() == 6
+		knock_quarters()
+		# 4. the stand: its lines, then the crown winds him (1 pip); with no pip nothing changes
+		main.crown_pips = 0
+		reset_to(Vector2(447, 36))
+		main.crown_key()
+		await wait(0.1)
+		var stand: bool = main.story_open and main.stand_seen
+		main.close_story()
+		await wait(0.3)
+		var no_pip: bool = main.quarters_q == 2 and not main.doll_walk
+		main.crown_pips = 1
+		main.crown_key()
+		await wait(0.1)
+		var wound: bool = main.quarters_q == 3 and main.crown_pips == 0 and main.doll_walk and main.story_open
+		main.close_story()
+		await wait(1.0)
+		var walks: bool = main.doll_at.distance_to(main.CASTLE.DOLL_PATH[0]) > 0.5
+		# 5. in the dining hall the heaps' three bits run at him; one that reaches him knocks his spring out
+		main.doll_at = Vector2(456.3, 30.1)
+		main.doll_i = 5
+		reset_to(Vector2(457, 33))
+		main.player.inv = 120.0
+		await wait_for(func(): return main.doll_bits().size() == 3, 2.0)
+		var bits: Array = main.doll_bits()
+		var three: bool = bits.size() == 3 and bits.all(func(e): return e.shard and e.cave)
+		if not bits.is_empty():
+			bits[0].x = main.doll_at.x
+			bits[0].z = main.doll_at.y
+		await wait_for(func(): return not main.doll_walk, 1.0)
+		var knocked: bool = not main.doll_walk and main.doll_bits().is_empty() and main.castle.doll_drop != null and main.castle.doll_drop.visible
+		var pips_k: int = main.crown_pips
+		reset_to(main.doll_at + Vector2(0.8, 0.6))
+		main.player.inv = 120.0
+		main.crown_key()
+		await wait_for(func(): return main.doll_bits().size() == 3, 2.0)
+		var rewalk: bool = main.doll_walk and main.crown_pips == pips_k and main.doll_bits().size() == 3
+		knock_quarters()
+		# 6. too far behind and he waits; beside him he walks to the bunk room door and it opens
+		reset_to(Vector2(445, 28))
+		await wait(0.3)
+		var d0: Vector2 = main.doll_at
+		await wait(1.0)
+		var waits: bool = main.doll_wait and main.doll_at.distance_to(d0) < 0.01
+		reset_to(main.doll_at + Vector2(1.0, 1.0))
+		main.player.inv = 120.0
+		await wait_for(func(): return main.quarters_q == 4, 25.0)
+		var bunk: bool = main.quarters_q == 4 and main.player_can(462, 34) and main.story_open
+		main.close_story()
+		await wait(2.0)
+		# 7. the ledger and her name are one beat, then he sits and gives the buckler; the toast comes after a hush
+		reset_to(Vector2(461, 36))
+		main.crown_key()
+		await wait(0.1)
+		var signed: bool = main.story_open and main.story_lines == STORY.QUARTERS_LOG.slice(1)
+		main.close_story()
+		await wait_for(func(): return main.quarters_q == 5, 1.0)
+		var sat: bool = main.quarters_q == 5 and main.has_buckler and main.castle.ledger_name.visible \
+			and not main.castle.doll.get_node("body/buckler").visible and main.story_open
+		main.close_story()
+		await wait(0.8)
+		var hushed: bool = not main.ui.toast.text.begins_with("작은 놋 방패")
+		await wait(1.4)
+		var toasted: bool = main.ui.toast.text.begins_with("작은 놋 방패")
+		# the buckler: a flash guard 0.15 s after raising the guard counts with it, and is a plain block without it
+		var foe := {"stun": 0.0}
+		reset_to(Vector2(461, 36))
+		main.player.face = Vector2(1, 0)
+		main.guarding = true
+		main.guard_since = main.t - 0.15
+		var r1: String = main.player_hit(10, Vector2(main.player.x + 1, main.player.z), foe)
+		main.player.inv = 0.0
+		main.has_buckler = false
+		main.guard_since = main.t - 0.15
+		var r2: String = main.player_hit(10, Vector2(main.player.x + 1, main.player.z), foe)
+		main.guarding = false
+		main.has_buckler = true
+		var guard_ok: bool = r1 == "flash_guard" and r2 == "guard"
+		await wait(0.3)
+		# 8. the chest: max HP +10, 2 potions, 80 gold
+		var mx: int = main.player.max_hp
+		var pots: int = main.player.pots
+		var gold: int = main.player.gold
+		reset_to(Vector2(467, 37))
+		main.crown_key()
+		await wait(0.1)
+		var chest: bool = main.quarters_box and main.player.max_hp == mx + 10 and main.player.pots == pots + 2 and main.player.gold == gold + 80
+		main.close_story()
+		await wait(0.3)
+		# 9. saves keep it; a save made mid-walk loads with him by his stand; a new round keeps only the buckler
+		main.save_game()
+		main.load_quarters(JSON.parse_string(FileAccess.get_file_as_string(main.SAVE_PATH)))
+		await wait(0.1)
+		var kept: bool = main.quarters_q == 5 and main.quarters_box and main.castle.quarters_open and main.castle.bunk_open and main.has_buckler
+		main.quarters_q = 3
+		main.doll_walk = true
+		main.doll_at = Vector2(458, 31)
+		main.save_game()
+		reset_to(Vector2(460, 31))
+		main.load_quarters(JSON.parse_string(FileAccess.get_file_as_string(main.SAVE_PATH)))
+		await wait(0.3)
+		var mid: bool = main.quarters_q == 3 and not main.doll_walk and main.doll_at == main.CASTLE.DOLL_PATH[0] \
+			and main.doll_bits().is_empty() and not main.castle.bunk_open
+		main.write_new_round()
+		var ng = JSON.parse_string(FileAccess.get_file_as_string(main.SAVE_PATH))
+		var round_ok: bool = ng != null and not ng.has("quarters_q") and bool(ng.get("has_buckler", false))
+		main.load_quarters(ng)
+		await wait(0.1)
+		round_ok = round_ok and main.quarters_q == 0 and not main.castle.quarters_open and main.castle.spring_node.visible and main.has_buckler and main.quarters_again
+		main.quarters_q = 4 # next round in his chair: a wave of the key hand, and he keeps his buckler
+		main.doll_at = Vector2(463, 36)
+		reset_to(Vector2(461, 36))
+		main.crown_key()
+		await wait(0.1)
+		main.close_story()
+		await wait_for(func(): return main.quarters_q == 5, 1.0)
+		round_ok = round_ok and main.ui.story_text.text == tr(String(STORY.QUARTERS_REST_AGAIN).split("|")[2]) \
+			and main.castle.doll.get_node("body/buckler").visible
+		main.close_story()
+		await wait(1.8)
+		# leave it as it was for the other tests
+		knock_quarters()
+		main.clear_quarters_job()
+		main.load_quarters({"quarters_q": keep.q, "quarters_box": keep.box, "has_buckler": keep.buckler, "quarters_again": keep.again})
+		main.quarters_spawned = false
+		main.castle_q = keep.castle_q
+		main.castle.set_spring(keep.castle_q >= 3 and keep.q == 0)
+		main.hill_q = keep.hill_q
+		main.story_step = keep.step
+		main.hour = keep.hour
+		main.crown_pips = keep.pips
+		main.player.max_hp = keep.max
+		main.player.hp = float(keep.max)
+		main.in_hill = false
+		calm_enemies(false)
+		main.save_game()
+		check("quarters", shut and toast_only and spring and opened and six and told and once and stand and no_pip and wound and walks and three and knocked and rewalk and waits and bunk and signed and sat and hushed and toasted and guard_ok and chest and kept and mid and round_ok,
+			"shut=%s toast only=%s spring=%s opened=%s six=%s told=%s once=%s stand=%s no pip=%s wound 1 pip=%s walks=%s bits 3=%s knocked=%s E walks on=%s waits=%s bunk open=%s ledger=%s sat+buckler=%s hush=%s toast=%s guard %s/%s=%s chest=%s saved=%s mid-walk load=%s new round=%s" % [shut, toast_only, spring, opened, six, told, once, stand, no_pip, wound, walks, three, knocked, rewalk, waits, bunk, signed, sat, hushed, toasted, r1, r2, guard_ok, chest, kept, mid, round_ok])
 	if want.call("trial_repeat"):
 		# after the first clear, the trial's foes give nothing (the field is where gold and XP come from)
 		var best0: float = main.trial_best

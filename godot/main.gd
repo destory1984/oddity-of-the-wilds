@@ -449,6 +449,9 @@ const SCENES := {
 	"scrap": {"play": true, "at": Vector2(42.5, 5.5), "hour": 17.0},
 	"shore": {"play": true, "shore": 1, "at": Vector2(18.5, 19.5), "hour": 15.0},              # the basket in the mud by day
 	"shore_float": {"play": true, "shore": 3, "at": Vector2(17.2, 23.0), "hour": 22.0},        # the lantern held at the first snag
+	"quarters": {"play": true, "village": true, "castle": true, "quarters": 2, "hour": 21.0},      # 달지기 숙소: the dining hall's bricks up
+	"quarters_doll": {"play": true, "village": true, "castle": true, "quarters": 3, "hour": 21.0}, # the doorkeeper walking, three bits at him
+	"quarters_rest": {"play": true, "village": true, "castle": true, "quarters": 5, "hour": 21.0}, # he rests in his chair, the ledger signed
 }
 
 func apply_test_args(args: PackedStringArray) -> void:
@@ -779,6 +782,34 @@ func apply_test_args(args: PackedStringArray) -> void:
 				player.x = castle.marks.K.x - 3.5
 				player.z = castle.marks.K.y + 1.0
 			set_quest(castle_quest())
+			if sc.has("quarters"): # 달지기 숙소 (DESIGN.md): 2 the dining hall, 3 the doorkeeper walking, 5 he rests
+				castle_q = 3
+				for pg in castle.pages:
+					pg.read = true
+				castle.open_door()
+				load_quarters({"quarters_q": int(sc.quarters)})
+				quarters_spawned = true
+				set_quest("동쪽 문을 지나 정원 한가운데로 가자")
+				player.x = 452.0
+				player.z = 30.0
+				if quarters_q == 2:
+					spawn_quarter_foes()
+				elif quarters_q == 3: # held still for the shot: the doorkeeper in the dining hall, the bits on their way
+					doll_at = Vector2(458.5, 31.7)
+					doll_i = 6
+					doll_shed = true
+					castle.doll_place(doll_at, Vector2(1, 0.4))
+					shed_doll_bits()
+					for e in doll_bits():
+						e.x = lerpf(e.x, doll_at.x, 0.45)
+						e.z = lerpf(e.z, doll_at.y, 0.45)
+						e.stun = 99.0
+					player.x = 456.0
+					player.z = 32.5
+					player.inv = 99.0
+				elif quarters_q >= 5:
+					player.x = 460.6
+					player.z = 36.6
 			if sc.has("under_in"): # just down the stair: the way back up beside her
 				castle_q = 3
 				enter_under()
@@ -1690,6 +1721,7 @@ func bori_news() -> Array:
 	if not has_tea and marsh.picked_count() == 0 and story_step >= 5: out.append("달이 반 넘게 찬 밤이면 늪에 달꽃이 핀단다. 세 송이만 가져오면 차를 끓여 주마.")
 	if story_step >= 3 and shore_q == 0: out.append("네가 깨어났다는 물가, 한번 다시 가 보렴. 물은 늘 무언가를 실어 오거든.")
 	if shore_q == 3 and story_step >= 5: out.append("물길이 흐르니, 밤에 그 등불을 띄워 주렴.")
+	if quarters_q >= 5: out.append("성 숙소 바구니 방이라…… 그 불빛을 기다리던 밤이 생각나는구나.")
 	return out
 
 func toggle_shop(open: bool) -> void:
@@ -2948,7 +2980,7 @@ func festival_key() -> bool:
 # attack, max HP, gold, potions, keepsakes, the woken skill, feats and records. Monsters then take
 # 1/(1 + 0.5 x round) of the damage and deal (1 + 0.5 x round) times as much.
 const NG_KEEP := ["lv", "xp", "max_hp", "atk", "gold", "pots", "has_pearl", "has_feather", "has_acorn", "has_ring", "has_shoes",
-	"has_armour", "has_tea", "has_shard", "has_bookmark", "has_lamp", "has_medal", "has_oar_ring", "has_whistle", "has_oil", "has_cushion", "has_bait", "skill_up", "stats", "feats", "trial_best", "race_best", "fish"]
+	"has_armour", "has_tea", "has_shard", "has_bookmark", "has_lamp", "has_medal", "has_oar_ring", "has_whistle", "has_oil", "has_cushion", "has_bait", "has_buckler", "skill_up", "stats", "feats", "trial_best", "race_best", "fish"]
 var ng := 0                 # how many rounds were finished before this one
 var ng_armed := 0.0         # seconds left to confirm with a second E
 
@@ -3094,9 +3126,10 @@ func travel(i: int) -> void:
 
 const CHANGES_PAGE := 100 # lines of 바뀐 것 shown before the 더 읽기 button
 const CHANGES := [
-	"개발 상황: 놀 수 있는 분량 약 297분 / 목표 300분 (99%)",
+	"개발 상황: 놀 수 있는 분량 약 300분 / 목표 300분 (100%)",
 	"",
 	"2026-10-24 아침",
+	"· v0.0.36: 7장에 달지기 숙소(약 4분). 벽돌 기사를 쓰러뜨린 자리에 녹슨 태엽이 남고, 그 태엽으로 옥좌의 방 남쪽 벽의 태엽 문을 연다. 식당과 바구니 방에서 벽돌 6마리와 싸우고, 바구니 셈판에서 한결이 마지막으로 가져간 등불 바구니를 찾는다. 일방 태엽대의 깡통 문지기를 왕관으로 감으면(눈금 1칸) 침방까지 걸어가는데, 식당의 벽돌 더미 셋이 문지기에게 달려든다(닿으면 태엽이 튕겨 나와 곁에서 E로 다시 걷는다). 침방 장부의 한결 다음 칸에 소라의 이름을 적으면 문지기가 백 년 만에 제 의자에 앉아 작은 놋 방패를 건넨다(섬광 막기 0.12초 → 0.16초, 새 바퀴에도 남음). 궤짝에서 최대 체력 +10, 회복약 2, 금화 80. 대사와 소품은 GPT와 의논해 다듬었다.",
 	"· v0.0.35: 마을에 일하는 사람 여섯이 생겼다. 나무꾼 두솔, 광부 차돌, 농부 새참, 낚시꾼 여울(두솔의 동생), 바구니 짜는 다래 할머니와 손자 토리. 저마다 일터(장작더미, 광석 수레, 굳은 밭, 연못가, 장터)에 서 있고, 말을 걸면 아직 못 끝낸 곁이야기의 실마리를 하나씩 들려준다. 이야기가 나아갈 때마다 하는 말이 바뀌고, 마지막 이야기에서 선물(회복약 1, 금화 30, 또는 물고기가 30% 빨리 무는 미끼 주머니)을 준다. 밤에는 집에 들어가 자며 한 집에 셋까지 잔다. 대사와 그림은 GPT와 함께 만들었다.",
 	"· v0.0.34: 1장에 깨어난 물가(약 4분). 보리 할머니를 만난 뒤, 소라가 깨어난 자리에서 물가로 눌린 갈대 줄이 이어지고 그 끝 진흙에 갈대 바구니가 묻혀 있다. 왕관으로 진흙을 풀면(눈금 1칸) 벽돌 두 무리(고블린 2, 고블린 1과 활 1)가 일어나고, 바구니에서 금화 30과 회복약 1이 나온다. 보리 할머니는 달지기 등불 바구니를 알아보고 백 년 동안 켜지 않은 자기 등불과 회복약 1을 준다. 벽돌왕을 넘어뜨린 뒤 밤에 물가에서 등불 바구니를 띄우면(눈금 1칸) 물길 약 20칸을 따라 흘러가고, 벽돌 걸림 셋(고블린 2, 2, 고블린 1과 활 1)을 풀어 주면 늪 호수 섬 앞에 머문다(최대 체력 +10). 보리 할머니께 알리면 갈대 방석을 준다(밤에 켜진 등불 곁에서 쉬면 체력이 초당 4씩 찬다). 대사와 소품은 GPT와 의논해 다듬었다.",
 	"· v0.0.33: 8 → 9장 끝 뒤에 큰 태엽 방(약 5분). 끝 장면은 그대로이고, 거푸집이 앉아 있던 자리에 구멍이 열린다. 내려가면 땅을 돌리는 큰 태엽 열쇠가 있다. 굳은 톱니 셋을 왕관으로 풀며(눈금 1칸씩) 열쇠에서 달려 나오는 거푸집 찌꺼기(2, 3, 4마리)를 막으면 벽돌 일꾼들이 일어나 톱니를 돌본다. 열쇠 한가운데에 왕관을 올리면 마을 사람들이 내려와 손잡이 여덟을 함께 잡고, 금빛 고리에 맞춰 E를 여덟 번 누르면 다 같이 감는다(그림 한 장). 궤짝에서 달지기 기름병(회복약을 마시면 기세 +20), 최대 체력 +20, 회복약 2, 금화 200. 대사와 소품은 GPT와 의논해 다듬었다.",
@@ -3725,6 +3758,7 @@ func story_talk_ok(key: String) -> bool:
 		"south_done": return south_q >= 5
 		"clock_done": return clock_q >= 5
 		"shore_done": return shore_q >= 4
+		"quarters_done": return quarters_q >= 5
 		"mill_hint": return hill_q >= 3 and mill_q == 0
 		"mill_done": return mill_q >= 5
 		"pearl": return grotto_q >= 4
@@ -3926,6 +3960,7 @@ func icon_button(root: Control, kind: String, key: String, tip: String, x: float
 
 # ---- 달의 계단 (between the castle and the garden): four landings, four powers of the crown
 func enter_stairs() -> void:
+	clear_quarters_job()
 	in_hill = true
 	in_garden = false
 	player.x = stairs.marks.S.x
@@ -5527,6 +5562,7 @@ func save_game() -> void:
 		"seals": garden.seals.map(func(sl): return sl.open),
 		"stairs_wall": stairs.wall_open, "stairs_lamps": stairs.lamps.map(func(l): return l.lit),
 		"castle_q": castle_q, "bars": castle.bars, "levers": castle.levers.map(func(lv): return lv.up), "vault": castle.vault_open, "has_armour": has_armour, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read),
+		"quarters_q": quarters_q, "quarters_box": quarters_box, "has_buckler": has_buckler, "quarters_again": quarters_again,
 		"under_drained": under.drained, "under_door": under.door_open, "under_guards": under_guards_done, "under_chest": under_chest_open,
 		"under_side": under_side_open, "under_diary": under_diary_read, "has_lamp": has_lamp}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
@@ -5751,6 +5787,7 @@ func load_game() -> void:
 		castle_q = 1 # the knight fight starts over
 	if bool(d.get("castle_gate", false)):
 		castle.open_gate()
+	load_quarters(d)
 	road_q = int(d.get("road_q", 0))
 	mill_q = int(d.get("mill_q", 0))
 	post_q = int(d.get("post_q", 0))
@@ -6468,7 +6505,8 @@ func hint_open(key: String) -> bool:
 		"under": return castle_q >= 1 and not under_chest_open
 		"stairs": return castle_q >= 3 and not stairs.door_open
 		"clock": return garden_q >= 5 and not clock_box
-	return false # oak, quarters: not in the game yet
+		"quarters": return castle_q >= 3 and quarters_q < 5
+	return false # oak: not in the game yet
 
 func hint_folk_talk(id: String) -> void:
 	var f: Dictionary = STORY.HINT_FOLK[id]
@@ -8134,6 +8172,7 @@ func castle_quest() -> String:
 	return "옥좌의 방으로 가자"
 
 func leave_castle() -> void:
+	clear_quarters_job()
 	player.x = hill.marks.X.x - 1.2
 	player.z = hill.marks.X.y
 	ground_y = 0.0
@@ -8163,6 +8202,8 @@ func castle_key() -> bool:
 				set_quest(castle_quest())
 				save_game()
 				return true
+	if quarters_key():
+		return true
 	for i in castle.levers.size():
 		if me.distance_to(castle.levers[i].pos) < 1.3:
 			var was := castle.vault_solved()
@@ -8379,12 +8420,361 @@ func update_knight(e: Dictionary, dt: float, d: float, to: Vector2) -> void:
 
 func knight_beaten() -> void:
 	castle_q = 3
+	castle.set_spring(quarters_q == 0) # 달지기 숙소: what is left where he knelt
 	ui.boss.visible = false
 	player.gold += 250
 	gain_xp(300)
 	show_story("", STORY.KNIGHT_DOWN)
 	set_quest("동쪽 문을 지나 정원 한가운데로 가자")
 	save_game()
+
+# ---- 달지기 숙소 (chapter 7, DESIGN.md): the moonkeepers' quarters under the throne room. The knight's rusty spring
+# opens the clockwork door; six bricks in the dining hall and the basket room (once a session); the tally board with
+# Hangyeol's last basket and his note on the workshop stand; the crown winds the tin doorkeeper (1 pip) and Sora sees
+# him to the bunk room while three brick bits from the heaps run at him (one that reaches him knocks his spring out;
+# E beside him walks him on). In the bunk room reading the ledger and writing her name is one beat; then he sits and
+# gives the small buckler (flash guard 0.12 -> 0.16 s). Lines and props reworked with GPT's notes.
+const QUARTERS_HP := 10
+const BUCKLER_GUARD := 0.16   # the flash guard window with the buckler (0.12 without)
+var quarters_q := 0           # 0 not yet, 1 spring picked up, 2 door open, 3 doorkeeper wound, 4 bunk room open, 5 he rests
+var quarters_box := false
+var has_buckler := false      # 작은 놋 방패, kept into a new round
+var quarters_again := false   # the buckler came from an earlier round: the chest and his greeting say less
+var quarters_spawned := false # the six bricks this session (not saved)
+var quarters_named := false   # the zone line says 달지기 숙소
+var stand_seen := false       # the stand's lines seen this session (not saved)
+var basket_seen := false
+var doll_at := Vector2(447, 36)
+var doll_i := 1               # the next point of CASTLE.DOLL_PATH
+var doll_walk := false
+var doll_wait := false        # Sora more than 12 tiles behind: he waits (on again inside 6)
+var doll_shed := false        # the heaps' bits came for this walk
+var doll_t := 0.0
+
+func castle_map() -> ImageTexture:
+	return with_stair_marks(castle.map_tex(CASTLE.CASTLE_X + CASTLE.W), [UNDER_STAIR])
+
+func doll_bits() -> Array:
+	return enemies.filter(func(e): return e.has("doll") and not e.dead)
+
+# E at the knight's spot and in the quarters (castle_key, before the levers and the pages)
+func quarters_key() -> bool:
+	if castle_q < 3:
+		return false
+	var me := Vector2(player.x, player.z)
+	var mk: Dictionary = castle.marks
+	if quarters_q == 0 and me.distance_to(mk.K) < 1.6:
+		quarters_q = 1
+		castle.set_spring(false)
+		burst(Vector3(mk.K.x + 0.6, 0.3, mk.K.y + 0.5), Color("#ffc46a"), 12, 1.2)
+		sfx(1400, 0.05, "square", 0.06)
+		show_story("", STORY.QUARTERS_SPRING)
+		after_story = func(): toast("녹슨 태엽을 얻었다")
+		save_game()
+		return true
+	if not castle.quarters_open and me.distance_to(mk.Q) < 1.6:
+		if quarters_q == 0:
+			toast("열쇠 무늬가 새겨진 작은 문이다. 꿈쩍도 하지 않는다")
+			return true
+		quarters_q = 2
+		open_quarters_door()
+		show_story("", STORY.QUARTERS_DOOR)
+		save_game()
+		return true
+	if quarters_q < 2:
+		return false
+	if quarters_q == 3 and not doll_walk and me.distance_to(doll_at) < 1.6:
+		doll_resume()
+		return true
+	if quarters_q == 2 and me.distance_to(mk.k) < 1.6:
+		if not stand_seen:
+			stand_seen = true
+			show_story("", STORY.QUARTERS_STAND)
+			after_story = wind_doll
+		else:
+			wind_doll()
+		return true
+	var near_r := 99.0
+	for r in castle.racks:
+		near_r = minf(near_r, me.distance_to(r))
+	var near_m := me.distance_to(mk.m)
+	if near_m < 1.4 and near_m <= near_r:
+		show_story("", STORY.QUARTERS_TALLY + (STORY.QUARTERS_TALLY_SHORE if shore_q >= 2 else STORY.QUARTERS_TALLY_NOSHORE))
+		return true
+	if near_r < 1.4:
+		var lines: Array = [STORY.QUARTERS_BASKET[0]]
+		if not basket_seen:
+			basket_seen = true
+			lines = STORY.QUARTERS_BASKET + [STORY.QUARTERS_BASKET_BORI if shore_q >= 3 else STORY.QUARTERS_BASKET_SORA]
+		show_story("", lines)
+		return true
+	if quarters_q >= 4 and not quarters_box and me.distance_to(mk.c) < 1.6:
+		open_quarters_box()
+		return true
+	var at_log: bool = me.distance_to(mk.o) < 1.5
+	var at_doll: bool = me.distance_to(doll_at) < 1.5 or me.distance_to(mk.h) < 1.5
+	if quarters_q == 4 and (at_log or at_doll): # the last beat: the ledger, her name, then he sits (GPT's note)
+		show_story("", STORY.QUARTERS_LOG)
+		after_story = quarters_sit
+		return true
+	if quarters_q >= 5 and at_log:
+		show_story("", STORY.QUARTERS_LOG_AGAIN)
+		return true
+	if quarters_q >= 5 and at_doll:
+		show_story("", STORY.QUARTERS_SEAT)
+		return true
+	return false
+
+# the door's leaf slides 1 tile aside in 0.5 s and is gone
+func open_quarters_door() -> void:
+	castle.quarters_open = true
+	var d: Node3D = castle.qdoor
+	var tw := create_tween()
+	tw.tween_property(d, "position:x", d.position.x + 1.0, 0.5)
+	tw.tween_callback(func(): d.visible = false)
+	burst(Vector3(d.position.x, 0.7, d.position.z), Color("#c8962a"), 16, 1.5)
+	sfx(330, 0.4, "triangle", 0.2, -60)
+	for k in 3:
+		get_tree().create_timer(0.12 * k).timeout.connect(func(): sfx(1400, 0.03, "square", 0.05))
+	ui.mini.map_tex = castle_map()
+
+func spawn_quarter_foes() -> void:
+	quarters_spawned = true
+	for f in castle.quarter_foes:
+		spawn_enemy(f[0], f[1] == "a")
+		var e: Dictionary = enemies[enemies.size() - 1]
+		e.cave = true # no respawn
+		e.quarters = true
+		if f[1] == "s":
+			give_shield(e)
+	for b in castle.quarter_bats:
+		spawn_bat(b[0])
+		enemies[enemies.size() - 1].quarters = true
+
+# the crown winds him (1 pip): his eyes light and he steps down off the stand
+func wind_doll() -> void:
+	if quarters_q != 2 or not spend_pips(1):
+		return
+	quarters_q = 3
+	castle.doll_wound(true)
+	doll_at = CASTLE.DOLL_PATH[0]
+	doll_i = 1
+	castle.doll_place(doll_at, Vector2(1, 0))
+	doll_walk = true
+	doll_wait = false
+	doll_shed = false
+	burst(Vector3(doll_at.x, 0.8, doll_at.y), Color("#9fd4ff"), 20, 2.0)
+	burst(Vector3(player.x, ground_y + 1.6, player.z), Color("#9fd4ff"), 14, 1.5)
+	sfx(523, 0.3, "sine", 0.2, 200)
+	show_story("", STORY.QUARTERS_WAKE)
+	after_story = func(): toast("깡통 문지기를 따라가자")
+	save_game()
+
+func doll_resume() -> void:
+	doll_walk = true
+	doll_wait = false
+	doll_shed = false # the heaps rise again for this walk
+	castle.doll_wound(true)
+	if castle.doll_drop != null:
+		castle.doll_drop.visible = false
+	burst(Vector3(doll_at.x, 0.8, doll_at.y), Color("#9fd4ff"), 12, 1.5)
+	sfx(1400, 0.05, "square", 0.06)
+	toast("문지기가 다시 걷는다")
+
+# three bits, one from each heap, run at him (the lantern ring's shards; they do not hit Sora)
+func shed_doll_bits() -> void:
+	for h in castle.heaps:
+		spawn_enemy(h)
+		var e: Dictionary = enemies[enemies.size() - 1]
+		e.shard = true
+		e.doll = true
+		e.cave = true # no respawn
+		e.hp = 18.0 + player.lv * 4
+		e.max_hp = int(e.hp)
+		e.post = doll_at
+		for mm in e.node.get_meta("mats"):
+			mm.albedo_color = Color("#a8322a").lightened(rnd(0, 0.15))
+		burst(Vector3(h.x, 0.6, h.y), Color("#a8322a"), 10, 2.0)
+	castle.show_heaps(false)
+	sfx(110, 0.3, "square", 0.15, -30)
+	toast("식당의 벽돌 더미가 문지기에게 달려든다")
+
+# a bit reached him: his spring jumps out and lands at his feet; the rest of the bits crumble
+func doll_knocked() -> void:
+	doll_walk = false
+	for e in doll_bits():
+		e.dead = true
+		e.node.queue_free()
+		e.shadow.queue_free()
+	castle.doll_wound(false)
+	castle.doll.rotation.z = 0.0
+	castle.show_heaps(true)
+	if castle.doll_drop == null:
+		castle.doll_drop = castle.key_mark(self, 0.4, mat_color(Color("#8a5a3a")))
+		add_child(castle.doll_drop)
+	var dr: Node3D = castle.doll_drop
+	dr.visible = true
+	dr.position = Vector3(doll_at.x, 0.6, doll_at.y)
+	var tw := create_tween()
+	tw.tween_property(dr, "position:y", 1.0, 0.2)
+	tw.tween_property(dr, "position", Vector3(doll_at.x + 0.5, 0.04, doll_at.y + 0.3), 0.2)
+	burst(Vector3(doll_at.x, 0.8, doll_at.y), Color("#a8322a"), 18, 2.5)
+	shake = 0.15
+	sfx(90, 0.3, "square", 0.2, -40)
+	toast("태엽이 튕겨 나왔다. 문지기 곁에서 E")
+
+# fainting, loading or leaving the castle: the bits go and he stops where he is (E beside him walks him on)
+func clear_quarters_job() -> void:
+	for e in doll_bits():
+		e.dead = true
+		e.node.queue_free()
+		e.shadow.queue_free()
+	doll_walk = false
+	quarters_named = false
+	if castle.doll != null:
+		castle.doll.rotation.z = 0.0
+	castle.show_heaps(true)
+
+func update_quarters(dt: float) -> void:
+	if castle.spring_node.visible: # the knight's spring glows faintly every 1.2 s
+		castle.spring_glow.albedo_color.a = 0.25 + 0.6 * maxf(0.0, sin(t * TAU / 1.2))
+	var me := Vector2(player.x, player.z)
+	if me.y > 22.5 and not quarters_named:
+		quarters_named = true
+		ui.zone_sub.text = "달지기 숙소"
+	elif me.y <= 22.5 and quarters_named:
+		quarters_named = false
+		ui.zone_sub.text = "옥좌의 방"
+	if story_open or fade_rect.color.a > 0.0:
+		return
+	if me.y > 26.5 and not quarters_spawned:
+		spawn_quarter_foes()
+		if quarters_q <= 2:
+			show_story("", STORY.QUARTERS_IN)
+		return
+	if quarters_q == 3 and doll_walk:
+		update_doll(dt, me)
+
+# he walks his path at 1.5 tiles a second, swaying, a tick every 0.25 s
+func update_doll(dt: float, me: Vector2) -> void:
+	var gap := me.distance_to(doll_at)
+	if gap > 12.0:
+		doll_wait = true
+	elif gap < 6.0:
+		doll_wait = false
+	if doll_wait:
+		castle.doll.rotation.z = 0.0
+		return
+	if doll_at.x > 456.5 and not doll_shed:
+		doll_shed = true
+		shed_doll_bits()
+	var path: Array = CASTLE.DOLL_PATH
+	if doll_i >= path.size():
+		castle.doll.rotation.z = 0.0
+		if doll_bits().is_empty():
+			doll_at_door()
+		return
+	var to: Vector2 = path[doll_i] - doll_at
+	var step := 1.5 * dt
+	if to.length() <= step or (doll_i == path.size() - 1 and to.length() < 0.5): # stops at the door, not in it
+		if doll_i < path.size() - 1:
+			doll_at = path[doll_i]
+		doll_i += 1
+	else:
+		doll_at += to / to.length() * step
+	doll_t += dt
+	if doll_t >= 0.25:
+		doll_t = 0.0
+		sfx(1400, 0.03, "square", 0.05)
+	castle.doll_place(doll_at, to)
+	castle.doll.rotation.z = 0.1 if fmod(t, 0.5) < 0.25 else -0.1
+
+# at the bunk room door: his key hand opens it and he walks to his chair
+func doll_at_door() -> void:
+	castle.open_bunk()
+	quarters_q = 4
+	doll_walk = false
+	var n: Vector2 = castle.marks.n
+	burst(Vector3(n.x, 0.7, n.y), Color("#c8962a"), 16, 1.5)
+	sfx(392, 0.3, "triangle", 0.2)
+	ui.mini.map_tex = castle_map()
+	doll_at = Vector2(463, 36)
+	show_story("", STORY.QUARTERS_BUNK)
+	after_story = func():
+		var dl: Node3D = castle.doll
+		var tw := create_tween()
+		tw.tween_property(dl, "position", Vector3(n.x, 0, n.y + 1.0), 0.7)
+		tw.tween_property(dl, "position", Vector3(463, 0, 36), 0.9)
+		tw.tween_callback(func(): dl.rotation.y = 0.0)
+		toast("문 곁 장부를 보자 (E)")
+	save_game()
+
+# after the ledger: he sits in his chair, the buckler held out (a new round: a wave of the key hand)
+func quarters_sit() -> void:
+	var give := not quarters_again
+	castle.ledger_name.visible = true
+	castle.doll_sit(give)
+	doll_at = castle.marks.h
+	quarters_q = 5
+	has_buckler = true
+	var lines: Array = STORY.QUARTERS_REST.duplicate()
+	if not give:
+		lines[0] = STORY.QUARTERS_REST_AGAIN
+	show_story("", lines)
+	after_story = quarters_hush.bind(give)
+	save_game()
+
+# 1.6 s of only the chair's creak and his slowing clockwork, then the buckler's numbers as a toast (GPT's note)
+func quarters_hush(give: bool) -> void:
+	castle.doll_rest_eye(self)
+	sfx(200, 0.35, "triangle", 0.1, -60)
+	for k in 4:
+		get_tree().create_timer(0.3 + 0.35 * k).timeout.connect(func(): sfx(1300 - k * 150, 0.03, "square", 0.045 - k * 0.008))
+	if give:
+		get_tree().create_timer(1.6).timeout.connect(func(): toast("작은 놋 방패를 얻었다. 섬광 막기를 조금 늦게 눌러도 된다 (0.12초 → 0.16초)"))
+
+func open_quarters_box() -> void:
+	quarters_box = true
+	castle.quarters_chest_look(true)
+	if quarters_again: # a new round: the buckler came along
+		player.pots += 1
+		player.gold += 40
+		show_story("", STORY.QUARTERS_BOX_AGAIN)
+	else:
+		player.max_hp += QUARTERS_HP
+		player.hp = minf(float(player.max_hp), player.hp + QUARTERS_HP)
+		player.pots += 2
+		player.gold += 80
+		show_story("", STORY.QUARTERS_BOX)
+	var c: Vector2 = castle.marks.c
+	burst(Vector3(c.x, 0.6, c.y), Color("#f2ead8"), 24, 2.0)
+	sfx(784, 0.12, "triangle", 0.25)
+	ui.mini.map_tex = castle_map()
+	save_game()
+
+func quarters_journal() -> String:
+	match quarters_q:
+		0: return tr("기사 자리의 녹슨 태엽 (E)")
+		1: return tr("옥좌의 방 남쪽 태엽 문 (E)")
+		2: return tr("일방의 태엽대")
+		3: return tr("깡통 문지기를 침방까지")
+		4: return tr("침방 문 곁의 장부 (E)")
+	return tr("끝") if quarters_box else tr("침방 끝 궤짝")
+
+# load the quarters (old saves: nothing done yet, the spring where the knight knelt); a walk in progress stops
+func load_quarters(d: Dictionary) -> void:
+	quarters_q = int(d.get("quarters_q", 0))
+	quarters_box = bool(d.get("quarters_box", false))
+	has_buckler = bool(d.get("has_buckler", false))
+	quarters_again = bool(d.get("quarters_again", has_buckler and quarters_q < 5))
+	clear_quarters_job()
+	doll_at = CASTLE.DOLL_PATH[0]
+	doll_i = 1
+	if quarters_q == 4:
+		doll_at = Vector2(463, 36)
+	elif quarters_q >= 5:
+		doll_at = castle.marks.h
+	castle.quarters_look(quarters_q, castle_q >= 3 and quarters_q == 0, quarters_box)
 
 func turtle_beaten() -> void:
 	lake_q = 4
@@ -9403,6 +9793,8 @@ func update_ring(dt: float) -> void:
 
 # a shard ignores Sora and runs for its post; reaching it snuffs the flame being lit and two more come
 func update_shard(e: Dictionary, dt: float) -> void:
+	if e.has("doll"): # 달지기 숙소: the bits run at the walking doorkeeper
+		e.post = doll_at
 	var to: Vector2 = e.post - Vector2(e.x, e.z)
 	var d := to.length()
 	if e.hurt <= 0.0 and e.get("stun", 0.0) <= 0.0:
@@ -9422,6 +9814,9 @@ func update_shard(e: Dictionary, dt: float) -> void:
 	if d < 0.8:
 		if e.has("gear"): # in the clock room: it hardens its gear again (the lantern ring's rule does not apply)
 			clock_gear_lost(int(e.gear))
+			return
+		if e.has("doll"): # in the quarters: his spring is knocked out
+			doll_knocked()
 			return
 		e.dead = true
 		e.node.queue_free()
@@ -10993,6 +11388,8 @@ func journal_lines() -> Array:
 	if hill_q >= 3:
 		side.call("구름 둔덕", tr("끝") if cloud_q >= 3 else tr("언덕 북쪽 바람구멍으로"))
 	if castle_q >= 3:
+		side.call("달지기 숙소", quarters_journal())
+	if castle_q >= 3:
 		side.call("달의 계단", tr("끝") if stairs.door_open else (tr("등불 %d/3") % stairs.lamps_lit() if stairs.wall_open else tr("벽돌 벽을 풀자")))
 	if castle_q >= 1:
 		side.call("한결의 일기", tr("%d/3 읽음") % castle.pages_read())
@@ -11031,6 +11428,8 @@ func journal_lines() -> Array:
 	if shore_q == 3: keep.append(tr("보리의 등불"))
 	if has_cushion: keep.append(tr("갈대 방석"))
 	if has_bait: keep.append(tr("미끼 주머니"))
+	if quarters_q == 1 or quarters_q == 2: keep.append(tr("녹슨 태엽"))
+	if has_buckler: keep.append(tr("작은 놋 방패"))
 	if post_q == 3: keep.append(tr("보리의 엽서"))
 	if has_armour: keep.append(tr("달지기 갑옷"))
 	if has_tea: keep.append(tr("달꽃 차"))
@@ -11379,6 +11778,8 @@ func _process(dt: float) -> void:
 		show_story("", STORY.KNIGHT_IN)
 		after_story = spawn_knight
 		save_game()
+	if in_castle():
+		update_quarters(dt)
 	if in_hill:
 		update_hill(dt)
 	if in_garden and Vector2(player.x, player.z).distance_to(garden.marks.S) < 0.9 and fade_rect.color.a == 0.0:
@@ -11821,7 +12222,7 @@ func player_hit(dmg: int, src: Vector2, attacker: Dictionary) -> String:
 		return "none"
 	var to_src := (src - Vector2(player.x, player.z)).normalized()
 	if guarding and to_src.dot(player.face) > 0.5: # attack from the front 120 degrees
-		if t - guard_since <= 0.12:
+		if t - guard_since <= (BUCKLER_GUARD if has_buckler else 0.12):
 			player.mp = minf(player.max_mp, player.mp + 25.0)
 			counter_t = 1.5
 			if not attacker.is_empty():
@@ -11906,6 +12307,7 @@ func update_fall(dt: float) -> void:
 # Sora faints: say so plainly, keep gold and level, heal the boss, and wake her at the start
 func faint() -> void:
 	clear_shore_job()
+	clear_quarters_job()
 	for id in ["mulgyeol", "noeul"]:
 		if mate_down[id] > 0.0:
 			mate_down[id] = 0.001 # gets up on the next tick
@@ -12224,6 +12626,7 @@ func build_under_stair() -> void:
 	add_child(rim)
 
 func enter_under() -> void:
+	clear_quarters_job()
 	in_hill = true
 	in_garden = false
 	player.x = under.marks.S.x + 1.2
