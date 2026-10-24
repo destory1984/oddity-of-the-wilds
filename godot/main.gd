@@ -425,6 +425,7 @@ const SCENES := {
 	"race": {"play": true, "village": true, "hill": true, "race": true, "hour": 10.0},
 	"moonflower": {"play": true, "at": Vector2(37.0, 24.5), "hour": 22.5, "day": 4},
 	"house": {"play": true, "village": true, "house": true, "hour": 15.0},
+	"sleep": {"play": true, "village": true, "sleep": true, "hour": 23.0, "day": 4}, # Doran asleep in his house
 	"festival": {"play": true, "village": true, "festival": true, "hour": 22.0, "day": 4},
 	"cloudpath": {"play": true, "village": true, "cloud": true, "path": true, "hour": 11.0},
 	"ways": {"play": true, "ways": true, "hour": 16.0},
@@ -770,6 +771,12 @@ func apply_test_args(args: PackedStringArray) -> void:
 			trial_wave = 3
 			trial_start = t
 			spawn_trial_wave()
+		if sc.get("sleep", false): # after dark: the villagers have gone in; Doran sleeps in his house
+			update_folk_sleep(0.0)
+			enter_house(folk_home("doran"))
+			player.x = HOUSE_X + 3.6
+			player.z = 2.8
+			update_folk_sleep(0.0)
 		if sc.get("house", false): # inside the last village house
 			enter_house(4)
 			player.x = HOUSE_X + 5.5
@@ -2519,6 +2526,152 @@ func build_house_room() -> void:
 	hearth.omni_range = 8.0
 	hearth.position = Vector3(HOUSE_X + 4.0, 2.5, 3.0)
 	add_child(hearth)
+	# the sleepers' beds: one per villager, shown in his own house at night (GPT pixel art, art/folk/sleepers.png)
+	var sheet: Texture2D = load("res://art/folk/sleepers.png")
+	for i in SLEEP_IDS.size() + 1:
+		var bed := Node3D.new()
+		bed.position = Vector3(HOUSE_X + 1.8, 0, 1.6)
+		var spr := Sprite3D.new()
+		spr.texture = sheet
+		spr.hframes = 4
+		spr.frame = i
+		spr.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+		spr.scale = Vector3(1, 1.0 / cos(0.78), 1)
+		spr.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+		spr.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
+		spr.shaded = false
+		spr.pixel_size = 1.25 / 256.0
+		spr.offset = Vector2(0, 128) # the quilt's bottom edge on the bed's front edge, so the bed box does not hide him
+		spr.position = Vector3(0, 0.25, 0.5)
+		bed.add_child(spr)
+		var z := Label3D.new() # the Z drifts up and fades, again and again
+		z.text = "z Z"
+		z.font = ui_font
+		z.font_size = 40
+		z.modulate = Color("#eef3ff")
+		z.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		z.no_depth_test = true
+		z.position = Vector3(0.45, 1.5, 0.5)
+		bed.add_child(z)
+		var tw := z.create_tween().set_loops()
+		tw.tween_property(z, "position:y", 2.0, 1.6).from(1.4)
+		tw.parallel().tween_property(z, "modulate:a", 0.0, 1.6).from(1.0)
+		bed.visible = false
+		add_child(bed)
+		sleeper_nodes[(SLEEP_IDS + ["kid"])[i]] = bed
+
+# ---- villagers sleep at home at night (the user asked, 2026-10-24): after dark Doran, Kongal, Mulgyeol (while he still
+# lives in the village) and Kongal's kid goblin walk to the nearest house door and go in; in the morning they come out
+# and walk back. Simji, the lamplighter, stays on the square, and on a festival night (full moon, Simji's letter) all
+# stay out. In his house a sleeper lies in bed and E beside him wakes him for the same talk and errands as by day.
+const SLEEP_IDS := ["doran", "kongal", "mulgyeol"]
+const FOLK_WALK := 1.8      # tiles a second on the way home
+var folk_state := {}        # id -> "out", "going", "in", "coming"
+var folk_walk_t := {}       # id -> 0..1 along the way between his spot and his door
+var sleeper_nodes := {}     # id -> the bed in the room
+var door_z := {}            # id -> the z over his door while he sleeps
+
+var sleep_off := false      # the autoplay tests keep the villagers out (all but folk_sleep)
+const FOLK_NAME := {"doran": "도란", "kongal": "콩알", "mulgyeol": "물결"}
+
+func folk_should_sleep() -> bool:
+	return is_night() and not (mail_got[1] and moon_phase().x >= 0.95) and not sleep_off
+
+# E where a sleeper stands by day: say where he is (the firefly and moonflower errands come at night)
+func asleep_hint(me: Vector2) -> bool:
+	for id in SLEEP_IDS:
+		if folk_state.get(id, "out") == "in" and folk_awake_here(id) and in_house < 0 and me.distance_to(village.folk_pos[id]) < 1.6:
+			toast(tr("%s은(는) 집에 들어가 자고 있다. 집에 들어가 깨워 보자") % tr(FOLK_NAME[id]))
+			return true
+	return false
+
+func folk_home(id: String) -> int: # the house nearest to where he stands by day
+	var at: Vector2 = village.folk_pos[id]
+	var best := 0
+	for i in village.doors.size():
+		if at.distance_to(village.doors[i]) < at.distance_to(village.doors[best]):
+			best = i
+	return best
+
+func folk_awake_here(id: String) -> bool:
+	return id != "mulgyeol" or mate == null # Mulgyeol travels with Sora once he joins
+
+func folk_talk_at(id: String) -> Vector2:
+	if not folk_awake_here(id):
+		return village.folk_pos[id]
+	match folk_state.get(id, "out"):
+		"in":
+			return Vector2(HOUSE_X + 1.8, 1.6) if in_house == folk_home(id) else Vector2.INF
+		"going", "coming":
+			var spr: Sprite3D = village.folk_node[id]
+			return Vector2(spr.position.x, spr.position.z)
+	return village.folk_pos[id]
+
+func update_folk_sleep(dt: float) -> void:
+	if village == null or village.doors.is_empty():
+		return
+	var night := folk_should_sleep()
+	var watching := in_village and in_house < 0 # walking home is only worth showing when she is on the street
+	for id in SLEEP_IDS:
+		if not village.folk_node.has(id) or not folk_awake_here(id):
+			continue
+		var spr: Sprite3D = village.folk_node[id]
+		var home: Vector2 = village.folk_pos[id]
+		var door: Vector2 = village.doors[folk_home(id)]
+		var st: String = folk_state.get(id, "out")
+		var k: float = folk_walk_t.get(id, 0.0)
+		if night and st in ["out", "coming"]:
+			st = "going" if watching else "in"
+			if st == "in":
+				k = 1.0
+		elif not night and st in ["in", "going"]:
+			st = "coming" if watching else "out"
+			if st == "out":
+				k = 0.0
+		var step := dt * FOLK_WALK / maxf(1.0, home.distance_to(door))
+		if st == "going":
+			k = minf(1.0, k + step)
+			if k >= 1.0:
+				st = "in"
+				if watching:
+					sfx(180, 0.15, "square", 0.08, -60) # the door shuts
+		elif st == "coming":
+			k = maxf(0.0, k - step)
+			if k <= 0.0:
+				st = "out"
+		var at := home.lerp(door, k)
+		spr.position = Vector3(at.x, 0, at.y)
+		spr.visible = st != "in"
+		if st in ["going", "coming"]:
+			spr.flip_h = screen_left(door - home) if st == "going" else screen_left(home - door)
+		for r in rocks: # his standing spot blocks the way only while he stands on it
+			if r.get("folk", "") == id:
+				r.r = 0.45 if st == "out" else 0.0
+		folk_state[id] = st
+		folk_walk_t[id] = k
+		if sleeper_nodes.has(id):
+			sleeper_nodes[id].visible = st == "in" and in_house == folk_home(id)
+		if not door_z.has(id):
+			var z := Label3D.new()
+			z.text = "z"
+			z.font = ui_font
+			z.font_size = 64
+			z.modulate = Color("#eef3ff")
+			z.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+			add_child(z)
+			door_z[id] = z
+		var dz: Label3D = door_z[id]
+		dz.visible = st == "in" and in_village and in_house < 0
+		dz.position = Vector3(door.x + 0.3 * float(SLEEP_IDS.find(id) % 2), 2.6 + 0.15 * sin(t * 2.0 + SLEEP_IDS.find(id)), door.y - 0.4)
+	# Kongal's kid goblin stays at her side, and sleeps in her house
+	if kid_node != null and kid_q == 3:
+		var kst: String = folk_state.get("kongal", "out")
+		kid_node.visible = kst != "in"
+		if kst != "out":
+			var ks: Sprite3D = village.folk_node.kongal
+			kid_node.position = ks.position + Vector3(0.7, 0, 0.3)
+		if sleeper_nodes.has("kid"):
+			sleeper_nodes.kid.visible = kst == "in" and in_house == folk_home("kongal")
 
 func house_door_near() -> int:
 	for i in village.doors.size():
@@ -2839,6 +2992,7 @@ const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 285분 / 목표 300분 (95%)",
 	"",
 	"2026-10-24 아침",
+	"· v0.0.32: 밤이 되면 마을 사람들(도란, 콩알, 마을에 있을 때의 물결, 꼬마 고블린)이 저마다 가까운 집 문으로 걸어 들어가 자고, 아침이면 나와 제자리로 돌아간다. 등불지기 심지는 밤에도 광장에 남고, 보름달 축제 밤에는 모두 밖에 있다. 자는 사람의 집 문 위에 z가 뜨고, 그 집에 들어가면 침대에서 자는 모습(GPT 그림)이 보인다. 곁에서 E를 누르면 깨어 낮과 같은 이야기와 심부름을 하니 반딧불, 달꽃 같은 밤 심부름도 막히지 않는다. 낮에 서던 자리에서 E를 누르면 어디서 자는지 알려 준다.",
 	"· v0.0.31: 아이폰과 아이패드에서 글자와 단추가 너무 작던 것을 키웠다. 휴대폰은 기준 화면을 640 → 540으로 줄여 모든 것이 약 1.2배 커지고 글자도 한 단계 커진다. 아이패드도 터치 화면으로 알아본다(전에는 사파리가 맥이라고 해서 데스크톱 화면이 나왔다). 메뉴 단추 넷은 미니맵 왼쪽에 2x2로 모이고, 설정과 일지 같은 큰 창은 화면에 맞게 줄어든다.",
 	"· v0.0.30: 아이폰에서 미니맵은 움직이는데 화면 속 세상은 멈춰 있던 잘못을 고쳤다. 미니어처 흐림이 흐리게 하려고 복사한 화면이 아이폰 브라우저에서 첫 장면에 멈춰 있었다. 아이폰과 아이패드에서는 미니어처 흐림을 끄고, 다른 기기에서도 화면 복사에 밉맵을 쓰지 않는다.",
 	"· v0.0.29: 휴대폰 가로 화면에서 놀 수 있다. 화면 왼쪽에 엄지를 대면 이동 막대가 생기고 끝까지 밀면 달린다. 오른쪽에 공격, 구르기, 막기, 왕관(E), 열기(Space) 단추가 있고 기술 그림을 누르면 기술을 쓴다. 손가락 여럿을 따로 읽어 걸으면서 벨 수 있다. 메뉴 단추는 미니맵 왼쪽, 확대·축소는 미니맵 아래로 옮긴다. 세로로 들면 가로로 돌려 달라고 한다. 휴대폰에서는 그림자를 끄고 풀을 절반만 그린다.",
@@ -6086,8 +6240,10 @@ func crown_key() -> void:
 				set_quest("광장 서쪽의 콩알이 울고 있다. 말을 걸어 보자 (E)")
 			save_game()
 			return
+		if asleep_hint(me):
+			return
 		for id in village.folk_pos:
-			if me.distance_to(village.folk_pos[id]) < 1.6:
+			if me.distance_to(folk_talk_at(id)) < 1.6: # by day where they stand, by night in bed at home
 				if id == "kongal" and errand >= 3 and kid_q != 1 and (kid_q != 3 or doran_q < 3 or fly_q < 3):
 					kongal_errand()
 					return
@@ -10240,6 +10396,7 @@ func _process(dt: float) -> void:
 		play_secs += dt
 	ng_armed -= dt
 	update_festival(dt)
+	update_folk_sleep(dt)
 	feat_t -= dt
 	if feat_t <= 0.0 and not intro:
 		feat_t = 1.0

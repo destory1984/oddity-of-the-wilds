@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "painting_once", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "esc_sheets", "news_more", "touch_controls", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "mill", "post", "lake_south", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "painting_once", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "esc_sheets", "news_more", "touch_controls", "folk_sleep", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "mill", "post", "lake_south", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -74,6 +74,7 @@ func calm_enemies(on: bool) -> void:
 
 func run() -> void:
 	var want := func(n): return only == "all" or only == n
+	main.sleep_off = true # the villagers stay out at night here; folk_sleep turns their sleep back on
 	if only == "title_space": # the user's web save, then Space at the title, twice
 		var f := FileAccess.open(main.SAVE_PATH, FileAccess.WRITE)
 		f.store_string('{"atk":37,"boss_dead":true,"chests":[true,true,true,true,true],"day":3,"door_open":false,"gold":786,"has_key":false,"hour":2.13,"hp":208.0,"in_cave":false,"lv":10,"max_hp":208,"pots":7,"saw_painting":false,"story":5,"x":14.65,"z":20.15}')
@@ -1708,6 +1709,73 @@ func run() -> void:
 		calm_enemies(false)
 		check("touch_controls", moved > 1.5 and runs and swung and stopped and guards and unguards and no_swing,
 			"stick walked %.1f tiles, runs at the rim=%s sword while walking=%s let go stops=%s shield held/let go=%s/%s a tap on the world does not swing=%s" % [moved, runs, swung, stopped, guards, unguards, no_swing])
+	if want.call("folk_sleep"):
+		# after dark the villagers walk home and go in (Simji stays out); in his house Doran sleeps and E still talks to
+		# him; in the morning they come back out (the user asked, 2026-10-24)
+		if main.intro:
+			main.start_game(false)
+		main.close_story()
+		await wait(0.1)
+		var h0: float = main.hour
+		var m1: bool = main.mail_got[1]
+		main.mail_got[1] = false # no festival tonight
+		main.sleep_off = false
+		main.hour = 12.0 # start by day with everyone out
+		main.in_village = true
+		main.in_house = -1
+		main.update_folk_sleep(0.0)
+		main.update_folk_sleep(30.0)
+		main.in_village = true
+		main.in_lake = false
+		main.in_forest = false
+		main.in_hill = false
+		main.in_garden = false
+		main.in_cave = false
+		reset_to(main.village.marks.M + Vector2(0, 2))
+		main.hour = 23.0
+		main.update_folk_sleep(0.0)
+		var walks: bool = main.folk_state.get("doran", "") == "going"
+		main.update_folk_sleep(30.0)
+		var spr: Sprite3D = main.village.folk_node.doran
+		var gone: bool = main.folk_state.doran == "in" and not spr.visible and main.folk_talk_at("doran") == Vector2.INF
+		var simji_out: bool = main.village.simji_node.visible
+		main.enter_house(main.folk_home("doran"))
+		main.update_folk_sleep(0.0)
+		var in_bed: bool = main.sleeper_nodes.doran.visible
+		reset_to(Vector2(main.HOUSE_X + 3.0, 2.0))
+		var errands := [main.doran_q, main.kid_q, main.mul_q, main.errand, main.mail_q, main.met.duplicate()]
+		main.crown_key()
+		await wait(0.1)
+		var talks: bool = main.story_open
+		main.close_story()
+		# waking him may start one of his errands: put them back, the later tests count on them
+		main.doran_q = errands[0]
+		main.kid_q = errands[1]
+		main.mul_q = errands[2]
+		main.errand = errands[3]
+		main.mail_q = errands[4]
+		main.met = errands[5]
+		await wait(0.1)
+		main.leave_house()
+		main.hour = 9.0
+		main.update_folk_sleep(0.0)
+		main.update_folk_sleep(30.0)
+		var back: bool = main.folk_state.doran == "out" and spr.visible and Vector2(spr.position.x, spr.position.z).distance_to(main.village.folk_pos.doran) < 0.1
+		reset_to(main.village.folk_pos.kongal + Vector2(-2.0, 0)) # back out at night: E on Kongal's empty spot says where she is
+		main.hour = 23.0
+		main.update_folk_sleep(30.0)
+		reset_to(main.village.folk_pos.kongal + Vector2(1.0, 0))
+		main.toast_t = 0.0
+		var hinted: bool = main.asleep_hint(Vector2(main.player.x, main.player.z))
+		main.hour = 12.0
+		main.update_folk_sleep(30.0)
+		main.sleep_off = true
+		main.hour = h0
+		main.mail_got[1] = m1
+		main.in_village = false
+		back = back and hinted
+		check("folk_sleep", walks and gone and simji_out and in_bed and talks and back,
+			"at night walks home=%s gone in=%s Simji stays out=%s asleep in his house=%s E talks to him there=%s back out by day=%s" % [walks, gone, simji_out, in_bed, talks, back])
 	if want.call("race"):
 		main.story_step = maxi(main.story_step, 10)
 		if main.intro:
@@ -2315,7 +2383,7 @@ func run() -> void:
 		main.forest_q = fq0
 		main.hill_q = hq0
 		calm_enemies(false)
-		check("mate_chat", talked and three and hushed and story_first and main.chat_cd > 10.0, "a balloon after standing still=%s a four-line talk among all three=%s (%d balloons) a monster stops it=%s story talk first=%s" % [talked, three, said, hushed, story_first])
+		check("mate_chat", talked and three and hushed and story_first and main.chat_cd > 10.0, "a balloon after standing still=%s a four-line talk among all three=%s (%d balloons) a monster stops it=%s story talk first=%s %s" % [talked, three, said, hushed, story_first, main.talks_heard.keys()])
 	if want.call("east_bridge"):
 		main.in_village = false
 		main.in_hill = false

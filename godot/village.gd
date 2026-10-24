@@ -199,7 +199,7 @@ func build(m: Node) -> void:
 		tw.tween_callback(func(): spr.frame = 1)
 		tw.tween_interval(0.35)
 		tw.tween_callback(func(): spr.frame = 0)
-		m.rocks.append({"x": w.x, "z": w.y, "r": 0.45})
+		m.rocks.append({"x": w.x, "z": w.y, "r": 0.45, "folk": f.id}) # main.gd clears it while he sleeps
 	simji_node = simji(m)
 	simji_node.position = Vector3(marks.M.x, 0, marks.M.y)
 	m.add_child(simji_node)
