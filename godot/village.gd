@@ -57,7 +57,15 @@ const FOLK := [
 	{"id": "doran", "at": Vector2i(14, 3)},
 	{"id": "kongal", "at": Vector2i(10, 15)},
 	{"id": "mulgyeol", "at": Vector2i(28, 21)},
+	# six working villagers who give hints (v0.0.35), each by his work
+	{"id": "dusol", "at": Vector2i(43, 11)},   # woodcutter, on the east road to the forest
+	{"id": "chadol", "at": Vector2i(45, 20)},  # miner, east field with his ore cart
+	{"id": "saecham", "at": Vector2i(38, 21)}, # farmer, by his hardened field
+	{"id": "yeoul", "at": Vector2i(32, 24)},   # fisher, on the pond's north edge
+	{"id": "darae", "at": Vector2i(36, 7)},    # weaver, market floor with her baskets
+	{"id": "tori", "at": Vector2i(41, 7)},     # market kid with his handcart
 ]
+const FIELD := Rect2i(32, 20, 5, 3) # the farmer's hardened field (tiles, walkable)
 var folk_pos := {}
 var doors: Array = []    # world Vector2 in front of each house door, in build order
 var folk_node := {}
@@ -200,6 +208,7 @@ func build(m: Node) -> void:
 		tw.tween_interval(0.35)
 		tw.tween_callback(func(): spr.frame = 0)
 		m.rocks.append({"x": w.x, "z": w.y, "r": 0.45, "folk": f.id}) # main.gd clears it while he sleeps
+	build_work_props(m)
 	simji_node = simji(m)
 	simji_node.position = Vector3(marks.M.x, 0, marks.M.y)
 	m.add_child(simji_node)
@@ -210,6 +219,49 @@ func build(m: Node) -> void:
 	tw.tween_interval(0.35)
 	tw.tween_callback(func(): spr.frame = 0)
 	m.rocks.append({"x": marks.M.x, "z": marks.M.y, "r": 0.5})
+
+# props by the six working villagers: a woodpile, an ore cart, the hardened field, a fish basket, reed baskets,
+# crates by the kid's handcart. The field is only low furrows (walkable); the rest block like small rocks.
+func build_work_props(m: Node) -> void:
+	var add := func(size: Vector3, pos: Vector2, y: float, col: Color, rot := 0.0) -> MeshInstance3D:
+		var b: MeshInstance3D = m.box(size, m.mat_color(col))
+		b.position = Vector3(VILLAGE_X + pos.x, y, pos.y)
+		b.rotation.y = rot
+		m.add_child(b)
+		return b
+	# woodpile beside Dusol: split logs stacked three high
+	for row in 3:
+		for k in 3 - row:
+			add.call(Vector3(0.8, 0.22, 0.22), Vector2(44.3, 11.45 - 0.25 + k * 0.25 + row * 0.12), 0.11 + row * 0.22, Color("#a0703c").darkened(0.08 * ((k + row) % 2)))
+	add.call(Vector3(0.4, 0.3, 0.4), Vector2(44.2, 12.1), 0.15, Color("#6a4a2c")) # chopping block
+	m.rocks.append({"x": VILLAGE_X + 44.3, "z": 11.5, "r": 0.4})
+	# Chadol's ore cart: a box on four wheels, grey ore heaped in it
+	add.call(Vector3(0.9, 0.4, 0.6), Vector2(46.0, 20.8), 0.42, Color("#6a4a2e"))
+	for wx in [-0.32, 0.32]:
+		for wz in [-0.32, 0.32]:
+			add.call(Vector3(0.16, 0.24, 0.06), Vector2(46.0 + wx, 20.8 + wz), 0.12, Color("#2e2a26"))
+	for k in 4:
+		add.call(Vector3(0.24, 0.2, 0.24), Vector2(45.8 + (k % 2) * 0.35, 20.7 + (k / 2) * 0.2), 0.7, Color("#8a8a90").darkened(0.1 * (k % 2)), k * 0.5)
+	m.rocks.append({"x": VILLAGE_X + 46.0, "z": 20.8, "r": 0.45})
+	# the hardened field: furrows gone stiff like toy bricks, a few stud rows sticking up
+	for z in range(FIELD.position.y, FIELD.end.y):
+		add.call(Vector3(FIELD.size.x, 0.05, 0.9), Vector2(FIELD.position.x + (FIELD.size.x - 1) / 2.0, z), 0.025, Color("#5a3a26"))
+		add.call(Vector3(FIELD.size.x - 0.2, 0.1, 0.32), Vector2(FIELD.position.x + (FIELD.size.x - 1) / 2.0, z), 0.07, Color("#8a3a26") if z % 2 == 0 else Color("#7a3222"))
+		for x in range(FIELD.position.x, FIELD.end.x):
+			add.call(Vector3(0.14, 0.08, 0.14), Vector2(x, z), 0.15, Color("#c8322a") if (x + z) % 2 == 0 else Color("#2f5fb8"))
+	# Yeoul's fish basket and a net rolled up on the bank
+	add.call(Vector3(0.45, 0.32, 0.45), Vector2(31.2, 24.2), 0.16, Color("#b89a5a"))
+	add.call(Vector3(0.7, 0.14, 0.3), Vector2(32.9, 23.6), 0.07, Color("#4a8a8a"), 0.3)
+	m.rocks.append({"x": VILLAGE_X + 31.2, "z": 24.2, "r": 0.3})
+	# Darae's reed baskets, one half woven
+	add.call(Vector3(0.45, 0.35, 0.45), Vector2(35.2, 7.3), 0.17, Color("#c8a46a"))
+	add.call(Vector3(0.4, 0.2, 0.4), Vector2(35.4, 6.6), 0.1, Color("#b8945a"))
+	add.call(Vector3(0.6, 0.08, 0.14), Vector2(35.3, 6.6), 0.26, Color("#d8c08a"), 0.6) # reed bundle
+	m.rocks.append({"x": VILLAGE_X + 35.3, "z": 7.0, "r": 0.4})
+	# crates by Tori's handcart
+	add.call(Vector3(0.4, 0.36, 0.4), Vector2(42.0, 7.4), 0.18, Color("#9a6a3a"))
+	add.call(Vector3(0.3, 0.26, 0.3), Vector2(42.05, 7.4), 0.49, Color("#c88a4a"))
+	m.rocks.append({"x": VILLAGE_X + 42.0, "z": 7.4, "r": 0.3})
 
 # Kongal's friend: a little green brick goblin with the red scarf she knitted (errand 2)
 const KID_AT := Vector2i(6, 21)
@@ -282,6 +334,8 @@ func map_tex(width: int) -> ImageTexture:
 				"~", "B": col = Color("#2c5a8a")
 				"P", "f": col = Color("#6a5034")
 				"Q", "N": col = Color("#ffd060")
+			if FIELD.has_point(Vector2i(x, z)):
+				col = Color("#5a3a2a")
 			img.set_pixel(VILLAGE_X + x, z, col)
 	return ImageTexture.create_from_image(img)
 

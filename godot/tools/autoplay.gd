@@ -10,7 +10,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "painting_once", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "esc_sheets", "news_more", "touch_controls", "folk_sleep", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "mill", "post", "lake_south", "clock", "shore", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "painting_once", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "esc_sheets", "news_more", "touch_controls", "folk_sleep", "hint_folk", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "mill", "post", "lake_south", "clock", "shore", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -1797,6 +1797,107 @@ func run() -> void:
 		back = back and hinted
 		check("folk_sleep", walks and gone and simji_out and in_bed and talks and back,
 			"at night walks home=%s gone in=%s Simji stays out=%s asleep in his house=%s E talks to him there=%s back out by day=%s" % [walks, gone, simji_out, in_bed, talks, back])
+	if want.call("hint_folk"):
+		# the six working villagers (v0.0.35): first lines, the last beat with its gift, a hint that follows an unfinished
+		# side quest and a different one on the next talk, and at night three to a house with E waking one
+		if main.intro:
+			main.start_game(false)
+		main.close_story()
+		await wait(0.1)
+		var keep := {"met": main.met.duplicate(), "seen": main.hf_seen.duplicate(true), "turn": main.hf_turn.duplicate(),
+			"garden_q": main.garden_q, "pots": main.player.pots, "gold": main.player.gold, "bait": main.has_bait,
+			"medal": main.has_medal, "magpie": main.magpie_q, "hour": main.hour, "fest": main.mail_got[1]}
+		main.in_village = true
+		main.in_house = -1
+		main.in_lake = false
+		main.in_forest = false
+		main.in_hill = false
+		main.in_garden = false
+		main.in_cave = false
+		main.hour = 12.0
+		var said := func() -> String:
+			var s: String = main.ui.story_who.text + ": " + main.ui.story_text.text
+			main.close_story()
+			return s
+		# first meeting
+		main.met.erase("yeoul")
+		main.hf_seen.erase("yeoul")
+		reset_to(main.village.folk_pos.yeoul + Vector2(1.0, 0))
+		main.crown_key()
+		var first: String = said.call()
+		var first_ok: bool = first.contains("여울이야") and main.met.has("yeoul")
+		# the ending beat gives the bait pouch; Chadol's gives 30 gold
+		main.hf_seen["yeoul"] = [0, 1]
+		main.has_bait = false
+		main.garden_q = 5
+		main.crown_key()
+		var bait_said: String = main.ui.story_text.text
+		var bait_ok: bool = main.has_bait and main.story_lines.back() == STORY.HF_GIFT.bait and bait_said.contains("그물이 부드러워졌어")
+		main.close_story()
+		main.met["chadol"] = true
+		main.hf_seen["chadol"] = [0, 1]
+		var g0: int = main.player.gold
+		reset_to(main.village.folk_pos.chadol + Vector2(-1.0, 0))
+		main.crown_key()
+		main.close_story()
+		var gold_ok: bool = main.player.gold == g0 + 30 and main.hf_seen.chadol.has(2)
+		main.garden_q = keep.garden_q
+		# hints: the target is won, so Darae points at the magpie first, then at another unfinished one
+		main.met["darae"] = true
+		main.hf_seen["darae"] = [0, 1, 2]
+		main.hf_turn.erase("darae")
+		main.has_medal = true
+		main.magpie_q = 0
+		reset_to(main.village.folk_pos.darae + Vector2(0, 1.0))
+		main.crown_key()
+		var hint1: String = said.call()
+		main.crown_key()
+		var hint2: String = said.call()
+		var hint_ok: bool = hint1.contains("반짝이 도둑") and hint2 != hint1 and not hint2.contains("과녁")
+		main.has_medal = keep.medal
+		main.magpie_q = keep.magpie
+		# night: everyone goes in, no two on one spot, Darae and Tori share a house with a third, E wakes Tori
+		var m1: bool = main.mail_got[1]
+		main.mail_got[1] = false
+		main.sleep_off = false
+		main.update_folk_sleep(0.0)
+		main.update_folk_sleep(30.0)
+		reset_to(main.village.marks.M + Vector2(0, 2))
+		main.hour = 23.0
+		main.update_folk_sleep(0.0)
+		main.update_folk_sleep(30.0)
+		var all_in: bool = main.SLEEP_IDS.all(func(id): return id == "mulgyeol" and not main.folk_awake_here(id) or main.folk_state.get(id, "") == "in")
+		var spots := {}
+		for id in main.SLEEP_IDS + ["kid"]:
+			spots[str(main.folk_bed(id))] = true
+		var no_overlap: bool = spots.size() == main.SLEEP_IDS.size() + 1
+		var home: int = main.folk_home("tori")
+		var mates: Array = main.SLEEP_IDS.filter(func(id): return main.folk_home(id) == home)
+		main.enter_house(home)
+		main.update_folk_sleep(0.0)
+		var shown: Array = mates.filter(func(id): return main.sleeper_nodes[id].visible)
+		var shared: bool = main.folk_home("darae") == home and mates.size() == 3 and shown.size() == 3
+		reset_to(main.bed_spot("tori") + Vector2(0.9, 0))
+		main.crown_key()
+		var woke: String = said.call()
+		var wakes: bool = woke.begins_with("토리")
+		main.leave_house()
+		main.hour = 12.0
+		main.update_folk_sleep(0.0)
+		main.update_folk_sleep(30.0)
+		var out: bool = main.folk_state.tori == "out" and main.village.folk_node.tori.visible
+		main.sleep_off = true
+		main.mail_got[1] = m1
+		main.hour = keep.hour
+		main.met = keep.met
+		main.hf_seen = keep.seen
+		main.hf_turn = keep.turn
+		main.player.pots = keep.pots
+		main.player.gold = keep.gold
+		main.has_bait = keep.bait
+		main.in_village = false
+		check("hint_folk", first_ok and bait_ok and gold_ok and hint_ok and all_in and no_overlap and shared and wakes and out,
+			"first=%s bait gift=%s gold gift=%s hints=%s / %s all in=%s no overlap=%s shared house %d=%s E wakes Tori=%s (%s) out by day=%s" % [first_ok, bait_ok, gold_ok, hint1.left(24), hint2.left(24), all_in, no_overlap, home, mates, wakes, woke.left(20), out])
 	if want.call("race"):
 		main.story_step = maxi(main.story_step, 10)
 		if main.intro:

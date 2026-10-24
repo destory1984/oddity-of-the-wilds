@@ -428,6 +428,7 @@ const SCENES := {
 	"moonflower": {"play": true, "at": Vector2(37.0, 24.5), "hour": 22.5, "day": 4},
 	"house": {"play": true, "village": true, "house": true, "hour": 15.0},
 	"sleep": {"play": true, "village": true, "sleep": true, "hour": 23.0, "day": 4}, # Doran asleep in his house
+	"folk6": {"play": true, "village": true, "vat": Vector2(38, 18), "folk6": true, "hour": 14.0}, # the six working villagers by day
 	"festival": {"play": true, "village": true, "festival": true, "hour": 22.0, "day": 4},
 	"cloudpath": {"play": true, "village": true, "cloud": true, "path": true, "hour": 11.0},
 	"ways": {"play": true, "ways": true, "hour": 16.0},
@@ -910,6 +911,8 @@ func apply_test_args(args: PackedStringArray) -> void:
 		toggle_settings(true)
 	if sc.get("far", false): # zoomed all the way out, to judge the haze
 		cam_dist = 26.0
+	if sc.get("folk6", false): # far enough out to see all six
+		cam_dist = 24.0
 	if sc.get("swing", false): # a swing caught mid-sweep, just before the picture at 4 s
 		cam_dist = 11.0
 		player.face = Vector2(1, 0)
@@ -2365,7 +2368,7 @@ func fish_key() -> bool:
 	match fish_state:
 		"":
 			fish_state = "wait"
-			fish_t = rnd(2.0, 5.0)
+			fish_t = rnd(2.0, 5.0) * (0.7 if has_bait else 1.0) # Yeoul's bait pouch: a bite 30% sooner
 			if bobber == null:
 				bobber = Node3D.new()
 				var b: MeshInstance3D = box(Vector3(0.14, 0.14, 0.14), mat_color(Color("#e84a4a")))
@@ -2571,15 +2574,24 @@ func build_house_room() -> void:
 	hearth.omni_range = 8.0
 	hearth.position = Vector3(HOUSE_X + 4.0, 2.5, 3.0)
 	add_child(hearth)
-	# the sleepers' beds: one per villager, shown in his own house at night (GPT pixel art, art/folk/sleepers.png)
-	var sheet: Texture2D = load("res://art/folk/sleepers.png")
-	for i in SLEEP_IDS.size() + 1:
+	# the sleepers: one per villager, shown in his house at night (GPT pixel art: art/folk/sleepers.png for the first
+	# four, sleepers2.png for the six working villagers). place_sleeper puts each on his spot: the bed or a bedroll.
+	var sheets: Array = [load("res://art/folk/sleepers.png"), load("res://art/folk/sleepers2.png")]
+	var roll_mat: Material = mat_color(Color("#d8c8a8"))
+	for id in SLEEP_ART:
+		var art: Array = SLEEP_ART[id]
 		var bed := Node3D.new()
 		bed.position = Vector3(HOUSE_X + 1.8, 0, 1.6)
+		var roll := box(Vector3(1.5, 0.12, 0.9), roll_mat) # the floor spots get a bedroll; the first spot has the bed
+		roll.name = "roll"
+		roll.position = Vector3(0, 0.06, 0)
+		roll.visible = false
+		bed.add_child(roll)
 		var spr := Sprite3D.new()
-		spr.texture = sheet
-		spr.hframes = 4
-		spr.frame = i
+		spr.name = "spr"
+		spr.texture = sheets[art[0]]
+		spr.hframes = 4 if art[0] == 0 else 6
+		spr.frame = art[1]
 		spr.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
 		spr.scale = Vector3(1, 1.0 / cos(0.78), 1)
 		spr.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
@@ -2603,13 +2615,22 @@ func build_house_room() -> void:
 		tw.parallel().tween_property(z, "modulate:a", 0.0, 1.6).from(1.0)
 		bed.visible = false
 		add_child(bed)
-		sleeper_nodes[(SLEEP_IDS + ["kid"])[i]] = bed
+		sleeper_nodes[id] = bed
+	for k in range(1, HOUSE_SPOTS.size()): # a bedroll blocks the way only while someone sleeps on it
+		rocks.append({"x": HOUSE_X + HOUSE_SPOTS[k].x, "z": HOUSE_SPOTS[k].y, "r": 0.0, "spot": k})
 
 # ---- villagers sleep at home at night (the user asked, 2026-10-24): after dark Doran, Kongal, Mulgyeol (while he still
 # lives in the village) and Kongal's kid goblin walk to the nearest house door and go in; in the morning they come out
 # and walk back. Simji, the lamplighter, stays on the square, and on a festival night (full moon, Simji's letter) all
 # stay out. In his house a sleeper lies in bed and E beside him wakes him for the same talk and errands as by day.
-const SLEEP_IDS := ["doran", "kongal", "mulgyeol"]
+# v0.0.35: the six working villagers sleep too. A house sleeps three (HOUSE_SPOTS); each sleeper takes the nearest
+# house with a spot left, in SLEEP_IDS order (Darae and her grandson Tori come before the rest, so they share).
+const SLEEP_IDS := ["doran", "kongal", "mulgyeol", "darae", "tori", "dusol", "chadol", "saecham", "yeoul"]
+const SLEEP_ART := {"doran": [0, 0], "kongal": [0, 1], "mulgyeol": [0, 2], "kid": [0, 3], # [sheet, cell]
+	"dusol": [1, 0], "chadol": [1, 1], "saecham": [1, 2], "yeoul": [1, 3], "darae": [1, 4], "tori": [1, 5]}
+const HOUSE_SPOTS := [Vector2(1.8, 1.6), Vector2(1.8, 4.3), Vector2(6.3, 4.5)] # room tiles: the bed, two bedrolls
+var folk_bed_at := {}       # id -> [house, spot], filled on first use
+var folk_rocks := {}        # id (or "spot1", "spot2" for the bedrolls) -> its entry in rocks
 const FOLK_WALK := 1.8      # tiles a second on the way home
 var folk_state := {}        # id -> "out", "going", "in", "coming"
 var folk_walk_t := {}       # id -> 0..1 along the way between his spot and his door
@@ -2617,7 +2638,7 @@ var sleeper_nodes := {}     # id -> the bed in the room
 var door_z := {}            # id -> the z over his door while he sleeps
 
 var sleep_off := false      # the autoplay tests keep the villagers out (all but folk_sleep)
-const FOLK_NAME := {"doran": "도란", "kongal": "콩알", "mulgyeol": "물결"}
+const FOLK_NAME := {"doran": "도란", "kongal": "콩알", "mulgyeol": "물결", "dusol": "두솔", "chadol": "차돌", "saecham": "새참", "yeoul": "여울", "darae": "다래", "tori": "토리"}
 
 func folk_should_sleep() -> bool:
 	return is_night() and not (mail_got[1] and moon_phase().x >= 0.95) and not sleep_off
@@ -2630,13 +2651,41 @@ func asleep_hint(me: Vector2) -> bool:
 			return true
 	return false
 
-func folk_home(id: String) -> int: # the house nearest to where he stands by day
-	var at: Vector2 = village.folk_pos[id]
-	var best := 0
-	for i in village.doors.size():
-		if at.distance_to(village.doors[i]) < at.distance_to(village.doors[best]):
-			best = i
-	return best
+func folk_home(id: String) -> int: # the house nearest to where he stands by day that has a spot left
+	return folk_bed(id)[0]
+
+func folk_bed(id: String) -> Array:
+	if folk_bed_at.is_empty():
+		var used: Array = []
+		used.resize(village.doors.size())
+		used.fill(0)
+		for sid in SLEEP_IDS:
+			var need := 2 if sid == "kongal" else 1 # Kongal's kid goblin sleeps beside her
+			var at: Vector2 = village.folk_pos[sid]
+			var best := -1
+			for i in village.doors.size():
+				if used[i] + need <= HOUSE_SPOTS.size() and (best < 0 or at.distance_to(village.doors[i]) < at.distance_to(village.doors[best])):
+					best = i
+			folk_bed_at[sid] = [best, used[best]]
+			used[best] += 1
+			if sid == "kongal":
+				folk_bed_at["kid"] = [best, used[best]]
+				used[best] += 1
+	return folk_bed_at[id]
+
+func bed_spot(id: String) -> Vector2:
+	return Vector2(HOUSE_X, 0) + HOUSE_SPOTS[folk_bed(id)[1]]
+
+# show or hide one sleeper on his spot; returns whether he lies on a bedroll in this room
+func place_sleeper(id: String, on: bool) -> bool:
+	var bed: Node3D = sleeper_nodes[id]
+	var k: int = folk_bed(id)[1]
+	var at := bed_spot(id)
+	bed.position = Vector3(at.x, 0, at.y)
+	bed.get_node("roll").visible = k > 0
+	(bed.get_node("spr") as Sprite3D).position.y = 0.25 if k == 0 else 0.1
+	bed.visible = on
+	return on and k > 0
 
 func folk_awake_here(id: String) -> bool:
 	return id != "mulgyeol" or mate == null # Mulgyeol travels with Sora once he joins
@@ -2646,7 +2695,7 @@ func folk_talk_at(id: String) -> Vector2:
 		return village.folk_pos[id]
 	match folk_state.get(id, "out"):
 		"in":
-			return Vector2(HOUSE_X + 1.8, 1.6) if in_house == folk_home(id) else Vector2.INF
+			return bed_spot(id) if in_house == folk_home(id) else Vector2.INF
 		"going", "coming":
 			var spr: Sprite3D = village.folk_node[id]
 			return Vector2(spr.position.x, spr.position.z)
@@ -2657,6 +2706,13 @@ func update_folk_sleep(dt: float) -> void:
 		return
 	var night := folk_should_sleep()
 	var watching := in_village and in_house < 0 # walking home is only worth showing when she is on the street
+	var rolls := {} # bedroll spots taken in the room she is in
+	if folk_rocks.is_empty(): # the rocks this touches every frame, found once
+		for r in rocks:
+			if r.has("folk"):
+				folk_rocks[r.folk] = r
+			elif r.has("spot"):
+				folk_rocks["spot%d" % r.spot] = r
 	for id in SLEEP_IDS:
 		if not village.folk_node.has(id) or not folk_awake_here(id):
 			continue
@@ -2689,13 +2745,12 @@ func update_folk_sleep(dt: float) -> void:
 		spr.visible = st != "in"
 		if st in ["going", "coming"]:
 			spr.flip_h = screen_left(door - home) if st == "going" else screen_left(home - door)
-		for r in rocks: # his standing spot blocks the way only while he stands on it
-			if r.get("folk", "") == id:
-				r.r = 0.45 if st == "out" else 0.0
+		if folk_rocks.has(id): # his standing spot blocks the way only while he stands on it
+			folk_rocks[id].r = 0.45 if st == "out" else 0.0
 		folk_state[id] = st
 		folk_walk_t[id] = k
-		if sleeper_nodes.has(id):
-			sleeper_nodes[id].visible = st == "in" and in_house == folk_home(id)
+		if sleeper_nodes.has(id) and place_sleeper(id, st == "in" and in_house == folk_home(id)):
+			rolls[folk_bed(id)[1]] = true
 		if not door_z.has(id):
 			var z := Label3D.new()
 			z.text = "z"
@@ -2707,7 +2762,7 @@ func update_folk_sleep(dt: float) -> void:
 			door_z[id] = z
 		var dz: Label3D = door_z[id]
 		dz.visible = st == "in" and in_village and in_house < 0
-		dz.position = Vector3(door.x + 0.3 * float(SLEEP_IDS.find(id) % 2), 2.6 + 0.15 * sin(t * 2.0 + SLEEP_IDS.find(id)), door.y - 0.4)
+		dz.position = Vector3(door.x + 0.35 * float(folk_bed(id)[1] - 1), 2.6 + 0.15 * sin(t * 2.0 + SLEEP_IDS.find(id)), door.y - 0.4)
 	# Kongal's kid goblin stays at her side, and sleeps in her house
 	if kid_node != null and kid_q == 3:
 		var kst: String = folk_state.get("kongal", "out")
@@ -2715,8 +2770,13 @@ func update_folk_sleep(dt: float) -> void:
 		if kst != "out":
 			var ks: Sprite3D = village.folk_node.kongal
 			kid_node.position = ks.position + Vector3(0.7, 0, 0.3)
-		if sleeper_nodes.has("kid"):
-			sleeper_nodes.kid.visible = kst == "in" and in_house == folk_home("kongal")
+		if sleeper_nodes.has("kid") and place_sleeper("kid", kst == "in" and in_house == folk_home("kongal")):
+			rolls[folk_bed("kid")[1]] = true
+	elif sleeper_nodes.has("kid"):
+		sleeper_nodes.kid.visible = false
+	for k in range(1, HOUSE_SPOTS.size()):
+		if folk_rocks.has("spot%d" % k):
+			folk_rocks["spot%d" % k].r = 0.55 if rolls.has(k) else 0.0
 
 func house_door_near() -> int:
 	for i in village.doors.size():
@@ -2888,7 +2948,7 @@ func festival_key() -> bool:
 # attack, max HP, gold, potions, keepsakes, the woken skill, feats and records. Monsters then take
 # 1/(1 + 0.5 x round) of the damage and deal (1 + 0.5 x round) times as much.
 const NG_KEEP := ["lv", "xp", "max_hp", "atk", "gold", "pots", "has_pearl", "has_feather", "has_acorn", "has_ring", "has_shoes",
-	"has_armour", "has_tea", "has_shard", "has_bookmark", "has_lamp", "has_medal", "has_oar_ring", "has_whistle", "has_oil", "has_cushion", "skill_up", "stats", "feats", "trial_best", "race_best", "fish"]
+	"has_armour", "has_tea", "has_shard", "has_bookmark", "has_lamp", "has_medal", "has_oar_ring", "has_whistle", "has_oil", "has_cushion", "has_bait", "skill_up", "stats", "feats", "trial_best", "race_best", "fish"]
 var ng := 0                 # how many rounds were finished before this one
 var ng_armed := 0.0         # seconds left to confirm with a second E
 
@@ -3034,9 +3094,10 @@ func travel(i: int) -> void:
 
 const CHANGES_PAGE := 100 # lines of 바뀐 것 shown before the 더 읽기 button
 const CHANGES := [
-	"개발 상황: 놀 수 있는 분량 약 294분 / 목표 300분 (98%)",
+	"개발 상황: 놀 수 있는 분량 약 297분 / 목표 300분 (99%)",
 	"",
 	"2026-10-24 아침",
+	"· v0.0.35: 마을에 일하는 사람 여섯이 생겼다. 나무꾼 두솔, 광부 차돌, 농부 새참, 낚시꾼 여울(두솔의 동생), 바구니 짜는 다래 할머니와 손자 토리. 저마다 일터(장작더미, 광석 수레, 굳은 밭, 연못가, 장터)에 서 있고, 말을 걸면 아직 못 끝낸 곁이야기의 실마리를 하나씩 들려준다. 이야기가 나아갈 때마다 하는 말이 바뀌고, 마지막 이야기에서 선물(회복약 1, 금화 30, 또는 물고기가 30% 빨리 무는 미끼 주머니)을 준다. 밤에는 집에 들어가 자며 한 집에 셋까지 잔다. 대사와 그림은 GPT와 함께 만들었다.",
 	"· v0.0.34: 1장에 깨어난 물가(약 4분). 보리 할머니를 만난 뒤, 소라가 깨어난 자리에서 물가로 눌린 갈대 줄이 이어지고 그 끝 진흙에 갈대 바구니가 묻혀 있다. 왕관으로 진흙을 풀면(눈금 1칸) 벽돌 두 무리(고블린 2, 고블린 1과 활 1)가 일어나고, 바구니에서 금화 30과 회복약 1이 나온다. 보리 할머니는 달지기 등불 바구니를 알아보고 백 년 동안 켜지 않은 자기 등불과 회복약 1을 준다. 벽돌왕을 넘어뜨린 뒤 밤에 물가에서 등불 바구니를 띄우면(눈금 1칸) 물길 약 20칸을 따라 흘러가고, 벽돌 걸림 셋(고블린 2, 2, 고블린 1과 활 1)을 풀어 주면 늪 호수 섬 앞에 머문다(최대 체력 +10). 보리 할머니께 알리면 갈대 방석을 준다(밤에 켜진 등불 곁에서 쉬면 체력이 초당 4씩 찬다). 대사와 소품은 GPT와 의논해 다듬었다.",
 	"· v0.0.33: 8 → 9장 끝 뒤에 큰 태엽 방(약 5분). 끝 장면은 그대로이고, 거푸집이 앉아 있던 자리에 구멍이 열린다. 내려가면 땅을 돌리는 큰 태엽 열쇠가 있다. 굳은 톱니 셋을 왕관으로 풀며(눈금 1칸씩) 열쇠에서 달려 나오는 거푸집 찌꺼기(2, 3, 4마리)를 막으면 벽돌 일꾼들이 일어나 톱니를 돌본다. 열쇠 한가운데에 왕관을 올리면 마을 사람들이 내려와 손잡이 여덟을 함께 잡고, 금빛 고리에 맞춰 E를 여덟 번 누르면 다 같이 감는다(그림 한 장). 궤짝에서 달지기 기름병(회복약을 마시면 기세 +20), 최대 체력 +20, 회복약 2, 금화 200. 대사와 소품은 GPT와 의논해 다듬었다.",
 	"· v0.0.32: 밤이 되면 마을 사람들(도란, 콩알, 마을에 있을 때의 물결, 꼬마 고블린)이 저마다 가까운 집 문으로 걸어 들어가 자고, 아침이면 나와 제자리로 돌아간다. 등불지기 심지는 밤에도 광장에 남고, 보름달 축제 밤에는 모두 밖에 있다. 자는 사람의 집 문 위에 z가 뜨고, 그 집에 들어가면 침대에서 자는 모습(GPT 그림)이 보인다. 곁에서 E를 누르면 깨어 낮과 같은 이야기와 심부름을 하니 반딧불, 달꽃 같은 밤 심부름도 막히지 않는다. 낮에 서던 자리에서 E를 누르면 어디서 자는지 알려 준다.",
@@ -5462,7 +5523,7 @@ func save_game() -> void:
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
 		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "books": castle.books.map(func(b): return b.read), "has_bookmark": has_bookmark, "has_shard": has_shard, "shop_bought": shop_bought, "play_secs": play_secs, "ng": ng, "fest_gift": fest_gift, "mail_q": mail_q, "mail_got": mail_got, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes, "target_best": target_best, "has_medal": has_medal, "bottles": village.bottles.map(func(b): return b.got), "inn_nights": inn_nights, "magpie_q": magpie_q, "talks_heard": talks_heard.keys(),
-		"road_q": road_q, "road_box": road_box, "mill_q": mill_q, "has_oar_ring": has_oar_ring, "post_q": post_q, "south_q": south_q, "has_whistle": has_whistle, "clock_q": clock_q, "clock_gears": clock_gears, "clock_box": clock_box, "clock_late": clock_late, "has_oil": has_oil, "shore_q": shore_q, "has_cushion": has_cushion, "hollow_q": hollow_q, "mem_lit": forest.mem_lamps.map(func(l): return l.lit), "hollow_doors": forest.doors.map(func(dr): return dr.open), "hollow_boxes": forest.boxes.map(func(b): return b.open),
+		"road_q": road_q, "road_box": road_box, "mill_q": mill_q, "has_oar_ring": has_oar_ring, "post_q": post_q, "south_q": south_q, "has_whistle": has_whistle, "clock_q": clock_q, "clock_gears": clock_gears, "clock_box": clock_box, "clock_late": clock_late, "has_oil": has_oil, "shore_q": shore_q, "has_cushion": has_cushion, "hf_seen": hf_seen, "has_bait": has_bait, "hollow_q": hollow_q, "mem_lit": forest.mem_lamps.map(func(l): return l.lit), "hollow_doors": forest.doors.map(func(dr): return dr.open), "hollow_boxes": forest.boxes.map(func(b): return b.open),
 		"seals": garden.seals.map(func(sl): return sl.open),
 		"stairs_wall": stairs.wall_open, "stairs_lamps": stairs.lamps.map(func(l): return l.lit),
 		"castle_q": castle_q, "bars": castle.bars, "levers": castle.levers.map(func(lv): return lv.up), "vault": castle.vault_open, "has_armour": has_armour, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read),
@@ -5560,6 +5621,11 @@ func load_game() -> void:
 		place_oar()
 	for id in d.get("met", []):
 		met[id] = true
+	hf_seen = {} # the six working villagers' beats told (old saves: none)
+	var hfs: Dictionary = d.get("hf_seen", {})
+	for id in hfs:
+		hf_seen[id] = (hfs[id] as Array).map(func(v): return int(v))
+	has_bait = bool(d.get("has_bait", false))
 	var vlit: Array = d.get("vlit", [])
 	for i in mini(vlit.size(), village.dark.size()):
 		if vlit[i]:
@@ -6307,8 +6373,16 @@ func crown_key() -> void:
 			return
 		if asleep_hint(me):
 			return
+		var near_id := ""
+		for fid in village.folk_pos: # by day where they stand, by night in bed at home; the nearest one answers
+			var dd := me.distance_to(folk_talk_at(fid))
+			if dd < 1.6 and (near_id == "" or dd < me.distance_to(folk_talk_at(near_id))):
+				near_id = fid
 		for id in village.folk_pos:
-			if me.distance_to(folk_talk_at(id)) < 1.6: # by day where they stand, by night in bed at home
+			if id == near_id:
+				if STORY.HINT_FOLK.has(id):
+					hint_folk_talk(id)
+					return
 				if id == "kongal" and errand >= 3 and kid_q != 1 and (kid_q != 3 or doran_q < 3 or fly_q < 3):
 					kongal_errand()
 					return
@@ -6333,6 +6407,102 @@ func crown_key() -> void:
 					light_village_lamp(d)
 					return
 	touch_crown()
+
+# ---- six working villagers who drop hints (v0.0.35; the user: "마을이 너무 썰렁해", "실마리만 말해주는 npc"):
+# woodcutter Dusol, miner Chadol, farmer Saecham, fisher Yeoul (Dusol's sister), weaver Darae and her grandson Tori.
+# E: the first lines once; then a story beat whose milestone is reached and not yet told (the third gives a gift);
+# otherwise a hint for a side quest that is open now and unfinished, a different one each talk; else an idle line.
+var hf_seen := {}           # id -> beat indices already told (saved)
+var hf_turn := {}           # id -> talks spent on hints, to cycle them
+var has_bait := false       # 미끼 주머니 from Yeoul: fish bite 30% sooner, kept into a new round
+
+func hf_milestone(key: String) -> bool:
+	match key:
+		"cave": return story_step >= 5 # the Brick King is down and the cave open
+		"lamps": return errand >= 3    # the village lamps relit and Simji thanked
+		"lake": return lake_q >= 4
+		"forest": return forest_q >= 3
+		"hill": return hill_q >= 3
+		"castle": return castle_q >= 3
+		"ending": return garden_q >= 5
+	return false
+
+# the side quest a hint points at can be done now (its zone open) and is not finished; the same tests as the journal
+func hint_open(key: String) -> bool:
+	match key:
+		# the marsh and the village
+		"scraps": return story_step >= 2 and not marsh.chest_open
+		"moonflowers": return story_step >= 3 and not has_tea
+		"fireflies": return kid_q >= 3 and doran_q >= 3 and fly_q < 3
+		"shore": return story_step >= 3 and shore_q < 2
+		"fishing": return fish_kinds.count(true) < FISH.size() # the village pier is always open
+		"target": return not has_medal
+		"magpie": return magpie_q < 3
+		"bottles": return village.bottles_got() < village.bottles.size()
+		"inn": return inn_nights == 0
+		"cupboards": return house_seen.count(true) < house_seen.size()
+		"errands": return int(errand >= 3) + int(kid_q >= 3) + int(doran_q >= 3) + int(mul_q >= 3) + int(fly_q >= 3) < 5
+		"festival": return mail_got[1] and not fest_gift
+		"mail": return doran_q >= 3 and lake_q >= 4 and mail_q < 2
+		# the cave (open once the Brick King is down)
+		"crystals": return story_step >= 6 and not has_ring
+		"shrine": return story_step >= 6 and skill_up < 0
+		"post": return has_skip and post_q < 3
+		# the lake (open after the night chase)
+		"grotto": return lake_q >= 4 and grotto_q < 4
+		"south": return lake_q >= 4 and south_q < 5
+		# the forest (open once Mulgyeol joins)
+		"squirrels": return lake_q >= 4 and not has_acorn
+		"grove": return lake_q >= 4 and not forest.chest_open
+		"hollow": return forest_q >= 3 and hollow_q < 4
+		# the wind hills (open once Noeul turns) and the clouds above
+		"race": return forest_q >= 3 and race_best <= 0.0
+		"mill": return hill_q >= 3 and mill_q < 5
+		"cloud": return hill_q >= 3 and cloud_q < 3
+		"cloud_path": return cloud_q >= 1 and not has_shard
+		"trial": return hill_q >= 3 and trial_best <= 0.0
+		# the castle, its stairs and the garden
+		"pages": return castle_q >= 1 and castle.pages_read() < 3
+		"books": return castle_q >= 1 and not has_bookmark
+		"vault": return castle_q >= 1 and not castle.vault_open
+		"under": return castle_q >= 1 and not under_chest_open
+		"stairs": return castle_q >= 3 and not stairs.door_open
+		"clock": return garden_q >= 5 and not clock_box
+	return false # oak, quarters: not in the game yet
+
+func hint_folk_talk(id: String) -> void:
+	var f: Dictionary = STORY.HINT_FOLK[id]
+	if not met.has(id):
+		met[id] = true
+		show_story("", f.first)
+		save_game()
+		return
+	var seen: Array = hf_seen.get(id, [])
+	var beats: Array = f.beats
+	for i in beats.size():
+		if not seen.has(i) and hf_milestone(beats[i][0]):
+			seen.append(i)
+			hf_seen[id] = seen
+			var lines: Array = (beats[i][1] as Array).duplicate()
+			if i == beats.size() - 1: # the last beat comes with a gift
+				hf_gift(f.gift)
+				lines.append(STORY.HF_GIFT[f.gift])
+			show_story("", lines)
+			save_game()
+			return
+	var topics: Array = f.hints.keys().filter(func(k): return hint_open(k))
+	if not topics.is_empty():
+		var n: int = hf_turn.get(id, 0)
+		hf_turn[id] = n + 1
+		show_story("", f.hints[topics[n % topics.size()]])
+		return
+	show_story("", [f.idle[rng.randi() % f.idle.size()]])
+
+func hf_gift(kind: String) -> void:
+	match kind:
+		"pots": player.pots += 1
+		"gold": player.gold += 30
+		"bait": has_bait = true
 
 # errand 2: Kongal's kid goblin was dragged to the south field by three goblins
 func kongal_errand() -> void:
@@ -10860,6 +11030,7 @@ func journal_lines() -> Array:
 	if has_oil: keep.append(tr("달지기 기름병"))
 	if shore_q == 3: keep.append(tr("보리의 등불"))
 	if has_cushion: keep.append(tr("갈대 방석"))
+	if has_bait: keep.append(tr("미끼 주머니"))
 	if post_q == 3: keep.append(tr("보리의 엽서"))
 	if has_armour: keep.append(tr("달지기 갑옷"))
 	if has_tea: keep.append(tr("달꽃 차"))
