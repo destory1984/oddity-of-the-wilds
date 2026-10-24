@@ -10,7 +10,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "painting_once", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "esc_sheets", "news_more", "touch_controls", "folk_sleep", "folk_routine", "hint_folk", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "mill", "post", "lake_south", "clock", "shore", "quarters", "oak", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "painting_once", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "esc_sheets", "news_more", "touch_controls", "folk_sleep", "folk_routine", "hint_folk", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "story_fixes", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "mill", "post", "lake_south", "clock", "shore", "quarters", "oak", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -1081,7 +1081,8 @@ func run() -> void:
 			reset_to(sl.pos + (main.garden.marks.C - sl.pos).normalized() * -1.2)
 			tap(KEY_E)
 			await wait(0.1)
-		var seals_ok: bool = asleep and main.garden.seals_open() == 3
+		var seal_quest: bool = main.ui.quest.text == main.tr("굳은달 거푸집의 심장을 노리자") # not left at 2/3
+		var seals_ok: bool = asleep and main.garden.seals_open() == 3 and seal_quest
 		for e in main.enemies.filter(func(e): return not e.dead and e.x > main.GARDEN.GARDEN_X and not e.get("mold", false)):
 			e.dead = true
 			e.node.visible = false
@@ -1120,7 +1121,7 @@ func run() -> void:
 		var ended: bool = main.story_step == 12 and main.garden_q == 5 and mold[0].dead
 		main.close_story()
 		check("garden_end", entered and seals_ok and fought and locked and ready and ended,
-			"entered=%s seals=%s fought=%s locked at 12%%=%s lights filled=%s ended=%s step=%d" % [entered, seals_ok, fought, locked, ready, ended, main.story_step])
+			"entered=%s seals=%s (quest to the mold=%s) fought=%s locked at 12%%=%s lights filled=%s ended=%s step=%d" % [entered, seals_ok, seal_quest, fought, locked, ready, ended, main.story_step])
 		reset_to(main.garden.marks.S + Vector2(0.3, 0))
 		await wait(1.5)
 		main.in_hill = false
@@ -2464,7 +2465,9 @@ func run() -> void:
 		calm_enemies(false)
 		check("festival", quiet and on and gift, "no festival on a thin moon=%s full moon festival=%s rice cakes=%s" % [quiet, on, gift])
 	if want.call("new_round"):
+		var said: bool = "1.5배" in main.new_round_lines()[2] # round 0 -> 1
 		main.ng = 1
+		said = said and "2배" in main.new_round_lines()[2] and not "1.5" in main.new_round_lines()[2] # round 1 -> 2
 		var m: float = main.ng_mult()
 		calm_enemies(true)
 		reset_to(Vector2(20, 30))
@@ -2492,7 +2495,7 @@ func run() -> void:
 		main.write_new_round()
 		var sd = JSON.parse_string(FileAccess.get_file_as_string(main.SAVE_PATH))
 		var kept: bool = int(sd.get("story", -1)) == 0 and int(sd.get("ng", 0)) == 1 and int(sd.get("lv", 0)) == lv0 			and bool(sd.get("has_pearl", false)) and int(sd.get("skill_up", -1)) == 2 and not sd.has("lake_q") and not sd.has("chests")
-		check("new_round", tougher and harder and kept, "round 1: monsters take 1/1.5 damage=%s and deal 1.5x=%s, new-round save keeps level and keepsakes only=%s" % [tougher, harder, kept])
+		check("new_round", tougher and harder and kept and said, "round 1: monsters take 1/1.5 damage=%s and deal 1.5x=%s, new-round save keeps level and keepsakes only=%s, notice says 1.5x then 2x=%s" % [tougher, harder, kept, said])
 	if want.call("shop_price"):
 		main.in_village = false
 		main.in_hill = false
@@ -2594,12 +2597,117 @@ func run() -> void:
 		# a save made on the island mid-turtle-fight loads at the pier
 		var f := FileAccess.open(main.SAVE_PATH, FileAccess.WRITE)
 		var isl: Vector2 = main.lake.marks.T + Vector2(2, 0)
-		f.store_string(JSON.stringify({"story": 10, "night_q": 4, "lake_q": 3, "in_lake": true, "x": isl.x, "z": isl.y}))
+		f.store_string(JSON.stringify({"story": 10, "night_q": 4, "lake_q": 3, "in_lake": true, "x": isl.x, "z": isl.y, "quest": "섬의 벽돌 거북을 물리치자"}))
 		f.close()
 		main.load_game()
-		var pier: bool = main.lake_q == 2 and Vector2(main.player.x, main.player.z).distance_to(main.lake.marks.P) < 2.0
+		var pier: bool = main.lake_q == 2 and Vector2(main.player.x, main.player.z).distance_to(main.lake.marks.P) < 2.0 \
+			and main.ui.quest.text == main.tr("부두의 물결에게 말을 걸자 (E)") # not the island fight
 		main.return_to_start()
 		check("stuck_fixes", west and marsh_ok and pier, "old save leaves the garden westward=%s F8 clears zones=%s turtle-fight save loads at the pier=%s" % [west, marsh_ok, pier])
+	if want.call("story_fixes"):
+		# GPT's fourth playtest (whole story): the state before is saved and loaded back at the end
+		calm_enemies(true)
+		main.save_game()
+		var before: String = FileAccess.get_file_as_string(main.SAVE_PATH)
+		var cfg_text: int = int(main.cfg.text)
+		# 1. saved during the last winding lines: the load plays the ending and pays once
+		var g: Vector2 = main.garden.marks.C + Vector2(-2.0, 0)
+		var f := FileAccess.open(main.SAVE_PATH, FileAccess.WRITE)
+		f.store_string(JSON.stringify({"story": 11, "garden_q": 5, "in_garden": true, "x": g.x, "z": g.y, "gold": 100, "quest": "왕관을 높이 들어 마지막으로 감자 (E)"}))
+		f.close()
+		main.load_game()
+		var ending: bool = main.story_open and main.story_step == 12 and main.player.gold == 600 and main.clock_q >= 1 and not main.ending_due
+		main.close_story()
+		await wait(0.3)
+		main.load_game() # the save the ending wrote: nothing paid again
+		var once: bool = main.player.gold == 600 and main.story_step == 12 and not main.story_open
+		main.return_to_start()
+		# 2. a later cave visit saved inside: the quest from before comes back on the way out
+		var q := "물결과 함께 마을 동쪽 문으로, 굳은 숲에 가자"
+		main.story_step = 10
+		main.cave_exit_seen = true
+		main.set_quest(q)
+		main.enter_cave()
+		main.save_game()
+		main.quest_before_cave = "" # a fresh start knows nothing but the save
+		main.load_game()
+		main.leave_cave()
+		var cave_q: bool = main.ui.quest.text == main.tr(q)
+		main.enter_cave()
+		main.quest_before_cave = "" # an older save without it: the main road's step instead
+		var road0 := [main.forest_q, main.hill_q, main.castle_q, main.garden_q]
+		main.forest_q = 3
+		main.hill_q = 0
+		main.castle_q = 0
+		main.garden_q = 0
+		main.leave_cave()
+		cave_q = cave_q and main.ui.quest.text == main.tr("숲 동쪽 끝 길로, 바람 언덕에 가자")
+		main.forest_q = road0[0]
+		main.hill_q = road0[1]
+		main.castle_q = road0[2]
+		main.garden_q = road0[3]
+		main.return_to_start()
+		# 11. every story line stays inside the box at 720x540 with the biggest text, the box inside the screen
+		var root: Window = main.get_tree().root
+		var scale0 := [root.content_scale_mode, root.content_scale_aspect, root.content_scale_size]
+		root.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
+		root.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
+		root.content_scale_size = Vector2i(720, 540)
+		main.cfg.text = main.TEXT_SIZES.size() - 1
+		main.apply_settings()
+		await wait(0.2)
+		var lines: Array = []
+		var consts: Dictionary = main.STORY.get_script_constant_map()
+		for k in consts:
+			var v = consts[k]
+			if v is String and v.count("|") >= 2:
+				lines.append(v)
+			var lists: Array = v.values() if v is Dictionary else [v]
+			for arr in lists:
+				if arr is Array:
+					for l in arr:
+						if l is String and l.count("|") >= 2:
+							lines.append(l)
+		lines.append_array(main.new_round_lines())
+		var over := 0
+		var grew := 0
+		var worst := ""
+		for path in ["res://art/story/01_wake.jpg", ""]: # with a face beside the text (narrowest) and in talk scenes
+			main.show_story(path, ["||"])
+			for l in lines:
+				main.show_line(l)
+				main.fit_story()
+				var box_h: float = main.ui.story_cap.offset_bottom - main.ui.story_cap.offset_top
+				var cap_r: Rect2 = main.ui.story_cap.get_global_rect()
+				var bottom: float = main.ui.story_text.position.y + main.ui.story_text.get_minimum_size().y
+				if box_h > main.STORY_BOX_H:
+					grew += 1
+				if bottom > box_h - 8.0 or cap_r.position.y < 0.0 or cap_r.end.y > 540.5:
+					over += 1
+					worst = l
+		var nr: Array = main.new_round_lines()
+		var pages: bool = nr.size() == 4 and not "배" in nr[1] and "배" in nr[2]
+		main.close_story()
+		main.cfg.text = cfg_text
+		main.apply_settings()
+		root.content_scale_mode = scale0[0]
+		root.content_scale_aspect = scale0[1]
+		root.content_scale_size = scale0[2]
+		await wait(0.6)
+		main.show_line("||")
+		main.fit_story()
+		var box_back: bool = main.ui.story_cap.offset_bottom - main.ui.story_cap.offset_top == main.STORY_BOX_H
+		# put the state from before back
+		f = FileAccess.open(main.SAVE_PATH, FileAccess.WRITE)
+		f.store_string(before)
+		f.close()
+		main.load_game()
+		if main.story_open:
+			main.close_story()
+		calm_enemies(false)
+		check("story_fixes", ending and once and cave_q and over == 0 and pages and box_back,
+			"winding-lines save plays the ending on load, +500 gold, step 12=%s paid once=%s cave quest back after a reload=%s lines over the box at 720x540 biggest text=%d of %d (%d grew the box)%s new-round notice on two pages=%s box back to 144=%s"
+			% [ending, once, cave_q, over, lines.size() * 2, grew, (" worst: " + worst.left(40)) if over > 0 else "", pages, box_back])
 	if want.call("books"):
 		main.story_step = maxi(main.story_step, 10)
 		if main.intro:

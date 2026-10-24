@@ -3173,10 +3173,15 @@ func ng_key() -> bool:
 		return false
 	if ng_armed <= 0.0:
 		ng_armed = 10.0
-		show_story("", STORY.NEW_ROUND_ASK)
+		show_story("", new_round_lines())
 		return true
 	new_round()
 	return true
+
+# the notice with the next round's multiplier, 1 + 0.5 x (ng + 1)
+func new_round_lines() -> Array:
+	var m := ("%.1f" % (1.0 + 0.5 * (ng + 1))).trim_suffix(".0")
+	return STORY.NEW_ROUND_ASK.map(func(l): return ("||" + tr(l.substr(2)) % m) if "%s" in l else l)
 
 func new_round() -> void:
 	write_new_round()
@@ -3310,6 +3315,7 @@ const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 302분 / 목표 300분 (100%)",
 	"",
 	"2026-10-24 아침",
+	"· v0.0.43: GPT가 처음부터 끝까지 이야기대로 따라가며 찾은 열한 가지를 고쳤다. 마지막 태엽 감기 대사 도중 저장하고 이어하면 엔딩, 금화 500, 경험치 400, 큰 태엽 방 구멍이 사라졌는데, 이제 이어하면 엔딩이 그대로 나오고 보상은 한 번만 받는다. 나중에 동굴을 다시 찾았다가 안에서 저장하면 나올 때 할 일 줄이 비던 것, 거북 전투 중 저장을 불러오면 부두로 돌아오는데 할 일 줄은 섬 전투로 남던 것, 마지막 봉인을 풀어도 할 일 줄이 2/3에 멈추던 것을 고쳤다. 동굴 출구의 '다음 장에서 이어진다'는 지금 강을 건너 마을로 가자는 말로, 심지의 등불 열두 개는 광장 둘레 등불로, 보리가 읽은 편지는 도란에게 돌려주라는 말로, 왕관을 머리에 쓰지 않는다는 말과 첫 만남 이야기는 실제 이야기에 맞게 고쳤다. 새 바퀴 안내는 다음 바퀴의 실제 배율(1.5배 → 2배 → 2.5배)을 보여 주고 두 쪽으로 나뉘며, 작은 화면에서 큰 글자로 긴 대사가 나오면 대화 상자가 위로 늘어난다.",
 	"· v0.0.42: 마을 사람들이 낮에 저마다 두세 곳을 오간다. 나무꾼 두솔은 장작더미와 숲길 가, 광부 차돌은 광석 수레와 장터, 농부 새참은 밭과 연못가와 장터, 어부 여울은 연못가와 나루 머리, 다래는 장터 자리와 여관 문 앞, 토리는 장터와 광장과 새참의 밭, 도란은 북쪽 집들 앞, 콩알은 광장(꼬마 고블린도 따라간다), 마을에 있을 때의 물결은 연못가를 오간다. 한 곳에서 6 → 14초 머물고 1초에 1.4칸 걷는다. 걷는 도중에도 E로 말을 걸 수 있고, 말하는 동안은 멈춘다. 소라가 앞길 0.9칸 안에 서 있으면 기다린다. 해가 지면 있던 자리에서 길을 되짚어 집으로 간다. 심부름이 걸린 사람(울고 있는 콩알, 편지를 든 도란, 노를 기다리는 물결)과 등불지기 심지는 제자리에 있다.",
 	"· v0.0.41: 휴대폰에서 할 일 줄, 알림, 대사에 남아 있던 키보드 말(Shift, (E), Space)을 터치 단추 이름(막대를 끝까지 밀어, 왕관 단추, 손 단추)으로 바꿔 보인다. 웹 판에서 나던 오류 하나(뒤로 단추 제목 찾기)도 고쳤다.",
 	"· v0.0.40: 휴대폰 화면에서 GPT 시험 놀이꾼이 찾은 여덟 가지를 고쳤다. 상점이 화면 안에 줄어 들어가고 제목이 잘리지 않으며, 상점·일지·설정·조작법이 열리면 메뉴 단추와 미니맵이 비켜난다. 상점은 왼쪽 위 단추로 닫는다. 돋보기 단추는 메뉴 단추 왼쪽으로 옮겨 보스 체력 막대를 가리지 않는다. 긴 할 일 줄은 동료 상태와 오른쪽 단추 사이에서 두 줄로 접힌다. 휴대폰 조작법은 이동 막대와 터치 단추 그림으로 설명하고, 기술 그림 밑에 이름이 붙는다. 동료 말풍선이 1.4배로 커지고 1초 더 머문다. 창의 뒤로 단추가 56px 이상이 되었다. 달지기 숙소는 벽 윗면을 옅은 청회색으로 덮고 바닥을 조금 밝혀 밤에도 벽과 바닥이 구별된다.",
@@ -5684,6 +5690,7 @@ func build_hud() -> void:
 	var cap_text := label(cap, "", Vector2(140, 34), 20)
 	cap_text.size = Vector2(760, 90)
 	cap_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	cap_text.visible_characters_behavior = TextServer.VC_CHARS_AFTER_SHAPING # wrapped as the whole line, so fit_story sees every line while it types
 	var cap_hint := label(cap, "▼", Vector2(905, 116), 13, Color("#e8b018"))
 	cap_hint.size = Vector2(20, 18)
 	ui.story_tab = tab
@@ -5892,7 +5899,7 @@ func save_game() -> void:
 		"quarters_q": quarters_q, "quarters_box": quarters_box, "has_buckler": has_buckler, "quarters_again": quarters_again,
 		"oak_q": oak_q, "oak_knots": forest.knots.map(func(k): return k.open), "has_sprout": has_sprout,
 		"under_drained": under.drained, "under_door": under.door_open, "under_guards": under_guards_done, "under_chest": under_chest_open,
-		"under_side": under_side_open, "under_diary": under_diary_read, "has_lamp": has_lamp}
+		"under_side": under_side_open, "under_diary": under_diary_read, "has_lamp": has_lamp, "cave_quest": quest_before_cave}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify(d))
@@ -6251,6 +6258,7 @@ func load_game() -> void:
 		player.x = px
 		player.z = pz
 		ui.mini.map_tex = cave_map_tex()
+	quest_before_cave = String(d.get("cave_quest", "")) # enter_cave above overwrote it
 	if is_instance_valid(ui.title_hint):
 		ui.title_hint.text = "아무 키나 눌러 이어하기  ·  F9 처음부터"
 	repair_story_step(d)
@@ -6261,6 +6269,12 @@ func load_game() -> void:
 			set_quest(main_road_quest())
 	else:
 		set_quest(["", "왕관을 만져 보자 (E)", "서쪽 오두막으로 가 보자", "북쪽 벽돌왕이 늪의 물길을 막고 있다", "", CAVE_QUEST][clampi(story_step, 0, 5)])
+	if turtle_cut: # the fight starts over from the pier
+		set_quest("부두의 물결에게 말을 걸자 (E)")
+	# saved during the last winding lines (garden_q 5, ending not yet played): the ending plays now, paid once
+	ending_due = garden_q >= 5 and story_step < 12
+	if ending_due and not intro:
+		mold_breaks()
 
 # Until v0.0.5 every load with the Brick King down rebuilt the cave mouth with story_step = 5, so the story and the
 # quest line wound back to "the cave opened" (the user, 2026-10-23, level 21 at the cave mouth). The step comes
@@ -10371,6 +10385,7 @@ func update_garden(dt: float) -> void:
 	if garden_q == 1 and not story_open and garden.seals_open() == garden.seals.size() and Vector2(player.x, player.z).distance_to(garden.marks.C) < 8.0:
 		garden_q = 2
 		spawn_mold()
+		set_quest("굳은달 거푸집의 심장을 노리자")
 	if not mold_wave.is_empty():
 		update_mold_wave(dt)
 	update_ring(dt)
@@ -10391,6 +10406,7 @@ func seal_key() -> bool:
 			var n: int = garden.seals_open()
 			if n == garden.seals.size():
 				toast("마지막 봉인이 풀렸다. 거푸집이 깨어난다")
+				set_quest("굳은달 거푸집의 심장을 노리자")
 			else:
 				toast(tr("벽돌 봉인 %d/3") % n)
 				set_quest(tr("거푸집 둘레의 벽돌 봉인을 풀자 (E) %d/3") % n)
@@ -10607,6 +10623,8 @@ func update_shard(e: Dictionary, dt: float) -> void:
 		ring_t = 0.0
 		shed_shards()
 
+var ending_due := false # loaded a save made during the winding lines: the ending plays on start
+
 func final_wind() -> void:
 	garden_q = 5
 	crown_pips = 0
@@ -10617,6 +10635,7 @@ func final_wind() -> void:
 	save_game()
 
 func mold_breaks() -> void:
+	ending_due = false
 	for e in enemies:
 		if e.get("mold", false) and not e.dead:
 			e.dead = true
@@ -10639,7 +10658,8 @@ func mold_breaks() -> void:
 	clock_q = maxi(clock_q, 1) # where the mold sat a hole opens down to the clock room (a side story after the end)
 	clock_hint_told = true
 	garden.open_hatch()
-	ui.mini.map_tex = garden_map()
+	if in_garden:
+		ui.mini.map_tex = garden_map()
 	after_story = clock_hint
 	save_game()
 
@@ -11948,7 +11968,8 @@ func leave_cave() -> void:
 	player.z = 20.0
 	ground_y = height_at(player.x, player.z)
 	snap_mates()
-	set_quest("동쪽 강을 물수제비 걸음으로 건너, 마을 불빛을 찾아라" if first_time else quest_before_cave)
+	var back := quest_before_cave if quest_before_cave != "" else main_road_quest() # older saves kept no quest
+	set_quest("동쪽 강을 물수제비 걸음으로 건너, 마을 불빛을 찾아라" if first_time else back)
 	if ui.has("outside_map"):
 		ui.mini.map_tex = ui.outside_map
 	ui.zone_name.text = "갈대늪"
@@ -12247,6 +12268,8 @@ func start_game(with_story := true) -> void:
 	cam_yaw = CAM_YAW # the title screen orbits the camera; play always starts from the same angle
 	if with_story and (not loaded or story_step == 0): # a new round loads with the story back at 0
 		show_story("res://art/story/01_wake.jpg", STORY.WAKE)
+	if ending_due:
+		mold_breaks()
 	sfx(392, 0.3, "triangle", 0.25)
 	get_tree().create_timer(0.15).timeout.connect(func(): sfx(587, 0.5, "triangle", 0.25))
 	for c in ui.hidden_for_intro:
@@ -12720,6 +12743,7 @@ func _process(dt: float) -> void:
 
 # keep the story picture and dialogue box off the screen edges on narrow windows
 const STORY_MARGIN := 28.0
+const STORY_BOX_H := 144.0
 func fit_story() -> void:
 	var vw := get_viewport().get_visible_rect().size.x
 	var pw := minf(896.0, vw - 2.0 * (STORY_MARGIN + 12.0)) # the frame draws 10px outside its rect
@@ -12733,6 +12757,10 @@ func fit_story() -> void:
 	ui.story_cap.offset_right = cw / 2.0
 	ui.story_text.size.x = cw - ui.story_text.position.x - 40.0
 	ui.story_hint.position.x = cw - 35.0
+	# the box grows upward when the text needs more lines than its 144 px hold (big text on a small screen)
+	var ch := maxf(STORY_BOX_H, ui.story_text.position.y + ui.story_text.get_minimum_size().y + 14.0)
+	ui.story_cap.offset_top = ui.story_cap.offset_bottom - ch
+	ui.story_hint.position.y = ch - 28.0
 
 func update_enemies(dt: float, gy: float) -> void:
 	for e in enemies.duplicate():
