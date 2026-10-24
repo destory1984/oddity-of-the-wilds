@@ -946,7 +946,7 @@ func apply_test_args(args: PackedStringArray) -> void:
 		shrine_seen = true
 		skill_up = 0
 		marsh.found = [true, false, true]
-		set_quest("마을 심부름을 모두 마쳤다. 밤이 되면 마을에서 쉬자")
+		set_quest(NIGHT_REST_QUEST)
 		toggle_journal(true)
 	if sc.get("ways", false): # the waystone list by Bori's cottage
 		story_step = 9
@@ -3088,6 +3088,10 @@ func check_feats() -> void:
 var mail_q := 0             # 0 not asked, 1 carrying letters, 2 done
 var mail_got := [false, false, false] # Bori, Simji, the island hut
 
+# the garden is wound again: the ending played or its last winding is done
+func garden_wound() -> bool:
+	return garden_q >= 5 or story_step >= 12
+
 func mail_errand() -> bool:
 	if mail_q == 0:
 		mail_q = 1
@@ -3099,7 +3103,10 @@ func mail_errand() -> bool:
 		player.gold += 150
 		player.max_hp += 10
 		player.hp = float(player.max_hp)
-		show_story("", STORY.MAIL_DONE)
+		var mail_lines: Array = STORY.MAIL_DONE.duplicate()
+		if garden_wound(): # before the ending Doran thanks her for the letters, not for the garden (GPT playtest 5)
+			mail_lines[1] = STORY.MAIL_DONE_WOUND
+		show_story("", mail_lines)
 		save_game()
 		return true
 	if mail_q == 1:
@@ -3153,7 +3160,10 @@ func festival_key() -> bool:
 		return true
 	fest_gift = true
 	player.pots += 3
-	show_story("", STORY.FESTIVAL)
+	var fest_lines: Array = STORY.FESTIVAL.duplicate()
+	if garden_wound():
+		fest_lines[1] = STORY.FESTIVAL_WOUND
+	show_story("", fest_lines)
 	save_game()
 	return true
 
@@ -3313,6 +3323,9 @@ func travel(i: int) -> void:
 const CHANGES_PAGE := 100 # lines of 바뀐 것 shown before the 더 읽기 button
 const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 302분 / 목표 300분 (100%)",
+	"",
+	"2026-10-24 저녁",
+	"· v0.0.44: GPT가 이야기 큰길을 다시 따라가며 찾은 일곱 가지를 고쳤다. (1) 동굴 문을 연 뒤에도 할 일 줄이 '열쇠를 찾아 잠긴 문을 열자'로 남았다. 이제 문이 열리면 '열린 문 너머, 수레두더지가 있는 안쪽 방으로 가자'로 바뀐다. (2) 마을에 처음 닿은 순간의 저장을 이어하면 이미 온 마을을 찾으라고 했다. 이제 광장의 등불지기에게 말을 걸라는 줄이 나온다. (3) 달의 계단 마지막 등불을 켜면 아직 못 만난 거푸집의 심장을 노리라고 했다. 이제 '꼭대기 문을 지나 정원으로 가자'이고, 거푸집 줄은 정원 봉인 셋을 푼 뒤에 나온다. (4) 엔딩 전에 편지 세 통을 전하거나 보름달 축제를 보면 정원을 이미 감았다고 했다. 엔딩 전에는 묵은 편지와 꺼진 등불을 되살린 덕이라고 말하고, 정원 이야기는 엔딩 뒤에만 한다. (5) 보리 할머니에게 한결이 누군지 들은 뒤 엽서를 주워도 '한결이 누군지는 몰라도'라고 했다. 이제 마지막 달지기 한결에게 못 간 엽서라고 말한다. (6) 밤 추격 중에 낮까지 있다가 저장하고 이어하면 낮에는 없는 노을을 쫓으라고 했다. 이제 밤이 되면 마을에서 쉬자는 줄이 나온다. (7) 마을 다섯째 집 그림을 안 봤는데도 물결이 그 그림 속 한결과 닮았다고 했다. 그림을 안 봤으면 처음 보는 말을 한다. 전체 시험에서 가끔 실패하던 동료 수다 시험(말풍선 4개 → 1개)은 앞 시험에서 쓰러진 고블린이 8초 뒤 9칸 밖에서 다시 일어나 8칸 안으로 다가와 수다를 끊은 탓이라, 그 시험 동안은 되살아나지 않게 했다.",
 	"",
 	"2026-10-24 아침",
 	"· v0.0.43: GPT가 처음부터 끝까지 이야기대로 따라가며 찾은 열한 가지를 고쳤다. 마지막 태엽 감기 대사 도중 저장하고 이어하면 엔딩, 금화 500, 경험치 400, 큰 태엽 방 구멍이 사라졌는데, 이제 이어하면 엔딩이 그대로 나오고 보상은 한 번만 받는다. 나중에 동굴을 다시 찾았다가 안에서 저장하면 나올 때 할 일 줄이 비던 것, 거북 전투 중 저장을 불러오면 부두로 돌아오는데 할 일 줄은 섬 전투로 남던 것, 마지막 봉인을 풀어도 할 일 줄이 2/3에 멈추던 것을 고쳤다. 동굴 출구의 '다음 장에서 이어진다'는 지금 강을 건너 마을로 가자는 말로, 심지의 등불 열두 개는 광장 둘레 등불로, 보리가 읽은 편지는 도란에게 돌려주라는 말로, 왕관을 머리에 쓰지 않는다는 말과 첫 만남 이야기는 실제 이야기에 맞게 고쳤다. 새 바퀴 안내는 다음 바퀴의 실제 배율(1.5배 → 2배 → 2.5배)을 보여 주고 두 쪽으로 나뉘며, 작은 화면에서 큰 글자로 긴 대사가 나오면 대화 상자가 위로 늘어난다.",
@@ -4293,6 +4306,8 @@ func enter_stairs() -> void:
 
 var stairs_q_shown := ""
 
+const STAIRS_DONE_QUEST := "꼭대기 문을 지나 정원으로 가자"
+
 func stairs_quest() -> String:
 	if not stairs.wall_open:
 		return "계단을 막은 벽돌 벽을 왕관으로 풀자 (E)"
@@ -4348,7 +4363,7 @@ func stairs_key() -> bool:
 				shake = 0.3
 				ui.mini.map_tex = stairs.map_tex(STAIRS.STAIRS_X + STAIRS.W)
 				show_story("", STORY.STAIRS_TOP)
-				set_quest("굳은달 거푸집의 심장을 노리자")
+				set_quest(STAIRS_DONE_QUEST) # the mold's heart comes only after the garden's seals (GPT playtest 5)
 			else:
 				set_quest(stairs_quest())
 			save_game()
@@ -5984,7 +5999,8 @@ func load_game() -> void:
 	if forest_q == 2:
 		forest_q = 1 # the duel starts over when she walks back to the clearing
 	has_unbrick = bool(d.get("has_unbrick", false))
-	if night_q == 1 or night_q == 2:
+	var chase_cut := night_q == 1 or night_q == 2
+	if chase_cut:
 		night_q = 0 # a chase cut short by quitting starts over the next night
 	if night_q == 3:
 		spawn_noeul_duel()
@@ -6271,6 +6287,10 @@ func load_game() -> void:
 		set_quest(["", "왕관을 만져 보자 (E)", "서쪽 오두막으로 가 보자", "북쪽 벽돌왕이 늪의 물길을 막고 있다", "", CAVE_QUEST][clampi(story_step, 0, 5)])
 	if turtle_cut: # the fight starts over from the pier
 		set_quest("부두의 물결에게 말을 걸자 (E)")
+	if bool(d.get("in_village", false)) and errand == 0: # saved on arrival before the quest changed (GPT playtest 5)
+		set_quest(SIMJI_QUEST)
+	if chase_cut: # Noeul is not here until the next night (by night in the village start_night begins it again at once)
+		set_quest(NIGHT_REST_QUEST)
 	# saved during the last winding lines (garden_q 5, ending not yet played): the ending plays now, paid once
 	ending_due = garden_q >= 5 and story_step < 12
 	if ending_due and not intro:
@@ -6638,10 +6658,13 @@ func enter_village() -> void:
 	ui.mini.map_tex = village.map_tex(VILLAGE.VILLAGE_X + VILLAGE.W)
 	ui.zone_name.text = "등불 마을"
 	ui.zone_sub.text = "돌 광장"
+	if errand == 0: # the quest goes in before the save, so a load right after arrival does not ask for the village again
+		set_quest(SIMJI_QUEST)
 	save_game()
 	if errand == 0:
-		set_quest("광장의 등불지기에게 말을 걸자 (E)")
 		show_story("", STORY.VILLAGE)
+
+const SIMJI_QUEST := "광장의 등불지기에게 말을 걸자 (E)"
 
 func leave_village() -> void:
 	in_village = false
@@ -6967,7 +6990,7 @@ func mulgyeol_errand() -> void:
 		mul_q = 3
 		player.gold += 50
 		show_story("", STORY.MUL_DONE)
-		set_quest("마을 심부름을 모두 마쳤다. 밤이 되면 마을에서 쉬자")
+		set_quest(NIGHT_REST_QUEST)
 	else:
 		folk_talk("mulgyeol")
 	save_game()
@@ -7039,6 +7062,8 @@ func set_village_lamps(on: bool) -> void:
 	if on:
 		for d in village.dark:
 			d.lit = true
+
+const NIGHT_REST_QUEST := "마을 심부름을 모두 마쳤다. 밤이 되면 마을에서 쉬자"
 
 func start_night() -> void:
 	night_q = 1
@@ -10335,8 +10360,15 @@ func update_road(dt: float) -> void:
 		return
 	if road_q == 3 and me.y > 21.5 and me.y < 26.5 and me.x > GARDEN.GARDEN_X + 8.5 and me.x < GARDEN.GARDEN_X + 18.5 \
 			and not enemies.any(func(e): return e.get("echo", false) and not e.dead):
-		show_story("", STORY.ROAD_ECHO)
+		show_story("", road_echo_lines())
 		after_story = spawn_knight.bind(true)
+
+# Mulgyeol recalls the fifth house's painting only if she opened it (house_seen[4]); else a first look (GPT playtest 5)
+func road_echo_lines() -> Array:
+	var lines: Array = STORY.ROAD_ECHO.duplicate()
+	if not house_seen[4]:
+		lines[1] = STORY.ROAD_ECHO_FIRST
+	return lines
 
 func echo_beaten() -> void:
 	road_q = 4
@@ -11875,11 +11907,18 @@ func post_key() -> bool:
 		(post_pile.get_meta("card") as Node3D).visible = false
 		burst(post_pile.position + Vector3(0, 0.6, 0), Color("#f2ead8"), 24, 2.5)
 		sfx(784, 0.12, "triangle", 0.25)
-		show_story("", STORY.POST_CARD)
+		show_story("", post_card_lines())
 		ui.mini.map_tex = cave_map_tex()
 		save_game()
 		return true
 	return false
+
+# after BORI_LETTER (doran_q >= 3) Sora knows who Hangyeol was (GPT playtest 5)
+func post_card_lines() -> Array:
+	var lines: Array = STORY.POST_CARD.duplicate()
+	if doran_q >= 3:
+		lines[4] = STORY.POST_CARD_KNOWN
+	return lines
 
 func update_post() -> void:
 	var me := Vector2(player.x, player.z)
@@ -11919,10 +11958,15 @@ func cave_interact() -> bool:
 			sfx(330, 0.3, "square", 0.2, 200)
 			toast("문이 열렸다")
 			ui.mini.map_tex = cave_map_tex()
+			if not has_skip: # the painting's "find the key" line used to stay up past the open door (GPT playtest 5)
+				set_quest(CAVE_DOOR_QUEST)
+				save_game()
 		else:
 			toast("잠겨 있다. 열쇠가 필요하다")
 		return true
 	return false
+
+const CAVE_DOOR_QUEST := "열린 문 너머, 수레두더지가 있는 안쪽 방으로 가자"
 
 func check_painting() -> void:
 	if saw_painting or Vector2(player.x, player.z).distance_to(cave_marks.P) > 2.0:

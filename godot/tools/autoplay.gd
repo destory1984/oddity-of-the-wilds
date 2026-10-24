@@ -10,7 +10,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "painting_once", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "esc_sheets", "news_more", "touch_controls", "folk_sleep", "folk_routine", "hint_folk", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "story_fixes", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "mill", "post", "lake_south", "clock", "shore", "quarters", "oak", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "painting_once", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "esc_sheets", "news_more", "touch_controls", "folk_sleep", "folk_routine", "hint_folk", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "story_fixes", "playtest5", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "mill", "post", "lake_south", "clock", "shore", "quarters", "oak", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -2708,6 +2708,109 @@ func run() -> void:
 		check("story_fixes", ending and once and cave_q and over == 0 and pages and box_back,
 			"winding-lines save plays the ending on load, +500 gold, step 12=%s paid once=%s cave quest back after a reload=%s lines over the box at 720x540 biggest text=%d of %d (%d grew the box)%s new-round notice on two pages=%s box back to 144=%s"
 			% [ending, once, cave_q, over, lines.size() * 2, grew, (" worst: " + worst.left(40)) if over > 0 else "", pages, box_back])
+	if want.call("playtest5"):
+		# GPT's fifth playtest (main road): quest lines after the cave door, the village arrival save, the stairs top and
+		# a day-loaded chase save; lines that must fit what Sora knows and holds. The state before comes back at the end.
+		if main.intro:
+			main.start_game(false)
+		await wait(0.2)
+		main.close_story()
+		calm_enemies(true)
+		main.save_game()
+		var before: String = FileAccess.get_file_as_string(main.SAVE_PATH)
+		# 1. the cave door opens: the quest points on to the cart-mole's room
+		var keep := [main.has_key, main.cave_door_open, main.has_skip, null, main.story_step]
+		if is_instance_valid(main.door_node): # an earlier test may have opened (and freed) the real door
+			keep[3] = main.door_node
+		main.door_node = Node3D.new() # a stand-in, so the real door (open or shut) is untouched
+		main.add_child(main.door_node)
+		main.has_key = true
+		main.cave_door_open = false
+		main.has_skip = false
+		main.set_quest("열쇠를 찾아 잠긴 문을 열자")
+		reset_to(main.cave_marks.D + Vector2(0.8, 0))
+		main.cave_interact()
+		var door_q: bool = main.cave_door_open and main.ui.quest.text == main.tr(main.CAVE_DOOR_QUEST)
+		main.has_key = keep[0]
+		main.cave_door_open = keep[1]
+		main.has_skip = keep[2]
+		if keep[3] != null:
+			main.door_node = keep[3]
+		main.story_step = keep[4]
+		main.return_to_start()
+		# 2. the save made on reaching the village loads with Simji's quest, and so does an older one with the river line
+		var e0: int = main.errand
+		main.errand = 0
+		main.story_step = maxi(main.story_step, 7)
+		main.set_quest("동쪽 강을 물수제비 걸음으로 건너, 마을 불빛을 찾아라")
+		main.enter_village()
+		main.close_story()
+		main.set_quest("") # a fresh start knows nothing but the save
+		main.load_game()
+		var arrive_q: bool = main.in_village and main.ui.quest.text == main.tr(main.SIMJI_QUEST)
+		main.return_to_start()
+		var m: Vector2 = main.village.marks.M
+		var f := FileAccess.open(main.SAVE_PATH, FileAccess.WRITE)
+		f.store_string(JSON.stringify({"story": 8, "errand": 0, "in_village": true, "has_skip": true, "x": m.x - 3.0, "z": m.y, "quest": "동쪽 강을 물수제비 걸음으로 건너, 마을 불빛을 찾아라"}))
+		f.close()
+		main.load_game()
+		arrive_q = arrive_q and main.ui.quest.text == main.tr(main.SIMJI_QUEST)
+		main.return_to_start()
+		main.errand = e0
+		# 7. a chase save loaded by day: no Noeul to chase, so the quest says to rest in the village till night
+		f = FileAccess.open(main.SAVE_PATH, FileAccess.WRITE)
+		f.store_string(JSON.stringify({"story": 9, "errand": 3, "kid_q": 3, "doran_q": 3, "mul_q": 3, "night_q": 1, "in_village": true, "has_skip": true,
+			"hour": 12.0, "x": m.x + 4.0, "z": m.y + 1.0, "quest": "등불을 끈 노을을 쫓자 (Shift로 달리기)"}))
+		f.close()
+		main.load_game()
+		await wait(0.4)
+		var chase_q: bool = main.night_q == 0 and not main.is_night() and main.ui.quest.text == main.tr(main.NIGHT_REST_QUEST)
+		main.return_to_start()
+		# 6. the postcard: after Bori's letter (doran_q 3) Sora knows who Hangyeol was
+		var dq0: int = main.doran_q
+		main.doran_q = 2
+		var card_before: bool = "몰라도" in String(main.post_card_lines()[4])
+		main.doran_q = 3
+		var card_after: bool = main.post_card_lines()[4] == main.STORY.POST_CARD_KNOWN and not "몰라도" in String(main.post_card_lines()[4])
+		main.doran_q = dq0
+		# 8. the brick Hangyeol: the house painting is recalled only if she opened it
+		var hs0: bool = main.house_seen[4]
+		main.house_seen[4] = false
+		var echo_first: bool = main.road_echo_lines()[1] == main.STORY.ROAD_ECHO_FIRST
+		main.house_seen[4] = true
+		var echo_seen: bool = "그림" in String(main.road_echo_lines()[1])
+		main.house_seen[4] = hs0
+		# 5. Doran's thanks before the ending speak of letters; after it, of the garden
+		main.mail_q = 1
+		for i in main.mail_got.size():
+			main.mail_got[i] = true
+		main.garden_q = 0
+		main.story_step = 10
+		main.mail_errand()
+		var mail_pre: bool = main.story_open and not "정원" in "".join(main.story_lines)
+		main.close_story()
+		main.mail_q = 1
+		main.garden_q = 5
+		main.story_step = 12
+		main.mail_errand()
+		var mail_end: bool = main.story_open and main.STORY.MAIL_DONE_WOUND in main.story_lines
+		main.close_story()
+		var fest: bool = not "정원" in String(main.STORY.FESTIVAL[1]) and "정원" in main.STORY.FESTIVAL_WOUND
+		# put the state from before back
+		f = FileAccess.open(main.SAVE_PATH, FileAccess.WRITE)
+		f.store_string(before)
+		f.close()
+		main.return_to_start()
+		f = FileAccess.open(main.SAVE_PATH, FileAccess.WRITE)
+		f.store_string(before)
+		f.close()
+		main.load_game()
+		if main.story_open:
+			main.close_story()
+		calm_enemies(false)
+		check("playtest5", door_q and arrive_q and chase_q and card_before and card_after and echo_first and echo_seen and mail_pre and mail_end and fest,
+			"cave door quest=%s village arrival save quest=%s day chase save quest=%s postcard before/after the letter=%s/%s road echo unseen/seen painting=%s/%s mail thanks before/after the ending=%s/%s festival=%s"
+			% [door_q, arrive_q, chase_q, card_before, card_after, echo_first, echo_seen, mail_pre, mail_end, fest])
 	if want.call("books"):
 		main.story_step = maxi(main.story_step, 10)
 		if main.intro:
@@ -2805,6 +2908,11 @@ func run() -> void:
 		main.join_mate()
 		main.join_noeul()
 		calm_enemies(true)
+		# goblins downed by earlier tests rise again 8 s later somewhere 9+ tiles off and walk in, and one inside 8 tiles
+		# hushes the talk (the full run once counted 1 balloon of 4): hold their rising until this test is done
+		var risers: Array = main.enemies.filter(func(e): return e.dead and not e.get("cave", false) and not e.get("boss", false))
+		for e in risers:
+			e.respawn = 9999.0
 		reset_to(Vector2(20, 30))
 		main.snap_mates()
 		main.chat_t = 9.5
@@ -2830,6 +2938,8 @@ func run() -> void:
 			chat_gob.dead = true
 			chat_gob.node.queue_free()
 			chat_gob.shadow.queue_free()
+		chat_gob.respawn = 9999.0 # nor may it rise again beside her while the story talk is checked
+		risers.append(chat_gob)
 		# a talk about where the story stands comes first, once
 		main.talks_heard = {}
 		var fq0: int = main.forest_q
@@ -2850,6 +2960,8 @@ func run() -> void:
 		var story_first: bool = main.talks_heard.has("noeul_new")
 		main.forest_q = fq0
 		main.hill_q = hq0
+		for e in risers:
+			e.respawn = 8.0
 		calm_enemies(false)
 		check("mate_chat", talked and three and hushed and story_first and main.chat_cd > 10.0, "a balloon after standing still=%s a four-line talk among all three=%s (%d balloons) a monster stops it=%s story talk first=%s %s" % [talked, three, said, hushed, story_first, main.talks_heard.keys()])
 	if want.call("east_bridge"):
@@ -4531,7 +4643,8 @@ func run() -> void:
 			tap(KEY_E)
 			await wait(0.1)
 		main.close_story()
-		var door: bool = main.stairs.door_open and main.player_can(sx + 11, 2)
+		var door: bool = main.stairs.door_open and main.player_can(sx + 11, 2) \
+			and main.ui.quest.text == main.tr(main.STAIRS_DONE_QUEST) # the top door, not the mold's heart yet
 		main.road_q = 4
 		reset_to(main.stairs.marks.N + Vector2(0, 0.3))
 		await wait(1.5)

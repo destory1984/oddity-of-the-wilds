@@ -600,17 +600,22 @@ const MAIL_HUT := [
 
 const MAIL_DONE := [
 	"도란|doran|다 전했소? 고맙소, 정말 고맙소! 이건 배달 삯이오.",
-	"도란|doran|내일부턴 나도 다시 우편 자루를 메고 다닐 거요. 정원이 다시 돌아가니 편지도 돌아야지.",
+	"도란|doran|내일부턴 나도 다시 우편 자루를 메고 다닐 거요. 묵은 편지가 닿았으니 새 편지도 돌아야지.",
 	"||금화 150닢을 받고, 최대 체력이 10 늘었다.",
 ]
+# MAIL_DONE's second line once the garden is wound (garden_q >= 5): before that Doran thanks her for the letters
+const MAIL_DONE_WOUND := "도란|doran|내일부턴 나도 다시 우편 자루를 메고 다닐 거요. 정원이 다시 돌아가니 편지도 돌아야지."
 
 const FESTIVAL := [
 	"||보름달 아래 마을 하늘로 등불이 하나둘 떠올랐다. 아이들이 손뼉을 치며 그 뒤를 쫓았다.",
-	"심지|simji|백 년 만의 등불 축제요! 이게 다 손님이 정원을 감아 준 덕이오.",
+	"심지|simji|백 년 만의 등불 축제요! 이게 다 손님이 꺼진 등불을 되살려 준 덕이오.",
 	"심지|simji|자, 축제 떡이오. 셋이나 챙겨 가시오. 먼 길에 요긴할 거요.",
 	"소라|laugh|고마워요, 심지 할아버지. 정말 예쁘다……",
 	"||축제 떡 셋(회복약 3개)을 받았다.",
 ]
+
+# FESTIVAL's second line once the garden is wound (garden_q >= 5)
+const FESTIVAL_WOUND := "심지|simji|백 년 만의 등불 축제요! 이게 다 손님이 정원을 감아 준 덕이오."
 
 const FEST_AGAIN := [
 	"심지|simji|등불 구경 실컷 하시오. 오늘 밤은 괴물도 쉬는 밤이라오.",
@@ -1325,6 +1330,8 @@ const ROAD_ECHO := [
 	"노을|jae|거푸집이 떠 둔 모양이야. 한결이 진 밤의 모양 그대로.",
 	"소라|determined|왕관을 머리에 썼네. 그건 쓰는 게 아니라 쥐는 거야. 나는 안 써.",
 ]
+# ROAD_ECHO's second line when the fifth house's painting (house_seen[4]) was never opened
+const ROAD_ECHO_FIRST := "물결|mulgyeol|저게…… 한결이야? 마을 어른들 얘기 속 모습 그대로야."
 
 const ROAD_ECHO_DOWN := [
 	"||벽돌 한결이 무너지자 머리의 벽돌 왕관이 모래처럼 흩어졌다.",
@@ -1413,6 +1420,8 @@ const POST_CARD := [
 	"소라|determined|한결이 누군지는 몰라도, 이건 내가 들고 갈게.",
 	"||엽서를 챙겼다. 더미 밑에서 회복약 2개를 찾았다. 최대 체력 +10.",
 ]
+# POST_CARD's fifth line once Bori has told who Hangyeol was (doran_q >= 3, BORI_LETTER)
+const POST_CARD_KNOWN := "소라|determined|마지막 달지기 한결에게 못 간 엽서구나. 이건 내가 들고 갈게."
 
 const POST_BORI := [
 	"소라|calm|할머니, 하나 더 있어요. 동굴 물길 끝에서 주운 엽서예요. 한결에게 가는.",
