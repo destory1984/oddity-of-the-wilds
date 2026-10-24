@@ -136,6 +136,10 @@ python -m http.server 8765
 
 그다음 `http://localhost:8765` 를 연다.
 
+## 의견을 주는 법
+
+[이슈](https://github.com/destory1984/the-crown-oddity/issues)에 적어 주면 된다.
+
 ## 라이선스
 
 - 코드: MIT 라이선스. 마음대로 고치고 써도 된다.
