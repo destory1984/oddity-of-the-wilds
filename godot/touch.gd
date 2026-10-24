@@ -30,8 +30,9 @@ func keys() -> Dictionary:
 		"guard": [Vector2(vs.x - 176, vs.y - 270), 42.0],
 		"crown": [Vector2(vs.x - 64, vs.y - 300), 38.0],
 		"open": [Vector2(vs.x - 290, vs.y - 226), 38.0],
-		"zoom_in": [Vector2(vs.x - 290, 162), 26.0], # under the menu keys, left of the minimap
-		"zoom_out": [Vector2(vs.x - 226, 162), 26.0],
+		# a column left of the menu keys, level with their two rows: clear of the boss bar and the quest line under them
+		"zoom_in": [Vector2(vs.x - 358, 36), 26.0],
+		"zoom_out": [Vector2(vs.x - 358, 100), 26.0],
 	}
 	for i in 4: # the skill icons hud.gd draws (U I O and the potion)
 		k["skill%d" % i] = [Vector2(vs.x - 264 + i * 74, vs.y - 59), 36.0]
@@ -103,7 +104,14 @@ func press(n: String, idx: int) -> void:
 		"skill0", "skill1", "skill2": main.use_skill(int(n.right(1)))
 		"skill3": main.drink_potion()
 
+# the menu keys and the minimap step aside while a story, the shop, a sheet or the settings are up
+func step_aside() -> void:
+	var up: bool = main.intro or main.story_open or main.shop_open or main.settings_open or main.ui.journal.visible or main.ui.help.visible
+	for c in [main.ui.hint, main.ui.sound_btn, main.ui.journal_btn, main.ui.settings_btn, main.ui.mini.get_parent()]:
+		c.visible = not up
+
 func _process(_dt: float) -> void:
+	step_aside()
 	if not playing() and pad_idx >= 0: # a story or a sheet opened under the thumb: let go of everything
 		pad_idx = -1
 		main.touch_move = Vector2.ZERO

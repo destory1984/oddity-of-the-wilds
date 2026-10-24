@@ -1759,6 +1759,8 @@ func toggle_shop(open: bool) -> void:
 		lines.append_array(bori_news())
 		ui.shop_say.text = lines[rng.randi() % lines.size()]
 		ui.shop_keeper.texture = load("res://art/portrait/bori.png")
+		if touch_ui:
+			fit_shop()
 		refresh_shop()
 		sfx(660, 0.12, "triangle", 0.2)
 
@@ -3185,6 +3187,7 @@ const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 302분 / 목표 300분 (100%)",
 	"",
 	"2026-10-24 아침",
+	"· v0.0.40: 휴대폰 화면에서 GPT 시험 놀이꾼이 찾은 여덟 가지를 고쳤다. 상점이 화면 안에 줄어 들어가고 제목이 잘리지 않으며, 상점·일지·설정·조작법이 열리면 메뉴 단추와 미니맵이 비켜난다. 상점은 왼쪽 위 단추로 닫는다. 돋보기 단추는 메뉴 단추 왼쪽으로 옮겨 보스 체력 막대를 가리지 않는다. 긴 할 일 줄은 동료 상태와 오른쪽 단추 사이에서 두 줄로 접힌다. 휴대폰 조작법은 이동 막대와 터치 단추 그림으로 설명하고, 기술 그림 밑에 이름이 붙는다. 동료 말풍선이 1.4배로 커지고 1초 더 머문다. 창의 뒤로 단추가 56px 이상이 되었다. 달지기 숙소는 벽 윗면을 옅은 청회색으로 덮고 바닥을 조금 밝혀 밤에도 벽과 바닥이 구별된다.",
 	"· v0.0.39: GPT 시험 놀이꾼이 두 번째로 찾은 네 가지를 고쳤다. 벽돌왕을 쓰러뜨린 뒤 할 일 줄이 '다음 장에서 계속' 대신 '열린 동굴 입구로 내려가자'를 보여 주고, 동굴 입구 위에 금빛 느낌표가 뜬다. 작은 돌숲에 들어서면 남쪽 나무들이 반쯤 비쳐 달 돌 앞 바닥과 안내판이 보인다. 밤 숲의 벽돌 벽 앞 바닥에 옅게 빛나는 테두리가 생겼다. 성 아래 등불 방은 물이 빠질 때 '물빛 등불 넷을 8초 안에 켜자'라고 알려 주고, 아직 꺼진 등불 위에 금빛 느낌표가 뜬다.",
 	"· v0.0.38: GPT 시험 놀이꾼이 찾은 다섯 가지를 고쳤다. 좁은 틈에서는 물결과 노을이 소라 뒤에 한 줄로 따라오고, 소라가 멈추면 서로 떨어진 빈자리에 선다(다람쥐 나무 입구에서 셋이 겹쳐 보였다). 밤 아랫못의 열린 창살 길에 빛나는 다리 가장자리와 작은 등불을 달았다. 깨어난 물가에서 강가 길부터 다리 서쪽 끝까지 갈대를 걷어 한 칸 길을 냈다. 자는 주민이 깔개와 침대 위에 비스듬히 눕고 밑에 그림자가 생겼다. 달지기 숙소 안에서는 다음에 할 일(셈판, 작업대, 멈춘 문지기, 장부) 위에 금빛 느낌표가 뜬다.",
 	"· v0.0.37: 5장에 다람쥐 나무(약 2분). 다람쥐 다섯을 구하고 회색 문을 연 뒤에는 숲 한가운데 회색 나무 틈 앞에 큰 다람쥐가 앉아 있다. 말을 걸면 굳은 나무 한 그루가 비켜서고, 안쪽 숨은 빈터에 숲에서 가장 늙은 도토리나무가 서 있다. 이 나무 뿌리가 아직 살아서 남쪽 골짜기 개울을 데우고 있었다. 나무 곁 3.2칸 안에서는 낮에도 켜진 등불 곁처럼 쉬어 눈금이 찬다(칸마다 6초). 뿌리를 묶은 벽돌 매듭 셋을 왕관으로 풀면(눈금 1칸씩) 뿌리가 하나씩 나무 쪽으로 당겨 붙고, 둘째 매듭 뒤에는 벽돌 고슴도치 2마리가 굴러 나온다. 마지막 매듭 뒤 1.5초 동안은 대사 없이 나무가 한 번 숨 쉬고 낮은 가지의 잎 둘이 처음 흔들린다. 그 뒤 나무가 초록이 되고, 구해 준 다람쥐 다섯이 돌아와 가지에 앉는다. 싹 튼 도토리(회복약 65 → 75, 새 바퀴에도 남는다), 최대 체력 +10, 금화 60을 받는다. 마을 나무꾼 두솔의 다람쥐 틈 실마리도 켰다. 대사와 소품은 GPT의 의견으로 다듬었다.",
@@ -3353,8 +3356,22 @@ func back_key(parent: Control, fn: Callable) -> Button:
 	b.position = Vector2(8, 8)
 	b.size = Vector2(44, 44)
 	b.pressed.connect(fn)
+	b.set_meta("back", true) # size_back_keys finds it
 	parent.add_child(b)
 	return b
+
+# the corner back keys of a sheet: on phones at least 56 px on screen (the sheet's own shrink taken out), else 44 px;
+# a title beside the key moves along
+func size_back_keys(c: Control) -> void:
+	for b in c.get_children():
+		if not b.has_meta("back"):
+			continue
+		var s := ceilf(56.0 / c.scale.x) if touch_ui else 44.0
+		b.position = Vector2(4, 2) if touch_ui else Vector2(8, 8)
+		b.size = Vector2(s, s)
+		var title: Label = b.get_meta("title", null)
+		if title != null:
+			title.position.x = b.position.x + s + 8.0 if touch_ui else 62.0
 
 func menu_panel(root: Control, pos: Vector2, size: Vector2, anchor: int) -> Panel:
 	var p := panel(root, pos, size, anchor)
@@ -3428,11 +3445,20 @@ func layout_help() -> void:
 		kw = maxf(kw, (r[0] as Label).get_minimum_size().x)
 		dw = maxf(dw, (r[1] as Label).get_minimum_size().x)
 	var step := 27.0 * k
+	var top := 72.0 if touch_ui else 60.0 # phones: under the bigger back key
+	var iw := 0.0
+	if ui.help_rows[0].size() > 2: # the touch rows lead with the key's picture
+		step = 31.0 * k
+		iw = 28.0 * k + 8.0
 	for i in ui.help_rows.size():
-		(ui.help_rows[i][0] as Label).position = Vector2(14, 60 + i * step + 1)
-		(ui.help_rows[i][1] as Label).position = Vector2(14 + kw + 24, 60 + i * step)
-	var w: float = maxf(340.0, 14 + kw + 24 + dw + 22)
-	var h: float = 60 + ui.help_rows.size() * step + 18
+		if ui.help_rows[i].size() > 2:
+			var ic: TextureRect = ui.help_rows[i][2]
+			ic.position = Vector2(14, top + i * step - 2.0 * k)
+			ic.size = Vector2.ONE * 28.0 * k
+		(ui.help_rows[i][0] as Label).position = Vector2(14 + iw, top + i * step + 1)
+		(ui.help_rows[i][1] as Label).position = Vector2(14 + iw + kw + 24, top + i * step)
+	var w: float = maxf(340.0, 14 + iw + kw + 24 + dw + 22)
+	var h: float = top + ui.help_rows.size() * step + 18
 	place(ui.help, Control.PRESET_BOTTOM_LEFT, Vector2(8, -80 - h), Vector2(w, h)) # 8 px over the keys
 	if touch_ui:
 		fit_sheet(ui.help)
@@ -3602,6 +3628,22 @@ func build_settings(root: Control) -> void:
 		scale_text(hd)
 		scale_text(ht)
 		ui.set_stacks[1].append([ht, hd, null])
+	ui.set_help_keys = ui.set_stacks[1].duplicate()
+	# phones: the same page for the touch keys (use_touch_help swaps the two)
+	var touch_rows := [["이동", "화면 왼쪽에 엄지를 대면 막대가 생긴다. 끝까지 밀면 달린다 (물수제비 걸음을 얻으면 물 위도)"],
+		["싸움", "칼 단추로 베기, 화살표 단추로 구르기, 방패 단추를 누르고 있으면 막기"],
+		["기술", "오른쪽 아래 그림 셋은 회오리·불씨탄·빛파동, 초록 하트는 회복약"], ["왕관", "왕관 단추 (E): 말 걸기, 등불, 벽돌 풀기, 길돌, 낚시"],
+		["열기", "손 단추 (Space): 상자, 집"], ["화면", "돋보기 단추로 확대·축소. 미니맵 왼쪽 단추 넷: 조작법, 효과음, 일지, 설정"], help_rows[6]]
+	ui.set_help_touch = []
+	for i in touch_rows.size():
+		var tt := label(ui.set_pages[1], touch_rows[i][0], Vector2(0, i * 48), 16, Color("#eef3ff"))
+		tt.size = Vector2(112, 20)
+		var td := wrap_label(ui.set_pages[1], touch_rows[i][1], Vector2(122, i * 48), 518, 16, ODD_MUTED)
+		scale_text(td)
+		scale_text(tt)
+		tt.visible = false
+		td.get_parent().visible = false
+		ui.set_help_touch.append([tt, td, null])
 	# 바뀐 것
 	var scroll := ScrollContainer.new() # the list grows with every ship: it scrolls
 	scroll.size = Vector2(640, 396)
@@ -3724,11 +3766,12 @@ func say_bubble(who: Node3D, text: String, dur := 3.5) -> void:
 	l.position = Vector3(0, 0.045, 0) # centred on the card, above the tail
 	b.add_child(l)
 	b.position = Vector3(0, 2.45, 0)
-	b.scale = Vector3.ONE * 0.2
+	var big := 1.4 if touch_ui else 1.0 # phones: bigger text, and a second longer to read it
+	b.scale = Vector3.ONE * 0.2 * big
 	who.add_child(b)
 	var tw := b.create_tween() # pops up, then fades away
-	tw.tween_property(b, "scale", Vector3.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_interval(dur)
+	tw.tween_property(b, "scale", Vector3.ONE * big, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(dur + (1.0 if touch_ui else 0.0))
 	tw.tween_property(card, "modulate:a", 0.0, 0.3)
 	tw.parallel().tween_property(l, "modulate:a", 0.0, 0.3)
 	tw.tween_callback(b.queue_free)
@@ -3950,8 +3993,8 @@ func update_mate_hud() -> void:
 		else:
 			r.act.text = tr("싸우는 중") if fighting else tr("따라가는 중")
 
-# ---- phones: the touch layer over the HUD, and the four menu keys in a column left of the minimap (the stick takes
-# the bottom left); the zoom keys sit under the minimap
+# ---- phones: the touch layer over the HUD, and the four menu keys two by two left of the minimap (the stick takes
+# the bottom left); the zoom keys stand in a column left of them, clear of the boss bar and the quest line
 func enable_touch() -> void:
 	touch_ui = true
 	if touch_layer == null:
@@ -3962,6 +4005,8 @@ func enable_touch() -> void:
 	var col := [ui.hint, ui.sound_btn, ui.journal_btn, ui.settings_btn] # two by two, 56 px, left of the minimap
 	for i in col.size():
 		place(col[i], Control.PRESET_TOP_RIGHT, Vector2(-194 - 8 - 56 - (1 - i % 2) * 64, 8 + (i / 2) * 64), Vector2(56, 56))
+	use_touch_help(true)
+	ui.quest.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART # a long quest wraps in the free width (layout_touch_top)
 	cfg.text = maxi(int(cfg.text), 2) # text a size up on a small screen
 	apply_settings()
 	await get_tree().process_frame # the sheets know their size a frame later
@@ -3969,6 +4014,58 @@ func enable_touch() -> void:
 		fit_sheet(sheet)
 	ui.set_card.pivot_offset = ui.set_card.size / 2.0
 	ui.set_card.scale = Vector2.ONE * minf(1.0, (get_viewport().get_visible_rect().size.y - 16.0) / ui.set_card.size.y)
+	size_back_keys(ui.set_card)
+	fit_shop()
+
+# the controls sheet and the settings' Help page show the touch keys on phones, the keyboard and mouse elsewhere
+func use_touch_help(on: bool) -> void:
+	for r in ui.help_keys_rows:
+		for c in r:
+			c.visible = not on
+	for r in ui.help_touch_rows:
+		for c in r:
+			c.visible = on
+	ui.help_rows = ui.help_touch_rows if on else ui.help_keys_rows
+	for r in ui.set_help_keys:
+		r[0].visible = not on
+		r[1].get_parent().visible = not on
+	for r in ui.set_help_touch:
+		r[0].visible = on
+		r[1].get_parent().visible = on
+	ui.set_stacks[1] = ui.set_help_touch if on else ui.set_help_keys
+
+# phones: the quest line and the boss bar centred in the free width between the companions' rows (to x 296) and the
+# menu keys and minimap on the right (8 px from the minimap); a long quest wraps there
+func layout_touch_top() -> void:
+	var vs := get_viewport().get_visible_rect().size
+	var x0 := 296.0
+	var x1 := vs.x - 202.0
+	var mid := (x0 + x1) / 2.0 - vs.x / 2.0
+	ui.quest.offset_left = mid - (x1 - x0) / 2.0
+	ui.quest.offset_right = mid + (x1 - x0) / 2.0
+	ui.boss.offset_left = mid - 220.0
+	ui.boss.offset_right = mid + 220.0
+
+# the shop on a phone: the board shrunk to fit above Bori's line, the line along the bottom, a back key in the corner
+# (the touch keys are hidden while it is open, so the key is the way out); elsewhere the desktop layout
+func fit_shop() -> void:
+	var board: Control = ui.shop_board
+	var line: Control = ui.shop_line
+	ui.shop_back.visible = touch_ui
+	if not touch_ui:
+		board.scale = Vector2.ONE
+		place(board, Control.PRESET_CENTER, Vector2(-160, -270), Vector2(620, 420))
+		place(line, Control.PRESET_CENTER_BOTTOM, Vector2(-470, -150), Vector2(940, 100))
+		ui.shop_keys.text = "1 → 4 사기  ·  E / Space / Esc 닫기"
+		return
+	var vs := get_viewport().get_visible_rect().size
+	place(line, Control.PRESET_CENTER_BOTTOM, Vector2(-470, -108), Vector2(940, 100))
+	var s := minf(1.0, (vs.y - 140.0) / 438.0) # the board and its tab (18 px) between 8 px from the top and the line's tab
+	var x := (258.0 + vs.x - 8.0) / 2.0 - 310.0 * s # centred right of Bori
+	place(board, Control.PRESET_TOP_LEFT, Vector2(x, 8.0 + 18.0 * s), Vector2(620, 420))
+	board.scale = Vector2.ONE * s
+	ui.shop_keys.text = "카드를 누르면 산다  ·  왼쪽 위 단추로 닫기"
+	size_back_keys(ui.shop)
 
 # a sheet in the middle of a small screen, shrunk to fit its height
 func fit_sheet(c: Control) -> void:
@@ -3977,6 +4074,7 @@ func fit_sheet(c: Control) -> void:
 	place(c, Control.PRESET_CENTER, -sz / 2.0, sz)
 	c.pivot_offset = sz / 2.0
 	c.scale = Vector2.ONE * minf(1.0, minf((vs.y - 16.0) / sz.y, (vs.x - 16.0) / sz.x))
+	size_back_keys(c)
 
 # the autoplay test turns the touch layer off again, and the menu keys go back to the bottom left
 func disable_touch() -> void:
@@ -3991,9 +4089,21 @@ func disable_touch() -> void:
 		place(col[i], Control.PRESET_BOTTOM_LEFT, Vector2(8 + i * 72, -72), Vector2(64, 64))
 	for sheet in [ui.journal, ui.ways, ui.help, ui.set_card]:
 		sheet.scale = Vector2.ONE
+		size_back_keys(sheet)
 	place(ui.journal, Control.PRESET_BOTTOM_LEFT, Vector2(8, -647), Vector2(800, 567))
 	place(ui.ways, Control.PRESET_BOTTOM_LEFT, Vector2(8, -300), Vector2(330, 220))
+	use_touch_help(false)
+	ui.quest.autowrap_mode = TextServer.AUTOWRAP_OFF
+	ui.quest.offset_left = -300.0
+	ui.quest.offset_right = 300.0
+	ui.boss.offset_left = -220.0
+	ui.boss.offset_right = 220.0
+	for c in [ui.hint, ui.sound_btn, ui.journal_btn, ui.settings_btn, ui.mini.get_parent()]: # the touch layer hid them under sheets
+		c.visible = not intro
+	ui.hint.visible = not intro and not ui.help.visible
+	fit_shop()
 	layout_help()
+	layout_settings()
 
 # ---- the bottom-left buttons: gold diamond keys in the skills' family (draft 4 of five, double gold rim with a thin
 # line symbol, the user's pick 2026-10-24), 64 px, 8 px apart and 8 px from the edges; the key is in the tooltip
@@ -5106,6 +5216,7 @@ func build_hud() -> void:
 	board.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	shop.add_child(board)
 	place(board, Control.PRESET_CENTER, Vector2(-160, -270), Vector2(620, 420))
+	ui.shop_board = board
 	var btab := Control.new()
 	btab.set_script(load("res://frame.gd"))
 	btab.kind = "tab"
@@ -5157,6 +5268,7 @@ func build_hud() -> void:
 	say.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	shop.add_child(say)
 	place(say, Control.PRESET_CENTER_BOTTOM, Vector2(-470, -150), Vector2(940, 100))
+	ui.shop_line = say
 	var stab := Control.new()
 	stab.set_script(load("res://frame.gd"))
 	stab.kind = "tab"
@@ -5168,7 +5280,9 @@ func build_hud() -> void:
 	sn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ui.shop_say = label(say, "", Vector2(40, 32), 19)
 	ui.shop_say.size = Vector2(860, 40)
-	label(say, "1 → 4 사기  ·  E / Space / Esc 닫기", Vector2(680, 70), 12, Color("#a99d84"))
+	ui.shop_keys = label(say, "1 → 4 사기  ·  E / Space / Esc 닫기", Vector2(680, 70), 12, Color("#a99d84"))
+	ui.shop_back = back_key(shop, func(): toggle_shop(false)) # phones only (fit_shop)
+	ui.shop_back.visible = false
 	shop.visible = false
 	ui.shop = shop
 	ui.shop_hint = label(root, "E  보리 할머니의 상점", Vector2.ZERO, 16, Color("#fff1c8"))
@@ -5292,7 +5406,7 @@ func build_hud() -> void:
 	# controls help, starts hidden; H or the button toggles it
 	var help := menu_panel(root, Vector2(8, -567), Vector2(340, 487), Control.PRESET_BOTTOM_LEFT) # ends 8 px above the buttons
 	help.mouse_filter = Control.MOUSE_FILTER_STOP
-	label(help, "조작법", Vector2(62, 20), 13, Color("#a99d84"))
+	var help_title := label(help, "조작법", Vector2(62, 20), 13, Color("#a99d84"))
 	var rows := [["WASD / 방향키", "이동"], ["Shift", "달리기"], ["J / 왼쪽 클릭", "공격 (연속기)"], ["K / 오른쪽 클릭", "구르기 (때맞추면 섬광)"], ["L / 가운데 클릭", "막기 (때맞추면 반격, Lv4부터 1초 모아 J)"],
 		["U I O / 1 2 3", "스킬 (기세 30·15·60)"], ["4", "회복약"], ["Space", "상자 열기, 들어가기"], ["E", "왕관 만지기, 말 걸기 (보리 할머니 포함)"], ["Z X / 휠", "확대·축소"], ["T R P", "3시간 뒤로 / 비 / 사진"], ["F8", "처음 자리로 (진행은 그대로)"], ["F9", "처음부터 (저장 지우기)"], ["Q", "일지 (할 일과 곁이야기)"], ["H", "조작법 숨기기"]]
 	ui.help_rows = []
@@ -5302,17 +5416,40 @@ func build_hud() -> void:
 		scale_text(hk)
 		scale_text(hv)
 		ui.help_rows.append([hk, hv])
-	back_key(help, func(): toggle_help(false))
+	ui.help_keys_rows = ui.help_rows
+	# phones: the touch keys, each row with the key's own picture (use_touch_help swaps the two sets)
+	var trows := [["touch_stick_base", "왼쪽 막대", "이동, 끝까지 밀면 달리기"], ["touch_attack", "칼", "공격 (연속기)"],
+		["touch_dodge", "화살표", "구르기 (때맞추면 섬광)"], ["touch_guard", "방패 (누른 채)", "막기 (때맞추면 반격, Lv4부터 1초 모아 칼)"],
+		["touch_crown", "왕관 (E)", "왕관 만지기, 말 걸기 (보리 할머니 포함)"], ["touch_open", "손 (Space)", "상자 열기, 들어가기"],
+		["skill_0", "기술 그림 셋", "회오리·불씨탄·빛파동 (기세 30·15·60)"], ["skill_3", "초록 하트", "회복약"],
+		["touch_zoom_in", "돋보기 둘", "확대·축소"], ["key_help", "물음표", "조작법"], ["key_sound", "스피커", "효과음 켜고 끄기"],
+		["key_journal", "책", "일지 (할 일과 곁이야기)"], ["key_gear", "톱니바퀴", "설정"]]
+	ui.help_touch_rows = []
+	for r in trows:
+		var ic := TextureRect.new()
+		ic.texture = load("res://art/ui/%s.png" % r[0])
+		ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		help.add_child(ic)
+		var tk := label(help, r[1], Vector2.ZERO, 13, Color("#e9dfc4"))
+		var tv := label(help, r[2], Vector2.ZERO, 15)
+		scale_text(tk)
+		scale_text(tv)
+		for c in [ic, tk, tv]:
+			c.visible = false
+		ui.help_touch_rows.append([tk, tv, ic])
+	back_key(help, func(): toggle_help(false)).set_meta("title", help_title)
 	help.visible = false
 	ui.help = help
 	# the journal (Q): what to do now, the side stories found so far and the keepsakes Sora carries
 	var journal := menu_panel(root, Vector2(8, -647), Vector2(800, 567), Control.PRESET_BOTTOM_LEFT)
 	journal.mouse_filter = Control.MOUSE_FILTER_STOP
-	label(journal, "일지", Vector2(62, 20), 14, Color("#a99d84"))
+	var journal_title := label(journal, "일지", Vector2(62, 20), 14, Color("#a99d84"))
 	menu_rule(journal, Vector2(14, 60), 772)
 	ui.journal_text = journal_column(journal, Vector2(14, 70), Vector2(420, 487))
 	ui.journal_text2 = journal_column(journal, Vector2(450, 70), Vector2(336, 487)) # the right column: feats and keepsakes
-	back_key(journal, func(): toggle_journal(false))
+	back_key(journal, func(): toggle_journal(false)).set_meta("title", journal_title)
 	journal.visible = false
 	ui.journal = journal
 	var ways := menu_panel(root, Vector2(8, -300), Vector2(330, 220), Control.PRESET_BOTTOM_LEFT)
@@ -12420,13 +12557,15 @@ func _process(dt: float) -> void:
 	toast_t -= dt
 	if toast_t <= 0: ui.toast.modulate.a = maxf(0, ui.toast.modulate.a - dt * 3)
 	ui.lv.text = str(player.lv)
-	var narrow := get_viewport().get_visible_rect().size.x < 1180.0
+	var narrow := get_viewport().get_visible_rect().size.x < 1180.0 or touch_ui # a wide phone keeps the menu keys' row clear
 	if ui.story.visible:
 		fit_story()
 	ui.quest.offset_top = (200.0 if ui.boss.visible else 150.0) if narrow else 62.0
 	ui.boss.offset_top = 140.0 if narrow else 14.0
 	ui.boss.offset_bottom = ui.boss.offset_top + 40.0
 	ui.quest.offset_bottom = ui.quest.offset_top + 26.0
+	if touch_ui:
+		layout_touch_top()
 	ui.hp.size.x = 200.0 * player.hp / player.max_hp
 	ui.mp.size.x = 200.0 * player.mp / player.max_mp
 	ui.mp.modulate.a = 0.45 + 0.55 * absf(sin(t * 6.0)) if player.mp >= 60.0 else 1.0 # enough for 빛파동

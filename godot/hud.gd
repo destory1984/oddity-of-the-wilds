@@ -105,8 +105,14 @@ func _draw() -> void:
 	if main.ui.quest.visible:
 		var cx := vs.x / 2.0
 		var qy: float = main.ui.quest.position.y
-		for y in [qy - 8.0, qy + 34.0]:
-			var half := 140.0 if y < qy else 80.0
+		var low := qy + 34.0
+		var top_half := 140.0
+		if main.touch_ui: # phones: the line sits in the free width and may wrap to two lines
+			cx = main.ui.quest.position.x + main.ui.quest.size.x / 2.0
+			low = qy + main.ui.quest.size.y + 8.0
+			top_half = minf(140.0, main.ui.quest.size.x / 2.0)
+		for y in [qy - 8.0, low]:
+			var half := top_half if y < qy else 80.0
 			draw_line(Vector2(cx - half, y), Vector2(cx - 10, y), GOLD_DIM, 1.0)
 			draw_line(Vector2(cx + 10, y), Vector2(cx + half, y), GOLD_DIM, 1.0)
 			diamond(Vector2(cx, y), 4, GOLD)
@@ -114,6 +120,7 @@ func _draw() -> void:
 			diamond(Vector2(cx + half, y), 2.5, GOLD)
 	# ---- skills
 	var keys := ["U", "I", "O", "4"]
+	var names := ["회오리", "불씨탄", "빛파동", "회복약"] # phones have no keys: the tag names the skill
 	var cds: Array = p.cds
 	var cd_max := [main.SKILL_CD[0], main.SKILL_CD[1], main.SKILL_CD[2], 2.0]
 	for i in 4:
@@ -129,9 +136,14 @@ func _draw() -> void:
 				pts.append(sc + Vector2(cos(a1), sin(a1)) * 22)
 			draw_colored_polygon(pts, Color(0, 0, 0, 0.6))
 		var kb := sc + Vector2(0, 42)
-		draw_rect(Rect2(kb - Vector2(9, 9), Vector2(18, 18)), NAVY)
-		draw_rect(Rect2(kb - Vector2(9, 9), Vector2(18, 18)), GOLD_DIM, false, 1.0)
-		text(kb + Vector2(-9, 5), keys[i], 12, TEXT, HORIZONTAL_ALIGNMENT_CENTER, 18)
+		if main.touch_ui:
+			draw_rect(Rect2(kb - Vector2(30, 9), Vector2(60, 18)), NAVY)
+			draw_rect(Rect2(kb - Vector2(30, 9), Vector2(60, 18)), GOLD_DIM, false, 1.0)
+			text(kb + Vector2(-30, 5), names[i], 12, TEXT, HORIZONTAL_ALIGNMENT_CENTER, 60)
+		else:
+			draw_rect(Rect2(kb - Vector2(9, 9), Vector2(18, 18)), NAVY)
+			draw_rect(Rect2(kb - Vector2(9, 9), Vector2(18, 18)), GOLD_DIM, false, 1.0)
+			text(kb + Vector2(-9, 5), keys[i], 12, TEXT, HORIZONTAL_ALIGNMENT_CENTER, 18)
 		if i == 3:
 			text(sc + Vector2(14, 30), "×%d" % p.pots, 12, TEXT)
 	# ---- gold pill

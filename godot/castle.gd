@@ -132,6 +132,7 @@ func build(m: Node) -> void:
 	var blocks: Array = []
 	var lamp_spots: Array = []
 	var lit_path := quarters_path_tiles()
+	var caps: Array = [] # the quarters' wall tops (rows 22 on), capped with a faint pale light so walls part from the floor
 	for z in H:
 		for x in W:
 			var c: String = grid[z][x]
@@ -157,8 +158,11 @@ func build(m: Node) -> void:
 				"#":
 					if _low_wall(x, z): # the quarters' inner walls stay low, so the one-tile doorways show (GPT's note)
 						blocks.append([Transform3D(Basis().scaled(Vector3(1, 0.75, 1)), Vector3(w.x, -0.025, w.y)), Color("#7a7468").lightened(m.rnd(0, 0.08))])
+						caps.append([Transform3D(Basis().scaled(Vector3(0.96, 0.03, 0.96)), Vector3(w.x, 0.36, w.y)), Color.WHITE])
 					elif x == 0 or z == 0 or x == W - 1 or z == H - 1 or _floor_near(x, z):
 						blocks.append([Transform3D(Basis().scaled(Vector3(1, 1.1, 1)), Vector3(w.x, 0.15, w.y)), Color("#7a7468").lightened(m.rnd(0, 0.08))])
+						if z >= 22:
+							caps.append([Transform3D(Basis().scaled(Vector3(0.96, 0.03, 0.96)), Vector3(w.x, 0.71, w.y)), Color.WHITE])
 				"~":
 					blocks.append([Transform3D(Basis().scaled(Vector3(1, 0.05, 1)), Vector3(w.x, -0.38, w.y)), Color("#1f4f7a").lightened(m.rnd(0, 0.06))])
 				"_": # the broken floor: a dark drop, a few fallen stones far below
@@ -170,10 +174,18 @@ func build(m: Node) -> void:
 						col = Color("#7a5a3a") if (x + z) % 2 == 0 else Color("#72543a")
 					if lit_path.has(Vector2i(x, z)): # the way through the quarters, one step lighter
 						col = Color("#b0a38c")
+					if z >= 22: # the quarters' floor a little lighter, so it reads against the walls at night
+						col = col.lightened(0.1)
 					blocks.append([Transform3D(Basis().scaled(Vector3(1, 0.4, 1)), Vector3(w.x, -0.2, w.y)), col.lightened(m.rnd(0, 0.05))])
 					if VENTS.has(c):
 						vent_pad(m, w, VENTS[c])
 	m.add_chunks(blocks, CASTLE_X)
+	if not caps.is_empty():
+		var cap_mat := StandardMaterial3D.new() # unlit, so it reads the same by day and by night
+		cap_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		cap_mat.albedo_color = Color("#3a4250")
+		var cap_mm: MultiMeshInstance3D = m.multimesh_of(caps)
+		cap_mm.material_override = cap_mat
 	var post_mat: Material = m.mat_color(Color("#3b2a1e"))
 	var glass: Material = m.glow_mat(Color("#ffc46a"), 4.0)
 	glass.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED

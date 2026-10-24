@@ -1775,10 +1775,65 @@ func run() -> void:
 		Input.parse_input_event(click_up)
 		await wait(0.05)
 		var no_swing: bool = main.player.combo == combo1 and main.player.atk_cd <= 0.0
+		# the phone layout (GPT's third playtest): the zoom keys clear of the boss bar and a long quest line, the quest
+		# line clear of the companions' rows and the menu keys, sheet back keys at least 56 px on screen, touch help in
+		# the controls sheet, and the shop with the menu keys and minimap stepped aside and its board on the screen; laid
+		# out on a phone's 960x540 canvas (the headless window is tiny), put back afterwards
+		var root: Window = main.get_tree().root
+		var scale0 := [root.content_scale_mode, root.content_scale_aspect, root.content_scale_size]
+		root.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
+		root.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
+		root.content_scale_size = Vector2i(960, 540)
+		main.enable_touch()
+		await wait(0.2)
+		vs = main.get_viewport().get_visible_rect().size
+		var quest0: String = main.ui.quest.text
+		var boss0: bool = main.ui.boss.visible
+		main.ui.boss.visible = true
+		main.set_quest("벽돌 벽을 왕관으로 풀며 숲 동쪽 끝의 노을에게 가자. 길을 막은 회색 나무는 왕관으로 하나씩 풀 수 있다")
+		await wait(0.1)
+		var tk: Dictionary = main.touch_layer.keys()
+		var boss_r: Rect2 = main.ui.boss.get_global_rect()
+		var quest_r: Rect2 = main.ui.quest.get_global_rect()
+		var mates_r := Rect2(140, 150, 146, 64) # the companions' two rows (build_mate_hud)
+		var clear: bool = not quest_r.intersects(mates_r) and not boss_r.intersects(mates_r) and quest_r.end.x <= vs.x - 194.0 and main.ui.quest.autowrap_mode == TextServer.AUTOWRAP_WORD_SMART
+		for n in ["zoom_in", "zoom_out"]:
+			var zr := Rect2(tk[n][0] - Vector2.ONE * tk[n][1] * 1.1, Vector2.ONE * tk[n][1] * 2.2)
+			clear = clear and not zr.intersects(boss_r) and not zr.intersects(quest_r)
+			for b in [main.ui.hint, main.ui.sound_btn, main.ui.journal_btn, main.ui.settings_btn]:
+				clear = clear and not zr.intersects((b as Control).get_global_rect())
+		for b in [main.ui.hint, main.ui.sound_btn, main.ui.journal_btn, main.ui.settings_btn]:
+			clear = clear and not (b as Control).get_global_rect().intersects(quest_r) and not (b as Control).get_global_rect().intersects(boss_r)
+		main.ui.boss.visible = boss0
+		main.set_quest(quest0)
+		var backs := true
+		for sheet in [main.ui.help, main.ui.journal, main.ui.set_card, main.ui.shop]:
+			for c in sheet.get_children():
+				if c.has_meta("back"):
+					backs = backs and (c as Control).get_global_rect().size.x >= 55.9
+		var touch_help: bool = main.ui.help_rows == main.ui.help_touch_rows and main.ui.help_touch_rows[0][0].visible and not main.ui.help_keys_rows[0][0].visible \
+			and main.ui.set_stacks[1] == main.ui.set_help_touch
+		main.shop_open = true
+		main.ui.shop.visible = true
+		main.fit_shop()
+		main.touch_layer.step_aside()
+		var board_r: Rect2 = main.ui.shop_board.get_global_rect()
+		var shop_ok: bool = not main.ui.hint.visible and not main.ui.settings_btn.visible and not main.ui.mini.get_parent().visible \
+			and board_r.position.y >= 17.0 and board_r.end.y <= main.ui.shop_line.get_global_rect().position.y - 17.0 and board_r.end.x <= vs.x and main.ui.shop_back.visible
+		main.shop_open = false
+		main.ui.shop.visible = false
+		main.touch_layer.step_aside()
+		var keys_back: bool = main.ui.hint.visible and main.ui.mini.get_parent().visible
 		main.disable_touch()
+		root.content_scale_mode = scale0[0]
+		root.content_scale_aspect = scale0[1]
+		root.content_scale_size = scale0[2]
+		await wait(0.1)
+		var desk: bool = main.ui.help_rows == main.ui.help_keys_rows and main.ui.quest.offset_left == -300.0 and main.ui.boss.offset_left == -220.0 \
+			and not main.ui.shop_back.visible and main.ui.shop_board.scale == Vector2.ONE and main.ui.hint.visible
 		calm_enemies(false)
-		check("touch_controls", moved > 1.5 and runs and swung and stopped and guards and unguards and no_swing,
-			"stick walked %.1f tiles, runs at the rim=%s sword while walking=%s let go stops=%s shield held/let go=%s/%s a tap on the world does not swing=%s" % [moved, runs, swung, stopped, guards, unguards, no_swing])
+		check("touch_controls", moved > 1.5 and runs and swung and stopped and guards and unguards and no_swing and clear and backs and touch_help and shop_ok and keys_back and desk,
+			"stick walked %.1f tiles, runs at the rim=%s sword while walking=%s let go stops=%s shield held/let go=%s/%s a tap on the world does not swing=%s; layout clear=%s (quest %s boss %s) back keys 56=%s touch help=%s shop fits, keys aside=%s back after=%s desktop again=%s" % [moved, runs, swung, stopped, guards, unguards, no_swing, clear, quest_r, boss_r, backs, touch_help, shop_ok, keys_back, desk])
 	if want.call("folk_sleep"):
 		# after dark the villagers walk home and go in (Simji stays out); in his house Doran sleeps and E still talks to
 		# him; in the morning they come back out (the user asked, 2026-10-24)
