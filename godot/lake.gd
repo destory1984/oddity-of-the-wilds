@@ -74,6 +74,7 @@ var stone_nodes: Array = []
 var stone_rims: Node3D
 var chain_nodes: Array = []
 var grate: Node3D
+var pass_glow: Node3D      # lit edges and a lamp along the open grate's way, shown while the grate is up
 var latch: Node3D
 var spring_key: Node3D
 var spring_wheel: Node3D
@@ -282,6 +283,29 @@ func build_pond(m: Node) -> void:
 	grate.add_child(gl)
 	grate.position = Vector3(marks.H.x, 0, marks.H.y)
 	m.add_child(grate)
+	# the way through at night (GPT playtest 2026-10-24: bridge, grate and wall read as one black band): self-lit
+	# pale edges along the three bridge tiles and the grate's tile, a sill at the yard side and a small lamp box
+	pass_glow = Node3D.new()
+	var edge: Material = m.glow_mat(Color("#f0d49a"), 0.9)
+	edge.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
+	edge.blend_mode = BaseMaterial3D.BLEND_MODE_MIX
+	var hx: float = marks.H.x
+	var hz: float = marks.H.y
+	for side in [-0.43, 0.43]:
+		var e: MeshInstance3D = m.box(Vector3(4.0, 0.03, 0.07), edge)
+		e.position = Vector3(hx - 1.5, 0.02, hz + side)
+		pass_glow.add_child(e)
+	var sill: MeshInstance3D = m.box(Vector3(0.07, 0.03, 0.86), edge)
+	sill.position = Vector3(hx + 0.46, 0.02, hz)
+	pass_glow.add_child(sill)
+	var lpost: MeshInstance3D = m.box(Vector3(0.1, 0.8, 0.1), m.mat_color(Color("#5a3a26")))
+	lpost.position = Vector3(hx + 0.7, 0.4, hz - 0.62)
+	pass_glow.add_child(lpost)
+	var lbox: MeshInstance3D = m.box(Vector3(0.22, 0.22, 0.22), lamp)
+	lbox.position = Vector3(hx + 0.7, 0.9, hz - 0.62)
+	pass_glow.add_child(lbox)
+	pass_glow.visible = false
+	m.add_child(pass_glow)
 	latch = Node3D.new()
 	var lb: MeshInstance3D = m.box(Vector3(0.4, 0.4, 0.4), m.mat_color(Color("#8a8a90")))
 	lb.position = Vector3(0, 0.2, 0)
@@ -391,6 +415,7 @@ func raise_stones(m: Node, slow := true) -> void:
 
 func set_grate(m: Node, open: bool) -> void:
 	m.create_tween().tween_property(grate, "position:y", 1.4 if open else 0.0, 0.5)
+	pass_glow.visible = open or latch_open
 
 func break_latch(m: Node) -> void:
 	latch_open = true
@@ -416,6 +441,7 @@ func south_look(q: int) -> void:
 	latch_open = q >= 3
 	latch.visible = not latch_open
 	grate.position.y = 1.4 if latch_open else 0.0
+	pass_glow.visible = latch_open
 	spring_on = q >= 4
 	dam.visible = not spring_on
 	if water != null:

@@ -439,6 +439,18 @@ func build_shore(m: Node) -> void:
 		st.position = Vector3(x, m.height_at(x, z) + 0.03, z)
 		st.rotation.y = sin(z) * 0.6
 		m.add_child(st)
+	# a clear step from the bank walk down to the bridge's west end (GPT playtest 2026-10-24: tall reeds hid it at
+	# night), like the grass cleared by the basket: one tile cleared, the reeds either side kept low
+	var west := Vector2(18, 25.5)
+	for b in m.bridges:
+		if b.z == 25:
+			west = Vector2(b.a - 1, 25.5)
+			break
+	var bank := Vector2(16.9, 23.0)
+	for k in 9:
+		var p := bank.lerp(west, k / 8.0)
+		lower_vegetation(m, p, 1.2)
+		m.clear_vegetation(p, 0.6)
 	# nothing tall by the last stop, so the lantern shows from the island
 	m.clear_vegetation(Vector2(24, 37.2), 1.4)
 	m.clear_vegetation(Vector2(22.6, 36.8), 0.9)

@@ -1868,6 +1868,24 @@ func blob(r: float) -> MeshInstance3D:
 	add_child(m)
 	return m
 
+# a flat dark patch with soft edges (the sleepers' contact shadows)
+func soft_patch(w: float, d: float, a: float) -> MeshInstance3D:
+	var m := MeshInstance3D.new()
+	var q := PlaneMesh.new()
+	q.size = Vector2(w, d)
+	m.mesh = q
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_texture = make_tex(16, 16, func(img: Image):
+		for y in 16:
+			for x in 16:
+				var e := minf(minf(x + 0.5, 15.5 - x), minf(y + 0.5, 15.5 - y)) / 2.5 # 0 at the rim, 1 a little in
+				img.set_pixel(x, y, Color(0, 0, 0, a * clampf(e, 0.0, 1.0))))
+	m.material_override = mat
+	m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return m
+
 func build_player() -> void:
 	player = {
 		"x": START.x, "z": START.y, "vx": 0.0, "vz": 0.0, "face": Vector2(0, 1), "dir": "down", "anim": 0.0,
@@ -2647,8 +2665,10 @@ func build_house_room() -> void:
 		spr.texture = sheets[art[0]]
 		spr.hframes = 4 if art[0] == 0 else 6
 		spr.frame = art[1]
-		spr.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
-		spr.scale = Vector3(1, 1.0 / cos(0.78), 1)
+		# leaned back onto the bed or bedroll, the quilt's edge on its front edge (GPT playtest: they stood up like
+		# boards); place_sleeper turns the whole bed node to the camera, so picture, roll and shadow line up
+		spr.rotation.x = -SLEEP_LEAN
+		spr.scale = Vector3(1, 1.0 / cos(0.78 - SLEEP_LEAN), 1)
 		spr.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 		spr.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
 		spr.shaded = false
@@ -2656,6 +2676,13 @@ func build_house_room() -> void:
 		spr.offset = Vector2(0, 128) # the quilt's bottom edge on the bed's front edge, so the bed box does not hide him
 		spr.position = Vector3(0, 0.25, 0.5)
 		bed.add_child(spr)
+		var sh := soft_patch(1.3, 0.16, 0.55) # a contact shadow along the quilt's edge, and one on the floor round a bedroll
+		sh.name = "shadow"
+		bed.add_child(sh)
+		var fs := soft_patch(1.9, 1.25, 0.5)
+		fs.name = "floor_shadow"
+		fs.position = Vector3(0, 0.005, 0.08)
+		bed.add_child(fs)
 		var z := Label3D.new() # the Z drifts up and fades, again and again
 		z.text = "z Z"
 		z.font = ui_font
@@ -2684,6 +2711,7 @@ const SLEEP_IDS := ["doran", "kongal", "mulgyeol", "darae", "tori", "dusol", "ch
 const SLEEP_ART := {"doran": [0, 0], "kongal": [0, 1], "mulgyeol": [0, 2], "kid": [0, 3], # [sheet, cell]
 	"dusol": [1, 0], "chadol": [1, 1], "saecham": [1, 2], "yeoul": [1, 3], "darae": [1, 4], "tori": [1, 5]}
 const HOUSE_SPOTS := [Vector2(1.8, 1.6), Vector2(1.8, 4.3), Vector2(6.3, 4.5)] # room tiles: the bed, two bedrolls
+const SLEEP_LEAN := 0.55    # radians a sleeper's picture leans back from upright
 var folk_bed_at := {}       # id -> [house, spot], filled on first use
 var folk_rocks := {}        # id (or "spot1", "spot2" for the bedrolls) -> its entry in rocks
 const FOLK_WALK := 1.8      # tiles a second on the way home
@@ -2737,8 +2765,12 @@ func place_sleeper(id: String, on: bool) -> bool:
 	var k: int = folk_bed(id)[1]
 	var at := bed_spot(id)
 	bed.position = Vector3(at.x, 0, at.y)
+	bed.rotation.y = CAM_YAW # square to the fixed camera
 	bed.get_node("roll").visible = k > 0
-	(bed.get_node("spr") as Sprite3D).position.y = 0.25 if k == 0 else 0.1
+	var top := 0.4 if k == 0 else 0.12 # the bed's top or the bedroll's
+	(bed.get_node("spr") as Sprite3D).position = Vector3(0, top, 0.36)
+	(bed.get_node("shadow") as MeshInstance3D).position = Vector3(0, top + 0.008, 0.4)
+	bed.get_node("floor_shadow").visible = k > 0
 	bed.visible = on
 	return on and k > 0
 
@@ -3152,6 +3184,7 @@ const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 302분 / 목표 300분 (100%)",
 	"",
 	"2026-10-24 아침",
+	"· v0.0.38: GPT 시험 놀이꾼이 찾은 다섯 가지를 고쳤다. 좁은 틈에서는 물결과 노을이 소라 뒤에 한 줄로 따라오고, 소라가 멈추면 서로 떨어진 빈자리에 선다(다람쥐 나무 입구에서 셋이 겹쳐 보였다). 밤 아랫못의 열린 창살 길에 빛나는 다리 가장자리와 작은 등불을 달았다. 깨어난 물가에서 강가 길부터 다리 서쪽 끝까지 갈대를 걷어 한 칸 길을 냈다. 자는 주민이 깔개와 침대 위에 비스듬히 눕고 밑에 그림자가 생겼다. 달지기 숙소 안에서는 다음에 할 일(셈판, 작업대, 멈춘 문지기, 장부) 위에 금빛 느낌표가 뜬다.",
 	"· v0.0.37: 5장에 다람쥐 나무(약 2분). 다람쥐 다섯을 구하고 회색 문을 연 뒤에는 숲 한가운데 회색 나무 틈 앞에 큰 다람쥐가 앉아 있다. 말을 걸면 굳은 나무 한 그루가 비켜서고, 안쪽 숨은 빈터에 숲에서 가장 늙은 도토리나무가 서 있다. 이 나무 뿌리가 아직 살아서 남쪽 골짜기 개울을 데우고 있었다. 나무 곁 3.2칸 안에서는 낮에도 켜진 등불 곁처럼 쉬어 눈금이 찬다(칸마다 6초). 뿌리를 묶은 벽돌 매듭 셋을 왕관으로 풀면(눈금 1칸씩) 뿌리가 하나씩 나무 쪽으로 당겨 붙고, 둘째 매듭 뒤에는 벽돌 고슴도치 2마리가 굴러 나온다. 마지막 매듭 뒤 1.5초 동안은 대사 없이 나무가 한 번 숨 쉬고 낮은 가지의 잎 둘이 처음 흔들린다. 그 뒤 나무가 초록이 되고, 구해 준 다람쥐 다섯이 돌아와 가지에 앉는다. 싹 튼 도토리(회복약 65 → 75, 새 바퀴에도 남는다), 최대 체력 +10, 금화 60을 받는다. 마을 나무꾼 두솔의 다람쥐 틈 실마리도 켰다. 대사와 소품은 GPT의 의견으로 다듬었다.",
 	"· v0.0.36: 7장에 달지기 숙소(약 4분). 벽돌 기사를 쓰러뜨린 자리에 녹슨 태엽이 남고, 그 태엽으로 옥좌의 방 남쪽 벽의 태엽 문을 연다. 식당과 바구니 방에서 벽돌 6마리와 싸우고, 바구니 셈판에서 한결이 마지막으로 가져간 등불 바구니를 찾는다. 일방 태엽대의 깡통 문지기를 왕관으로 감으면(눈금 1칸) 침방까지 걸어가는데, 식당의 벽돌 더미 셋이 문지기에게 달려든다(닿으면 태엽이 튕겨 나와 곁에서 E로 다시 걷는다). 침방 장부의 한결 다음 칸에 소라의 이름을 적으면 문지기가 백 년 만에 제 의자에 앉아 작은 놋 방패를 건넨다(섬광 막기 0.12초 → 0.16초, 새 바퀴에도 남음). 궤짝에서 최대 체력 +10, 회복약 2, 금화 80. 대사와 소품은 GPT와 의논해 다듬었다.",
 	"· v0.0.35: 마을에 일하는 사람 여섯이 생겼다. 나무꾼 두솔, 광부 차돌, 농부 새참, 낚시꾼 여울(두솔의 동생), 바구니 짜는 다래 할머니와 손자 토리. 저마다 일터(장작더미, 광석 수레, 굳은 밭, 연못가, 장터)에 서 있고, 말을 걸면 아직 못 끝낸 곁이야기의 실마리를 하나씩 들려준다. 이야기가 나아갈 때마다 하는 말이 바뀌고, 마지막 이야기에서 선물(회복약 1, 금화 30, 또는 물고기가 30% 빨리 무는 미끼 주머니)을 준다. 밤에는 집에 들어가 자며 한 집에 셋까지 잔다. 대사와 그림은 GPT와 함께 만들었다.",
@@ -8780,6 +8813,8 @@ var doll_walk := false
 var doll_wait := false        # Sora more than 12 tiles behind: he waits (on again inside 6)
 var doll_shed := false        # the heaps' bits came for this walk
 var doll_t := 0.0
+var tally_seen := false       # the tally board read this session (not saved)
+var quarters_mark: Label3D    # the gold "!" over the next thing to do in the quarters
 
 func castle_map() -> ImageTexture:
 	return with_stair_marks(castle.map_tex(CASTLE.CASTLE_X + CASTLE.W), [UNDER_STAIR])
@@ -8829,6 +8864,7 @@ func quarters_key() -> bool:
 		near_r = minf(near_r, me.distance_to(r))
 	var near_m := me.distance_to(mk.m)
 	if near_m < 1.4 and near_m <= near_r:
+		tally_seen = true
 		show_story("", STORY.QUARTERS_TALLY + (STORY.QUARTERS_TALLY_SHORE if shore_q >= 2 else STORY.QUARTERS_TALLY_NOSHORE))
 		return true
 	if near_r < 1.4:
@@ -9019,6 +9055,43 @@ func update_doll(dt: float, me: Vector2) -> void:
 	castle.doll_place(doll_at, to)
 	castle.doll.rotation.z = 0.1 if fmod(t, 0.5) < 0.25 else -0.1
 
+# the next step inside the quarters (GPT playtest 2026-10-24: the quest line stays on the main road, so it was hard to
+# find): a gold "!" bobs over the tally board until read, the winding stand until wound, the doorkeeper while he stands
+# stopped, the ledger once the bunk room is open; nothing before the door opens or after he rests
+func quarters_target() -> Vector3:
+	if castle == null or not in_castle():
+		return Vector3.INF
+	var mk: Dictionary = castle.marks
+	match quarters_q:
+		2:
+			return Vector3(mk.k.x, 2.5, mk.k.y) if tally_seen else Vector3(mk.m.x, 2.3, mk.m.y)
+		3:
+			return Vector3.INF if doll_walk else Vector3(doll_at.x, 2.4, doll_at.y)
+		4:
+			return Vector3(mk.o.x, 1.9, mk.o.y)
+	return Vector3.INF
+
+func update_quarters_mark() -> void:
+	var at := quarters_target()
+	if at == Vector3.INF:
+		if quarters_mark != null:
+			quarters_mark.visible = false
+		return
+	if quarters_mark == null:
+		quarters_mark = Label3D.new()
+		quarters_mark.text = "!"
+		quarters_mark.font = ui_font
+		quarters_mark.font_size = 72
+		quarters_mark.pixel_size = 0.012 # about 0.85 m tall, readable from the fixed camera
+		quarters_mark.outline_size = 16
+		quarters_mark.modulate = Color("#ffd84a")
+		quarters_mark.outline_modulate = Color("#3a2a10")
+		quarters_mark.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		quarters_mark.no_depth_test = true
+		add_child(quarters_mark)
+	quarters_mark.visible = true
+	quarters_mark.position = at + Vector3(0, sin(t * 3.0) * 0.12, 0)
+
 # at the bunk room door: his key hand opens it and he walks to his chair
 func doll_at_door() -> void:
 	castle.open_bunk()
@@ -9130,12 +9203,104 @@ func join_mate() -> void:
 
 func snap_mate() -> void:
 	if mate != null:
-		mate.position = Vector3(player.x - 1.3, 0, player.z - 0.6)
+		mate.position = mate_goal("mulgyeol")
 
 func snap_mates() -> void:
+	mate_trail.clear()
+	mate_spot.clear()
 	snap_mate()
 	if mate2 != null:
-		mate2.position = Vector3(player.x + 1.3, 0, player.z - 0.6)
+		mate2.position = mate_goal("noeul")
+
+# companions in narrow places (GPT playtest 2026-10-24: both stood on Sora in the oak's one-tile gap). The side step
+# when it and the way to it are open; else single file on Sora's footsteps (Mulgyeol 1.3 tiles back, Noeul 2.5);
+# when she stands still (or has no footsteps yet) the nearest open spot around her, 1 tile clear of the other.
+const MATE_OFF := {"mulgyeol": Vector3(-1.3, 0, -0.6), "noeul": Vector3(1.3, 0, -0.6)}
+const MATE_BACK := {"mulgyeol": 1.3, "noeul": 2.5}
+var mate_trail: Array = []  # Sora's footsteps, newest first, 0.3 tiles apart
+var mate_idle := 0.0        # seconds she has stood still
+var mate_spot := {}         # id -> [where she stood, the open spot found there]
+var mate_aim := {}          # id -> this frame's goal (Noeul keeps clear of Mulgyeol's)
+
+func note_trail(dt: float) -> void:
+	var me := Vector3(player.x, 0, player.z)
+	if not mate_trail.is_empty() and (mate_trail[0] as Vector3).distance_to(me) > 3.0:
+		mate_trail.clear() # a jump (a door, a load): old footsteps lead nowhere
+	if mate_trail.is_empty() or (mate_trail[0] as Vector3).distance_to(me) > 0.3:
+		mate_trail.push_front(me)
+		if mate_trail.size() > 24:
+			mate_trail.pop_back()
+		mate_idle = 0.0
+	else:
+		mate_idle += dt
+
+# the point `back` tiles behind Sora along her footsteps, or null when she has not walked that far
+func trail_spot(back: float):
+	var prev := Vector3(player.x, 0, player.z)
+	var left := back
+	for p in mate_trail:
+		var d: float = prev.distance_to(p)
+		if d >= left and d > 0.0:
+			return prev.lerp(p, left / d)
+		left -= d
+		prev = p
+	return null
+
+func mate_way(a: Vector3, b: Vector3) -> bool:
+	for k in [0.35, 0.7, 1.0]:
+		var p := a.lerp(b, k)
+		if not walkable(p.x, p.z):
+			return false
+	return true
+
+# whether walking straight from `from` to `to` goes through Sora
+func passes_her(from_at: Vector3, to: Vector3, me: Vector3) -> bool:
+	var seg := to - from_at
+	var k := clampf((me - from_at).dot(seg) / maxf(seg.length_squared(), 0.0001), 0.0, 1.0)
+	return (from_at + seg * k).distance_to(me) < 0.55
+
+# the nearest open spot around Sora, turning out from the companion's usual side (kept while she stays put)
+func open_spot(id: String, avoid) -> Vector3:
+	var me := Vector3(player.x, 0, player.z)
+	var c: Array = mate_spot.get(id, [])
+	if not c.is_empty() and (c[0] as Vector3).distance_to(me) < 0.3 and (avoid == null or (c[1] as Vector3).distance_to(avoid) >= 1.0):
+		return c[1]
+	var off: Vector3 = MATE_OFF[id]
+	var spot := me
+	var found := false
+	var view := Vector3(-sin(CAM_YAW), 0, -cos(CAM_YAW)) # straight behind or before her on screen hides one of them
+	for strict in [true, false]:
+		for r in [1.4, 2.0, 2.6]:
+			for k in 8:
+				var a := int((k + 1) / 2.0) * (PI / 4.0) * (1.0 if k % 2 == 0 else -1.0) # 0, -45, 45, -90, 90 ... degrees
+				var dir := off.normalized().rotated(Vector3.UP, a)
+				var p := me + dir * float(r)
+				if strict and absf(dir.dot(view)) > 0.8:
+					continue
+				if mate_way(me, p) and (avoid == null or p.distance_to(avoid) >= 1.0):
+					spot = p
+					found = true
+					break
+			if found:
+				break
+		if found:
+			break
+	mate_spot[id] = [me, spot]
+	return spot
+
+func mate_goal(id: String) -> Vector3:
+	var me := Vector3(player.x, 0, player.z)
+	var node := mate_node(id)
+	var avoid = mate_aim.get("mulgyeol") if id == "noeul" and mate != null else null
+	var goal := me + (MATE_OFF[id] as Vector3)
+	var side_ok := mate_way(me, goal) and (avoid == null or goal.distance_to(avoid) >= 1.0)
+	if side_ok and node != null and mate_idle < 0.6 and passes_her(node.position, goal, me):
+		side_ok = false # behind her in a corridor: no squeezing past
+	if not side_ok:
+		var back_at = trail_spot(MATE_BACK[id]) if mate_idle < 0.6 else null
+		goal = back_at if back_at != null else open_spot(id, avoid)
+	mate_aim[id] = goal
+	return goal
 
 func join_noeul() -> void:
 	if mate2 != null:
@@ -9229,14 +9394,12 @@ func update_mate2(dt: float) -> void:
 		return
 	var me := Vector3(player.x, 0, player.z)
 	if mate2.position.distance_to(me) > 8.0:
-		mate2.position = me + Vector3(1.3, 0, -0.6)
+		mate2.position = mate_goal("noeul")
 	var spr: Sprite3D = mate2.get_child(0)
 	if mate_tick("noeul", dt):
 		return
 	mate2_cd -= dt
-	var goal := me + Vector3(1.3, 0, -0.6)
-	if not walkable(goal.x, goal.z):
-		goal = me # her side is inside a house or a rock: just follow her
+	var goal := mate_goal("noeul")
 	var to := goal - mate2.position
 	if to.length() > 0.3:
 		mate2.position = mate_step(mate2.position, to.normalized() * minf(to.length() - 0.3, dt * 5.5))
@@ -9244,6 +9407,10 @@ func update_mate2(dt: float) -> void:
 		spr.flip_h = screen_left(Vector2(to.x, to.z))
 	else:
 		spr.frame = 0
+	if mate != null and mate.visible: # never on top of Mulgyeol
+		var apart := Vector3(mate2.position.x - mate.position.x, 0, mate2.position.z - mate.position.z)
+		if apart.length() < 0.7 and apart.length() > 0.01:
+			mate2.position = mate_step(mate2.position, apart.normalized() * dt * 2.0)
 	var target = null
 	var best := 4.0
 	for e in enemies:
@@ -9283,9 +9450,7 @@ func update_mate(dt: float) -> void:
 		if not e.dead and not e.get("prop", false) and Vector2(e.x, e.z).distance_to(Vector2(mate.position.x, mate.position.z)) < best:
 			best = Vector2(e.x, e.z).distance_to(Vector2(mate.position.x, mate.position.z))
 			target = e
-	var goal := me + Vector3(-1.3, 0, -0.6)
-	if not walkable(goal.x, goal.z):
-		goal = me
+	var goal := mate_goal("mulgyeol")
 	if target != null:
 		goal = Vector3(target.x, 0, target.z)
 	var to := goal - mate.position
@@ -12119,6 +12284,7 @@ func _process(dt: float) -> void:
 		save_game()
 	if in_castle():
 		update_quarters(dt)
+	update_quarters_mark()
 	if in_hill:
 		update_hill(dt)
 	if in_garden and Vector2(player.x, player.z).distance_to(garden.marks.S) < 0.9 and fade_rect.color.a == 0.0:
@@ -12145,6 +12311,7 @@ func _process(dt: float) -> void:
 		show_story("", STORY.CRAB_IN)
 		after_story = spawn_crab
 		save_game()
+	note_trail(dt)
 	update_mate(dt)
 	update_mate2(dt)
 	update_pips(dt)

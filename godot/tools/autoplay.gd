@@ -65,6 +65,22 @@ func reset_to(p: Vector2) -> void:
 	main.player.inv = 0.0
 	main.ground_y = main.height_at(p.x, p.y)
 
+# companions out of a test whose numbers they would muddle (their hits stop a wolf's lunge, their kills add gold)
+var parked: Array = []
+func park_mates(on: bool) -> void:
+	if on:
+		parked = [main.mate, main.mate2]
+		for m in parked:
+			if m != null:
+				m.visible = false
+		main.mate = null
+		main.mate2 = null
+	elif parked.size() == 2:
+		main.mate = parked[0]
+		main.mate2 = parked[1]
+		parked = []
+		main.snap_mates()
+
 func calm_enemies(on: bool) -> void:
 	for e in main.enemies:
 		if not e.get("boss", false) and not e.get("mole", false) and not e.get("prop", false) and is_instance_valid(e.node):
@@ -1491,6 +1507,7 @@ func run() -> void:
 			main.start_game(false)
 		main.close_story()
 		calm_enemies(true)
+		park_mates(true)
 		reset_to(Vector2(20, 30))
 		main.spawn_wolf(Vector2(24, 30))
 		var w: Dictionary = main.enemies[main.enemies.size() - 1]
@@ -1514,6 +1531,7 @@ func run() -> void:
 			w.node.queue_free()
 			w.shadow.queue_free()
 		calm_enemies(false)
+		park_mates(false)
 		check("wolf", circled and lunged and spawned_forest, "circles=%s lunges=%s forest pack=%d" % [circled, lunged, main.forest.wolves.size()])
 	if want.call("trial"):
 		if main.intro:
@@ -2723,12 +2741,14 @@ func run() -> void:
 		main.skipping = false
 		var guards: Array = main.enemies.filter(func(e): return e.get("mill_guard", false) and not e.dead)
 		var guard_ok: bool = guards.size() == 1 and guards[0].max_hp == 300 + main.player.lv * 30
+		park_mates(true)
 		var g0: int = main.player.gold
 		if guards.size() == 1:
 			main.damage_enemy(guards[0], 100000.0, Vector2(guards[0].x - 1.0, guards[0].z))
 			await wait(1.4)
 		main.close_story()
 		var down: bool = main.mill_q == 4 and main.player.gold == g0 + 60
+		park_mates(false)
 		var hp0: int = main.player.max_hp
 		main.has_oar_ring = false
 		reset_to(sm.c + Vector2(1.0, 0))
@@ -3417,7 +3437,7 @@ func run() -> void:
 		await wait(0.1)
 		var keep := {"castle_q": main.castle_q, "hill_q": main.hill_q, "step": main.story_step, "hour": main.hour,
 			"pips": main.crown_pips, "max": main.player.max_hp, "q": main.quarters_q, "box": main.quarters_box,
-			"buckler": main.has_buckler, "again": main.quarters_again}
+			"buckler": main.has_buckler, "again": main.quarters_again, "tally": main.tally_seen}
 		main.in_village = false
 		main.in_forest = false
 		main.in_lake = false
@@ -3437,6 +3457,13 @@ func run() -> void:
 		main.load_quarters({})
 		main.quarters_spawned = false
 		main.stand_seen = false
+		main.tally_seen = false
+		var at_mark := func(p: Vector2) -> bool: # the gold "!" over p, shown
+			var tg: Vector3 = main.quarters_target()
+			return tg != Vector3.INF and Vector2(tg.x, tg.z).distance_to(p) < 0.1 and main.quarters_mark != null and main.quarters_mark.visible
+		var no_mark := func() -> bool:
+			return main.quarters_target() == Vector3.INF and (main.quarters_mark == null or not main.quarters_mark.visible)
+		var mark_none0: bool = no_mark.call()
 		# 1. the door shut, the castle's own foes as before, the spring where the knight knelt
 		reset_to(Vector2(465, 14))
 		await wait(0.1)
@@ -3476,6 +3503,16 @@ func run() -> void:
 		await wait(0.5)
 		var once: bool = quarter_foes().size() == 6
 		knock_quarters()
+		# the "!" (GPT playtest): the tally board until read, then the stand
+		var mkq: Dictionary = main.castle.marks
+		var mark_board: bool = at_mark.call(mkq.m)
+		reset_to(mkq.m + Vector2(0, 0.8))
+		main.crown_key()
+		await wait(0.1)
+		var mark_read: bool = main.story_open and main.tally_seen
+		main.close_story()
+		await wait(0.3)
+		var mark_stand: bool = at_mark.call(mkq.k)
 		# 4. the stand: its lines, then the crown winds him (1 pip); with no pip nothing changes
 		main.crown_pips = 0
 		reset_to(Vector2(447, 36))
@@ -3492,6 +3529,7 @@ func run() -> void:
 		main.close_story()
 		await wait(1.0)
 		var walks: bool = main.doll_at.distance_to(main.CASTLE.DOLL_PATH[0]) > 0.5
+		var mark_walk: bool = no_mark.call()
 		# 5. in the dining hall the heaps' three bits run at him; one that reaches him knocks his spring out
 		main.doll_at = Vector2(456.3, 30.1)
 		main.doll_i = 5
@@ -3505,6 +3543,8 @@ func run() -> void:
 			bits[0].z = main.doll_at.y
 		await wait_for(func(): return not main.doll_walk, 1.0)
 		var knocked: bool = not main.doll_walk and main.doll_bits().is_empty() and main.castle.doll_drop != null and main.castle.doll_drop.visible
+		await wait(0.1)
+		var mark_doll: bool = at_mark.call(main.doll_at)
 		var pips_k: int = main.crown_pips
 		reset_to(main.doll_at + Vector2(0.8, 0.6))
 		main.player.inv = 120.0
@@ -3524,6 +3564,7 @@ func run() -> void:
 		var bunk: bool = main.quarters_q == 4 and main.player_can(462, 34) and main.story_open
 		main.close_story()
 		await wait(2.0)
+		var mark_log: bool = at_mark.call(mkq.o)
 		# 7. the ledger and her name are one beat, then he sits and gives the buckler; the toast comes after a hush
 		reset_to(Vector2(461, 36))
 		main.crown_key()
@@ -3536,6 +3577,10 @@ func run() -> void:
 		main.close_story()
 		await wait(0.8)
 		var hushed: bool = not main.ui.toast.text.begins_with("작은 놋 방패")
+		var mark_done: bool = no_mark.call()
+		var marks_ok: bool = mark_none0 and mark_board and mark_read and mark_stand and mark_walk and mark_doll and mark_log and mark_done
+		if not marks_ok:
+			print("TEST note quarters marker: none=%s board=%s read=%s stand=%s walking=%s doll=%s ledger=%s done=%s" % [mark_none0, mark_board, mark_read, mark_stand, mark_walk, mark_doll, mark_log, mark_done])
 		await wait(1.4)
 		var toasted: bool = main.ui.toast.text.begins_with("작은 놋 방패")
 		# the buckler: a flash guard 0.15 s after raising the guard counts with it, and is a plain block without it
@@ -3599,6 +3644,7 @@ func run() -> void:
 		main.clear_quarters_job()
 		main.load_quarters({"quarters_q": keep.q, "quarters_box": keep.box, "has_buckler": keep.buckler, "quarters_again": keep.again})
 		main.quarters_spawned = false
+		main.tally_seen = keep.tally
 		main.castle_q = keep.castle_q
 		main.castle.set_spring(keep.castle_q >= 3 and keep.q == 0)
 		main.hill_q = keep.hill_q
@@ -3610,8 +3656,8 @@ func run() -> void:
 		main.in_hill = false
 		calm_enemies(false)
 		main.save_game()
-		check("quarters", shut and toast_only and spring and opened and six and told and once and stand and no_pip and wound and walks and three and knocked and rewalk and waits and bunk and signed and sat and hushed and toasted and guard_ok and chest and kept and mid and round_ok,
-			"shut=%s toast only=%s spring=%s opened=%s six=%s told=%s once=%s stand=%s no pip=%s wound 1 pip=%s walks=%s bits 3=%s knocked=%s E walks on=%s waits=%s bunk open=%s ledger=%s sat+buckler=%s hush=%s toast=%s guard %s/%s=%s chest=%s saved=%s mid-walk load=%s new round=%s" % [shut, toast_only, spring, opened, six, told, once, stand, no_pip, wound, walks, three, knocked, rewalk, waits, bunk, signed, sat, hushed, toasted, r1, r2, guard_ok, chest, kept, mid, round_ok])
+		check("quarters", shut and toast_only and spring and opened and six and told and once and marks_ok and stand and no_pip and wound and walks and three and knocked and rewalk and waits and bunk and signed and sat and hushed and toasted and guard_ok and chest and kept and mid and round_ok,
+			"shut=%s toast only=%s spring=%s opened=%s six=%s told=%s once=%s marker=%s stand=%s no pip=%s wound 1 pip=%s walks=%s bits 3=%s knocked=%s E walks on=%s waits=%s bunk open=%s ledger=%s sat+buckler=%s hush=%s toast=%s guard %s/%s=%s chest=%s saved=%s mid-walk load=%s new round=%s" % [shut, toast_only, spring, opened, six, told, once, marks_ok, stand, no_pip, wound, walks, three, knocked, rewalk, waits, bunk, signed, sat, hushed, toasted, r1, r2, guard_ok, chest, kept, mid, round_ok])
 	if want.call("oak"):
 		# 다람쥐 나무 (DESIGN.md): the big squirrel by the gap once the squirrels are free and the gate is open, the gap,
 		# the clearing's lines once, resting by the oak by day, three knots (1 pip each, the hedgehogs after the second),
@@ -3674,6 +3720,33 @@ func run() -> void:
 		await wait(0.5)
 		var once: bool = not main.story_open
 		main.close_story()
+		# 3b. the companions through the gap (GPT playtest): behind her in single file, then apart in the clearing
+		main.join_mate()
+		main.join_noeul()
+		reset_to(Vector2(192, 12))
+		main.snap_mates()
+		await wait(0.4)
+		var file_ok := false
+		var file_seen := false
+		var walk_t := 0.0
+		while main.player.x < 199.0 and walk_t < 6.0:
+			var dt := get_process_delta_time()
+			walk_t += dt
+			main.player.x = minf(199.0, main.player.x + 4.0 * dt)
+			if not file_seen and main.player.x >= 197.6:
+				file_seen = true
+				file_ok = main.mate.position.x < main.player.x - 0.5 and main.mate2.position.x < main.player.x - 0.5
+			await get_tree().process_frame
+		await wait(1.5)
+		var me3 := Vector3(main.player.x, 0, main.player.z)
+		var m1: Vector3 = main.mate.position
+		var m2: Vector3 = main.mate2.position
+		var d1 := Vector2(m1.x - me3.x, m1.z - me3.z).length()
+		var d2 := Vector2(m2.x - me3.x, m2.z - me3.z).length()
+		var d12 := Vector2(m1.x - m2.x, m1.z - m2.z).length()
+		var apart: bool = file_ok and d1 >= 0.8 and d2 >= 0.8 and d12 >= 0.8 and m1.x > 195.5 and m2.x > 195.5
+		if not apart:
+			print("TEST note oak follow: file=%s d1=%.2f d2=%.2f d12=%.2f m1=%s m2=%s me=%s" % [file_ok, d1, d2, d12, m1, m2, me3])
 		# 4. noon, no pips: by the oak a pip in 6.5 s; by the clearing's lantern (3.5 tiles off) none by day
 		main.hour = 12.0
 		main.crown_pips = 0
@@ -3773,8 +3846,8 @@ func run() -> void:
 		reset_to(Vector2(keep.x, keep.z))
 		calm_enemies(false)
 		main.save_game()
-		check("oak", none and waits and call and gap and told and once and warm and lamp_day and west and east and held and green and hushed and lines and pot and kept and round_ok,
-			"no acorn=%s waits by the gap=%s call=%s gap open=%s clearing told=%s once=%s rests by day=%s lantern by day=%s west 1 pip=%s east+hogs=%s south held=%s green+sprout=%s hush=%s lines=%s potion 75=%s saved=%s new round=%s" % [none, waits, call, gap, told, once, warm, lamp_day, west, east, held, green, hushed, lines, pot, kept, round_ok])
+		check("oak", none and waits and call and gap and told and once and apart and warm and lamp_day and west and east and held and green and hushed and lines and pot and kept and round_ok,
+			"no acorn=%s waits by the gap=%s call=%s gap open=%s clearing told=%s once=%s mates apart=%s rests by day=%s lantern by day=%s west 1 pip=%s east+hogs=%s south held=%s green+sprout=%s hush=%s lines=%s potion 75=%s saved=%s new round=%s" % [none, waits, call, gap, told, once, apart, warm, lamp_day, west, east, held, green, hushed, lines, pot, kept, round_ok])
 	if want.call("trial_repeat"):
 		# after the first clear, the trial's foes give nothing (the field is where gold and XP come from)
 		var best0: float = main.trial_best
