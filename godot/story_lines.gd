@@ -1562,6 +1562,78 @@ const CLOCK_CHEST := [
 	"||달지기 기름병을 얻었다. 회복약을 마시면 기세가 20 찬다. 최대 체력 +20, 회복약 2, 금화 200.",
 ]
 
+# ---- 깨어난 물가 (chapter 1): the reed lantern basket the crown came down in, stuck in the mud where Sora woke.
+# Lines reworked with GPT's notes (2026-10-24): Sora does not take on the winding yet (she only wants Bori to see
+# the light), Bori knows the weave and the old custom but only guesses the crown came in it (chapter 9's diary page
+# says so), and the lantern's stop off the island gets 2 s of only water before anything else.
+const SHORE_HINT := [
+	"||소라가 깨어났던 자리. 갈대가 둥글게 눌려 있고, 거기서 물가 쪽으로 한 줄이 길게 누워 있다.",
+	"소라|surprised|처음엔 정신이 없어서 못 봤어. 물가에 뭐가 걸려 있어.",
+	"소라|determined|집으로 가는 단서일지도 몰라. 가 보자.",
+]
+
+const SHORE_BASKET := [
+	"||물가 갈대 뿌리에 작은 바구니 하나가 반쯤 묻혀 있다. 둘레의 진흙이 장난감 벽돌처럼 굳었다.",
+	"||갈대를 촘촘히 엮은 둥근 바구니. 안쪽 바닥이 둥글게 움푹 꺼져 있다.",
+	"소라|surprised|이 왕관이 꼭 들어갈 크기야. ……왕관은 이걸 타고 떠내려온 걸까?",
+	"소라|determined|굳은 진흙만 풀면 꺼낼 수 있겠어.",
+]
+
+const SHORE_WAKE := [
+	"||왕관을 대자 굳은 진흙이 풀리며, 바구니 둘레의 벽돌들이 덜그럭거리며 일어선다.",
+	"소라|determined|또 움직여……! 이번에도 왕관을 보고 있어.",
+]
+
+const SHORE_FREE := [
+	"||마지막 벽돌이 무너지자 바구니가 진흙에서 쑥 빠졌다. 바닥에 나무패 하나가 끈으로 묶여 있다.",
+	"||나무패에 초승달 표시와 짧은 글. 「물이 흐르는 데까지.」",
+	"소라|calm|초승달 표시. 보리 할머니라면 알지도 몰라.",
+	"||바구니를 챙겼다. 진흙 속에서 금화 30닢과 회복약 1개를 찾았다.",
+]
+
+const SHORE_BORI := [
+	"소라|calm|할머니, 제가 깨어난 물가에서 이걸 찾았어요.",
+	"||할머니는 바구니를 받아 들고, 엮은 자리를 손끝으로 하나하나 짚었다.",
+	"보리 할머니|bori_serious|……달지기 등불 바구니구나. 이 엮음새는 마지막 달지기 솜씨야.",
+	"보리 할머니|bori|감는 밤이 끝나면 달지기들은 이 바구니에 등불을 담아 물길에 띄웠단다. 다 감았다고 늪에 알리는 거지. 나는 이 창가에서 그 불빛을 기다렸고.",
+	"보리 할머니|bori_serious|그 마지막 밤엔 아무 불빛도 내려오지 않았어. ……등불 대신 왕관을 실어 보낸 건지도 모르겠구나.",
+	"소라|sad|그럼…… 백 년 동안 거기 있었던 걸까요?",
+	"||할머니는 선반 맨 위에서 먼지 앉은 등불 하나를 내렸다. 한 번도 켠 적 없는 등불이다.",
+	"보리 할머니|bori|백 년 전에 누굴 주려고 챙겨 둔 건데, 그 사람이 오지 않았지. 이제 이 바구니에 태워 보내자.",
+]
+const SHORE_BORI_DAM := "보리 할머니|bori_serious|다만 지금은 벽돌왕이 물길을 막고 있어 띄워도 가지 않는다. 물이 다시 흐르거든, 밤에 그 물가에서 띄워 주렴."
+const SHORE_BORI_FLOW := "보리 할머니|bori|물길은 네가 이미 풀어 놓았지. 밤이 되거든 그 물가에서 띄워 주렴."
+const SHORE_BORI_END := [
+	"소라|determined|네. 할머니 창에서 보이게 띄울게요.",
+	"||보리 할머니의 등불을 받았다. 회복약 1개도 받았다.",
+]
+
+const SHORE_FLOAT := [
+	"||바구니에 보리 할머니의 등불을 앉히고, 왕관을 대 불을 옮겼다. 백 년 만에 켜진 불이다.",
+	"||등불 바구니가 물살을 타고 천천히 흘러가기 시작한다. 물가의 벽돌 무더기들이 불빛 쪽으로 고개를 든다.",
+	"소라|determined|따라가자. 걸리면 내가 풀어 줄게.",
+]
+
+# the reward and the way back come as a toast after 2 s of only water and the lantern (GPT's note)
+const SHORE_LAND := [
+	"||등불 바구니가 늪 호수로 흘러 나가, 섬 앞에서 천천히 흔들리다 멈췄다.",
+	"||물 위에 불빛 하나. 백 년 만에 늪으로 내려온 등불이다.",
+	"소라|calm|……할머니 창에서도 보일까?",
+	"소라|calm|조금만 더 보고 가자.",
+]
+
+const SHORE_THANKS := [
+	"보리 할머니|bori|창으로 봤단다. 물길 끝에 불이 하나 앉더구나.",
+	"보리 할머니|bori|오늘은 창가에 조금 더 앉아 있어야겠구나. 고맙다, 소라야.",
+	"||할머니는 남은 갈대로 작은 방석을 엮어 건넸다.",
+	"보리 할머니|bori|등불 곁에서 쉴 땐 이걸 깔고 앉으렴. 몸이 빨리 풀릴 게다.",
+	"||갈대 방석을 얻었다. 밤에 켜진 등불 곁에서 쉬는 동안 체력이 초당 4씩 찬다.",
+]
+const SHORE_THANKS_ROUND := "||금화 40닢과 회복약 1개를 받았다." # a new round: the cushion came along
+const ROAD_PAGE_BASKET := "소라|calm|물가에 걸려 있던 그 갈대 바구니. 왕관은 그걸 타고 내려왔구나."
+const POST_BORI_LAMP := "보리 할머니|bori|등불은 내가 챙긴다고 썼었지. 그 등불은 네가 띄워 줬고."
+const POST_BORI_LAMP_HELD := "보리 할머니|bori|등불은 내가 챙긴다고 썼었지. 그 등불이 지금 네 손에 있구나."
+
 const REST_TALK_STORY := [
 	["mul_new", [["mulgyeol", "섬 밖에서 이렇게 오래 있어 본 건 처음이야."], ["sora", "할아버지 생각 나?"], ["mulgyeol", "응. 그래도 할아버지라면 가라고 했을 거야."]]],
 	["noeul_new", [["noeul", "……내가 같이 가도 괜찮은 거야? 마을 등불을 끈 건 나였는데."], ["mulgyeol", "그건 이제 다 갚았잖아."], ["sora", "응. 지금은 우리 편이야."], ["noeul", "……고마워."]]],
@@ -1571,6 +1643,7 @@ const REST_TALK_STORY := [
 	["south_hint", [["mulgyeol", "섬 남쪽 끝 둑 너머, 할아버지가 일하던 데야."], ["sora", "가 보고 싶어?"], ["mulgyeol", "……응. 혼자는 좀 그렇고."]]],
 	["south_done", [["mulgyeol", "물이 다시 한 바퀴 도니까 물고기들이 돌아와."], ["sora", "할아버지 소식도 흘러올까?"], ["mulgyeol", "물결이 전해 주겠지. 내 이름처럼."]]],
 	["clock_done", [["noeul", "그 닳은 손잡이 봤어?"], ["sora", "응. 이제 여덟 개 다 닳겠지."], ["mulgyeol", "그만큼 자주 오자는 거지?"]]],
+	["shore_done", [["mulgyeol", "늪 호수에 등불 하나 떠 있던데."], ["sora", "보리 할머니 등불이야. 내가 띄웠어."], ["noeul", "……그 바구니 엮음새, 한결 솜씨지?"]]],
 	["mill_hint", [["mulgyeol", "언덕 남쪽 담에 참새들이 모여 있더라."], ["sora", "매 속에서 나온 애들?"], ["noeul", "뭘 찾나 봐."]]],
 	["mill_done", [["noeul", "장터 달빛 가루, 그 방앗간에서 빻던 거래."], ["mulgyeol", "그 가루 배로 실어 날랐겠지."], ["sora", "언젠가 그 배 고쳐서 셋이 타 보자."]]],
 	["scare", [["mulgyeol", "구름 위를 걸었다고 하면 아무도 안 믿을걸."], ["noeul", "바람 깃털이 증거지."], ["sora", "구르는 게 훨씬 가벼워졌어."]]],

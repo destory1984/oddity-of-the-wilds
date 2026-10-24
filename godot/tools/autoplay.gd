@@ -5,11 +5,12 @@
 extends Node
 
 const MARSH := preload("res://marsh.gd")
+const STORY := preload("res://story_lines.gd")
 var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "painting_once", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "esc_sheets", "news_more", "touch_controls", "folk_sleep", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "mill", "post", "lake_south", "clock", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "painting_once", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "esc_sheets", "news_more", "touch_controls", "folk_sleep", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "mill", "post", "lake_south", "clock", "shore", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -72,9 +73,29 @@ func calm_enemies(on: bool) -> void:
 				e.x = 2.0 # parked in the corner water, out of the way
 				e.z = 2.0
 
+# 깨어난 물가: the bricks risen by the basket or a snag
+func shore_foes() -> Array:
+	return main.enemies.filter(func(e): return e.get("shore", false) and not e.dead)
+
+func knock_shore() -> void: # down without gold or XP, so level-ups do not muddle the max HP check
+	for e in shore_foes():
+		e.dead = true
+		e.node.queue_free()
+		e.shadow.queue_free()
+
+func wait_for(cond: Callable, sec: float) -> bool:
+	var t := 0.0
+	while t < sec:
+		if cond.call():
+			return true
+		await wait(0.1)
+		t += 0.1
+	return cond.call()
+
 func run() -> void:
 	var want := func(n): return only == "all" or only == n
 	main.sleep_off = true # the villagers stay out at night here; folk_sleep turns their sleep back on
+	main.shore_q = 1 # the shore hint does not open over tests that wake Sora at the start; shore sets it itself
 	if only == "title_space": # the user's web save, then Space at the title, twice
 		var f := FileAccess.open(main.SAVE_PATH, FileAccess.WRITE)
 		f.store_string('{"atk":37,"boss_dead":true,"chests":[true,true,true,true,true],"day":3,"door_open":false,"gold":786,"has_key":false,"hour":2.13,"hp":208.0,"in_cave":false,"lv":10,"max_hp":208,"pots":7,"saw_painting":false,"story":5,"x":14.65,"z":20.15}')
@@ -3051,6 +3072,229 @@ func run() -> void:
 		main.save_game()
 		check("clock", ending and hint and down and hard and pip1 and two and one_at_a_time and lost and gears_ok and hub and early and wound and hush and late and box and oil and up and kept and old and back and round_ok,
 			"ending then hole=%s hint=%s down=%s gear hard=%s 1 pip=%s 2 scraps=%s one at a time=%s rehardened=%s packs %s, 6 workers=%s crown, all at spokes=%s early E=%s wound with picture=%s hush=%s Bori=%s chest=%s oil +20=%s up=%s saved=%s old save=%s load=%s new round=%s" % [ending, hint, down, hard, pip1, two, one_at_a_time, lost, str(counts), gears_ok, hub, early, wound, hush, late, box, oil, up, kept, old, back, round_ok])
+	if want.call("shore"):
+		# 깨어난 물가 (DESIGN.md): the basket where Sora woke and Bori's lantern floated down to the island. State is set
+		# directly and waits poll (slow machines); everything changed here is put back at the end
+		if main.intro:
+			main.start_game(false)
+		await wait(0.2)
+		main.close_story()
+		await wait(0.1)
+		var q0: int = main.shore_q
+		var cush0: bool = main.has_cushion
+		var step0: int = main.story_step
+		var hour0: float = main.hour
+		var max0: int = main.player.max_hp
+		var pips0: int = main.crown_pips
+		var dq0: int = main.doran_q
+		var pq0: int = main.post_q
+		var mq0: int = main.mail_q
+		var tea0: bool = main.has_tea
+		main.in_village = false
+		main.in_forest = false
+		main.in_lake = false
+		main.in_hill = false
+		main.in_cave = false
+		main.in_garden = false
+		main.in_house = -1
+		main.doran_q = 3 # nothing else waiting at Bori's door
+		main.post_q = 0
+		main.mail_q = 2
+		main.has_tea = true
+		main.has_cushion = false
+		calm_enemies(true)
+		knock_shore()
+		main.clear_shore_job()
+		main.shore_q = 0
+		main.shore_seen = false
+		main.marsh.shore_look(main, 0)
+		var b: Vector2 = MARSH.BASKET_AT
+		var by_b := b + Vector2(-0.8, 0.6)
+		# 1. before Bori nothing happens where she woke
+		main.story_step = 2
+		reset_to(main.START)
+		await wait(1.0)
+		var quiet: bool = main.shore_q == 0 and not main.story_open
+		# 2. after Bori the hint opens there; the basket blocks its spot only
+		main.story_step = 3
+		var hint: bool = await wait_for(func(): return main.story_open, 2.0)
+		hint = hint and main.shore_q == 1 and main.ui.story_text.text == tr(String(STORY.SHORE_HINT[0]).split("|")[2])
+		var blocks: bool = not main.player_can(b.x, b.y) and main.player_can(19, 19)
+		main.close_story()
+		await wait(0.6)
+		# 3. E at the basket: its lines, then 1 pip and two packs (2 goblins, then a goblin and an archer), once
+		main.crown_pips = 7
+		reset_to(by_b)
+		main.player.inv = 120.0
+		main.crown_key()
+		await wait(0.2)
+		var seen: bool = main.story_open and main.crown_pips == 7 and main.ui.story_text.text == tr(String(STORY.SHORE_BASKET[0]).split("|")[2])
+		main.close_story()
+		await wait(0.4)
+		main.crown_key()
+		await wait(0.2)
+		var woke: bool = main.story_open and main.crown_pips == 6
+		main.close_story()
+		await wait_for(func(): return shore_foes().size() == 2, 2.0)
+		var p1: Array = shore_foes()
+		var pack1: bool = p1.size() == 2 and p1.all(func(e): return e.cave and not e.archer)
+		var gold0: int = main.player.gold
+		var pots0: int = main.player.pots
+		main.player.inv = 120.0
+		knock_shore()
+		await wait_for(func(): return shore_foes().size() == 2, 3.0)
+		var p2: Array = shore_foes()
+		var pack2: bool = p2.size() == 2 and p2.filter(func(e): return e.archer).size() == 1 and p2.all(func(e): return e.cave)
+		main.player.inv = 120.0
+		knock_shore()
+		await wait_for(func(): return main.shore_q == 2, 3.0)
+		var out: bool = main.shore_q == 2 and main.player.gold == gold0 + 30 and main.player.pots == pots0 + 1 \
+			and not main.marsh.basket.visible and main.player_can(b.x, b.y)
+		main.close_story()
+		await wait(8.5)
+		var once: bool = shore_foes().is_empty()
+		# 4. Bori knows the basket: her lantern and a potion, not the shop; before the Brick King she says to wait
+		reset_to(Vector2(main.shop_pos.x, main.shop_pos.z))
+		pots0 = main.player.pots
+		main.crown_key()
+		await wait(0.2)
+		var bori: bool = main.shore_q == 3 and main.player.pots == pots0 + 1 and not main.shop_open and main.story_open \
+			and main.story_lines.has(STORY.SHORE_BORI_DAM)
+		main.close_story()
+		await wait(0.6)
+		# 5. floating only after the Brick King and only at night
+		reset_to(by_b)
+		main.crown_pips = 8
+		main.hour = 22.0
+		main.crown_key()
+		await wait(0.1)
+		var dam: bool = main.shore_q == 3 and main.crown_pips == 8 and main.shore_float.is_empty()
+		main.story_step = 5
+		main.hour = 13.0
+		main.crown_key()
+		await wait(0.1)
+		var day: bool = main.crown_pips == 8 and main.shore_float.is_empty()
+		main.hour = 22.0
+		main.crown_key()
+		await wait(0.1)
+		var floated: bool = main.crown_pips == 7 and not main.shore_float.is_empty()
+		await wait_for(func(): return main.story_open, 3.0)
+		var lit: bool = main.story_open and main.marsh.float_glass.material_override == main.marsh.glass_lit
+		main.close_story()
+		await wait(3.0)
+		var flows: bool = not main.shore_float.is_empty() and float(main.shore_float.d) > 2.0
+		# 6. a snag holds it; its bricks rise; when they are down it floats on
+		var snags_ok := true
+		var held := true
+		var counts: Array = []
+		var near: Array = [Vector2(16.6, 22.4), Vector2(16.4, 27.4), Vector2(17.4, 32.2)]
+		for i in 3:
+			reset_to(near[i])
+			main.player.inv = 120.0
+			main.shore_float.d = float(main.marsh.snag_d[i]) - 0.05
+			await wait_for(func(): return shore_foes().size() == 2, 3.0)
+			var pk: Array = shore_foes()
+			counts.append(pk.size())
+			snags_ok = snags_ok and pk.size() == 2 and (pk.filter(func(e): return e.archer).size() == (1 if i == 2 else 0))
+			var d1: float = main.shore_float.d
+			await wait(1.0)
+			held = held and bool(main.shore_float.wait) and absf(float(main.shore_float.d) - d1) < 0.01
+			main.player.inv = 120.0
+			knock_shore()
+			await wait_for(func(): return int(main.shore_float.snag) == i + 1, 3.0)
+			snags_ok = snags_ok and int(main.shore_float.snag) == i + 1 and not bool(main.shore_float.wait)
+			if i == 0:
+				# 7. too far behind and it waits
+				await wait(0.5)
+				var moving: bool = float(main.shore_float.d) > float(main.marsh.snag_d[0]) + 0.1
+				reset_to(Vector2(8, 17))
+				await wait(0.2)
+				var d2: float = main.shore_float.d
+				await wait(2.0)
+				held = held and moving and absf(float(main.shore_float.d) - d2) < 0.01
+		var hushed: bool = main.enemy_shots.is_empty()
+		# 8. off the island it stops; the reward and the way back come after a hush; Bori gives the cushion
+		main.shore_float.d = main.marsh.path_len() - 0.35
+		reset_to(Vector2(24, 37))
+		await wait_for(func(): return main.shore_q == 4, 3.0)
+		var landed: bool = main.shore_q == 4 and main.player.max_hp == max0 + 10 and main.story_open and main.marsh.landed \
+			and main.marsh.float_node.visible
+		main.close_story()
+		await wait(0.8)
+		var silent: bool = not main.ui.toast.text.begins_with("최대 체력")
+		await wait(2.0)
+		var after: bool = main.ui.toast.text.begins_with("최대 체력")
+		reset_to(Vector2(main.shop_pos.x, main.shop_pos.z))
+		main.crown_key()
+		await wait(0.2)
+		var cushion: bool = main.shore_q == 5 and main.has_cushion and main.story_open
+		main.close_story()
+		await wait(0.6)
+		# lines picked up elsewhere: chapter 9's diary page and chapter 3's postcard
+		var page: bool = main.road_page_lines().has(STORY.ROAD_PAGE_BASKET)
+		var card: bool = main.post_bori_lines().has(STORY.POST_BORI_LAMP)
+		# 9. the cushion: 4 HP a second resting at night by a lit lantern, full crown or not; nothing by day
+		var lamp = main.lanterns.filter(func(l): return l.position.x < 48.0 and not l.get_meta("dark", false) and l != main.dark_lamp)[0]
+		reset_to(Vector2(lamp.position.x + 0.5, lamp.position.z + 0.8))
+		main.player.vx = 0.0
+		main.player.vz = 0.0
+		main.crown_pips = 8
+		main.hour = 22.0
+		main.player.hp = 50.0
+		await wait(2.0)
+		var hp_night: float = main.player.hp
+		var rested: bool = hp_night >= 56.5 and hp_night <= 59.5
+		main.hour = 13.0
+		main.player.hp = 50.0
+		await wait(1.0)
+		var by_day: bool = main.player.hp == 50.0
+		# 10. saves keep it (the shore part of a load, so other places stay as they are); a save made while floating
+		# takes the basket back; a new round keeps only the cushion
+		main.save_game()
+		main.load_shore(JSON.parse_string(FileAccess.get_file_as_string(main.SAVE_PATH)))
+		await wait(0.2)
+		var kept: bool = main.shore_q == 5 and main.has_cushion and not main.marsh.basket.visible and main.marsh.landed
+		main.shore_q = 3
+		main.marsh.shore_look(main, 3)
+		main.shore_float = {"d": 3.0, "snag": 0, "wait": false, "up": false, "t": 1.0, "lit": true, "stop": false, "wt": 0.0}
+		main.marsh.set_float(main.marsh.float_at(3.0), true)
+		main.save_game()
+		main.load_shore(JSON.parse_string(FileAccess.get_file_as_string(main.SAVE_PATH)))
+		await wait(0.2)
+		var taken: bool = main.shore_q == 3 and main.shore_float.is_empty() and not main.marsh.float_node.visible and shore_foes().is_empty()
+		main.shore_q = 5
+		main.write_new_round()
+		var ng = JSON.parse_string(FileAccess.get_file_as_string(main.SAVE_PATH))
+		var round_ok: bool = ng != null and not ng.has("shore_q") and bool(ng.get("has_cushion", false))
+		main.shore_q = 4
+		main.has_cushion = true
+		reset_to(Vector2(main.shop_pos.x, main.shop_pos.z))
+		var g1: int = main.player.gold
+		var pt1: int = main.player.pots
+		main.crown_key()
+		await wait(0.2)
+		round_ok = round_ok and main.shore_q == 5 and main.player.gold == g1 + 40 and main.player.pots == pt1 + 1
+		main.close_story()
+		await wait(0.6)
+		# leave it as it was for the other tests
+		knock_shore()
+		main.clear_shore_job()
+		main.shore_q = q0
+		main.has_cushion = cush0
+		main.marsh.shore_look(main, q0)
+		main.story_step = step0
+		main.hour = hour0
+		main.player.max_hp = max0
+		main.player.hp = float(max0)
+		main.crown_pips = pips0
+		main.doran_q = dq0
+		main.post_q = pq0
+		main.mail_q = mq0
+		main.has_tea = tea0
+		calm_enemies(false)
+		main.save_game()
+		check("shore", quiet and hint and blocks and seen and woke and pack1 and pack2 and out and once and bori and dam and day and floated and lit and flows and snags_ok and held and hushed and landed and silent and after and cushion and page and card and rested and by_day and kept and taken and round_ok,
+			"quiet before Bori=%s hint=%s blocks=%s basket lines=%s woke 1 pip=%s pack 2=%s pack 1+archer=%s out +30 +1=%s once=%s Bori lamp+pot=%s dam=%s day=%s floated 1 pip=%s lit=%s flows=%s snags=%s %s held/waits=%s shots gone=%s landed +10=%s hush=%s then toast=%s cushion=%s page=%s card=%s rest hp %.1f=%s by day=%s saved=%s float taken back=%s new round=%s" % [quiet, hint, blocks, seen, woke, pack1, pack2, out, once, bori, dam, day, floated, lit, flows, snags_ok, str(counts), held, hushed, landed, silent, after, cushion, page, card, hp_night, rested, by_day, kept, taken, round_ok])
 	if want.call("trial_repeat"):
 		# after the first clear, the trial's foes give nothing (the field is where gold and XP come from)
 		var best0: float = main.trial_best

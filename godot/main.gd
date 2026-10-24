@@ -446,6 +446,8 @@ const SCENES := {
 	"under_in": {"play": true, "village": true, "castle": true, "under_in": true, "hour": 16.0},
 	"stairs_top": {"play": true, "village": true, "castle": true, "stairs": true, "stairs_at": 3, "hour": 16.0},
 	"scrap": {"play": true, "at": Vector2(42.5, 5.5), "hour": 17.0},
+	"shore": {"play": true, "shore": 1, "at": Vector2(18.5, 19.5), "hour": 15.0},              # the basket in the mud by day
+	"shore_float": {"play": true, "shore": 3, "at": Vector2(17.2, 23.0), "hour": 22.0},        # the lantern held at the first snag
 }
 
 func apply_test_args(args: PackedStringArray) -> void:
@@ -481,6 +483,18 @@ func apply_test_args(args: PackedStringArray) -> void:
 	if sc.get("shop", false):
 		story_step = 3
 		toggle_shop(true)
+	if sc.has("shore"): # 깨어난 물가 (DESIGN.md): 1 the basket by day, 3 Bori's lantern floating, held at the first snag
+		story_step = 3
+		shore_q = 1
+		shore_seen = true
+		if int(sc.shore) == 3:
+			story_step = 5
+			shore_q = 3
+			marsh.free_basket(self)
+			var sd: float = marsh.snag_d[0]
+			shore_float = {"d": sd, "snag": 0, "wait": true, "up": false, "t": 1.0, "lit": true, "stop": false, "wt": 0.0}
+			marsh.set_float(marsh.float_at(sd), true)
+			player.inv = 99.0
 	if sc.get("village", false):
 		story_step = 7
 		errand = 1
@@ -1671,6 +1685,8 @@ func bori_news() -> Array:
 	if trial_best > 0.0: out.append("심지가 그러던데, 달빛 시련을 마쳤다며? 대단하구나.")
 	if has_armour: out.append("달지기 갑옷이 잘 어울리는구나. 이제야 마음이 놓인다.")
 	if not has_tea and marsh.picked_count() == 0 and story_step >= 5: out.append("달이 반 넘게 찬 밤이면 늪에 달꽃이 핀단다. 세 송이만 가져오면 차를 끓여 주마.")
+	if story_step >= 3 and shore_q == 0: out.append("네가 깨어났다는 물가, 한번 다시 가 보렴. 물은 늘 무언가를 실어 오거든.")
+	if shore_q == 3 and story_step >= 5: out.append("물길이 흐르니, 밤에 그 등불을 띄워 주렴.")
 	return out
 
 func toggle_shop(open: bool) -> void:
@@ -2872,7 +2888,7 @@ func festival_key() -> bool:
 # attack, max HP, gold, potions, keepsakes, the woken skill, feats and records. Monsters then take
 # 1/(1 + 0.5 x round) of the damage and deal (1 + 0.5 x round) times as much.
 const NG_KEEP := ["lv", "xp", "max_hp", "atk", "gold", "pots", "has_pearl", "has_feather", "has_acorn", "has_ring", "has_shoes",
-	"has_armour", "has_tea", "has_shard", "has_bookmark", "has_lamp", "has_medal", "has_oar_ring", "has_whistle", "has_oil", "skill_up", "stats", "feats", "trial_best", "race_best", "fish"]
+	"has_armour", "has_tea", "has_shard", "has_bookmark", "has_lamp", "has_medal", "has_oar_ring", "has_whistle", "has_oil", "has_cushion", "skill_up", "stats", "feats", "trial_best", "race_best", "fish"]
 var ng := 0                 # how many rounds were finished before this one
 var ng_armed := 0.0         # seconds left to confirm with a second E
 
@@ -3018,9 +3034,10 @@ func travel(i: int) -> void:
 
 const CHANGES_PAGE := 100 # lines of 바뀐 것 shown before the 더 읽기 button
 const CHANGES := [
-	"개발 상황: 놀 수 있는 분량 약 290분 / 목표 300분 (97%)",
+	"개발 상황: 놀 수 있는 분량 약 294분 / 목표 300분 (98%)",
 	"",
 	"2026-10-24 아침",
+	"· v0.0.34: 1장에 깨어난 물가(약 4분). 보리 할머니를 만난 뒤, 소라가 깨어난 자리에서 물가로 눌린 갈대 줄이 이어지고 그 끝 진흙에 갈대 바구니가 묻혀 있다. 왕관으로 진흙을 풀면(눈금 1칸) 벽돌 두 무리(고블린 2, 고블린 1과 활 1)가 일어나고, 바구니에서 금화 30과 회복약 1이 나온다. 보리 할머니는 달지기 등불 바구니를 알아보고 백 년 동안 켜지 않은 자기 등불과 회복약 1을 준다. 벽돌왕을 넘어뜨린 뒤 밤에 물가에서 등불 바구니를 띄우면(눈금 1칸) 물길 약 20칸을 따라 흘러가고, 벽돌 걸림 셋(고블린 2, 2, 고블린 1과 활 1)을 풀어 주면 늪 호수 섬 앞에 머문다(최대 체력 +10). 보리 할머니께 알리면 갈대 방석을 준다(밤에 켜진 등불 곁에서 쉬면 체력이 초당 4씩 찬다). 대사와 소품은 GPT와 의논해 다듬었다.",
 	"· v0.0.33: 8 → 9장 끝 뒤에 큰 태엽 방(약 5분). 끝 장면은 그대로이고, 거푸집이 앉아 있던 자리에 구멍이 열린다. 내려가면 땅을 돌리는 큰 태엽 열쇠가 있다. 굳은 톱니 셋을 왕관으로 풀며(눈금 1칸씩) 열쇠에서 달려 나오는 거푸집 찌꺼기(2, 3, 4마리)를 막으면 벽돌 일꾼들이 일어나 톱니를 돌본다. 열쇠 한가운데에 왕관을 올리면 마을 사람들이 내려와 손잡이 여덟을 함께 잡고, 금빛 고리에 맞춰 E를 여덟 번 누르면 다 같이 감는다(그림 한 장). 궤짝에서 달지기 기름병(회복약을 마시면 기세 +20), 최대 체력 +20, 회복약 2, 금화 200. 대사와 소품은 GPT와 의논해 다듬었다.",
 	"· v0.0.32: 밤이 되면 마을 사람들(도란, 콩알, 마을에 있을 때의 물결, 꼬마 고블린)이 저마다 가까운 집 문으로 걸어 들어가 자고, 아침이면 나와 제자리로 돌아간다. 등불지기 심지는 밤에도 광장에 남고, 보름달 축제 밤에는 모두 밖에 있다. 자는 사람의 집 문 위에 z가 뜨고, 그 집에 들어가면 침대에서 자는 모습(GPT 그림)이 보인다. 곁에서 E를 누르면 깨어 낮과 같은 이야기와 심부름을 하니 반딧불, 달꽃 같은 밤 심부름도 막히지 않는다. 낮에 서던 자리에서 E를 누르면 어디서 자는지 알려 준다.",
 	"· v0.0.31: 아이폰과 아이패드에서 글자와 단추가 너무 작던 것을 키웠다. 휴대폰은 기준 화면을 640 → 540으로 줄여 모든 것이 약 1.2배 커지고 글자도 한 단계 커진다. 아이패드도 터치 화면으로 알아본다(전에는 사파리가 맥이라고 해서 데스크톱 화면이 나왔다). 메뉴 단추 넷은 미니맵 왼쪽에 2x2로 모이고, 설정과 일지 같은 큰 창은 화면에 맞게 줄어든다.",
@@ -3646,6 +3663,7 @@ func story_talk_ok(key: String) -> bool:
 		"south_hint": return lake_q >= 4 and south_q == 0
 		"south_done": return south_q >= 5
 		"clock_done": return clock_q >= 5
+		"shore_done": return shore_q >= 4
 		"mill_hint": return hill_q >= 3 and mill_q == 0
 		"mill_done": return mill_q >= 5
 		"pearl": return grotto_q >= 4
@@ -4678,7 +4696,7 @@ func interact() -> void:
 	if near_shop() and post_q == 3 and doran_q >= 3 and not shop_open:
 		post_q = 4
 		player.pots += 2
-		show_story("", STORY.POST_BORI)
+		show_story("", post_bori_lines())
 		save_game()
 		return
 	if near_shop() and not shop_open and deliver(0, STORY.MAIL_BORI):
@@ -4687,6 +4705,8 @@ func interact() -> void:
 		has_tea = true
 		show_story("", STORY.MOON_TEA)
 		save_game()
+		return
+	if near_shop() and not shop_open and shore_bori():
 		return
 	if near_shop():
 		toggle_shop(not shop_open)
@@ -5442,7 +5462,7 @@ func save_game() -> void:
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
 		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "books": castle.books.map(func(b): return b.read), "has_bookmark": has_bookmark, "has_shard": has_shard, "shop_bought": shop_bought, "play_secs": play_secs, "ng": ng, "fest_gift": fest_gift, "mail_q": mail_q, "mail_got": mail_got, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes, "target_best": target_best, "has_medal": has_medal, "bottles": village.bottles.map(func(b): return b.got), "inn_nights": inn_nights, "magpie_q": magpie_q, "talks_heard": talks_heard.keys(),
-		"road_q": road_q, "road_box": road_box, "mill_q": mill_q, "has_oar_ring": has_oar_ring, "post_q": post_q, "south_q": south_q, "has_whistle": has_whistle, "clock_q": clock_q, "clock_gears": clock_gears, "clock_box": clock_box, "clock_late": clock_late, "has_oil": has_oil, "hollow_q": hollow_q, "mem_lit": forest.mem_lamps.map(func(l): return l.lit), "hollow_doors": forest.doors.map(func(dr): return dr.open), "hollow_boxes": forest.boxes.map(func(b): return b.open),
+		"road_q": road_q, "road_box": road_box, "mill_q": mill_q, "has_oar_ring": has_oar_ring, "post_q": post_q, "south_q": south_q, "has_whistle": has_whistle, "clock_q": clock_q, "clock_gears": clock_gears, "clock_box": clock_box, "clock_late": clock_late, "has_oil": has_oil, "shore_q": shore_q, "has_cushion": has_cushion, "hollow_q": hollow_q, "mem_lit": forest.mem_lamps.map(func(l): return l.lit), "hollow_doors": forest.doors.map(func(dr): return dr.open), "hollow_boxes": forest.boxes.map(func(b): return b.open),
 		"seals": garden.seals.map(func(sl): return sl.open),
 		"stairs_wall": stairs.wall_open, "stairs_lamps": stairs.lamps.map(func(l): return l.lit),
 		"castle_q": castle_q, "bars": castle.bars, "levers": castle.levers.map(func(lv): return lv.up), "vault": castle.vault_open, "has_armour": has_armour, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read),
@@ -5763,6 +5783,7 @@ func load_game() -> void:
 	has_skip = bool(d.get("has_skip", false))
 	cave_exit_seen = bool(d.get("cave_exit_seen", false))
 	marsh.restore(d.get("scraps", []), bool(d.get("moon_chest", false)))
+	load_shore(d)
 	fly_q = int(d.get("fly_q", 0))
 	var fc: Array = d.get("flies", [])
 	for i in mini(fc.size(), marsh.flies.size()):
@@ -6206,6 +6227,8 @@ func crown_key() -> void:
 	if in_marsh() and near_shop(): # Bori answers to E like every other villager (Space still works)
 		interact()
 		return
+	if in_marsh() and story_step >= 3 and shore_key():
+		return
 	if in_cave and post_key():
 		return
 	if in_cave and shrine_key():
@@ -6373,7 +6396,7 @@ func deliver_letter() -> void:
 	if post_q == 3: # the postcard from the stream's end goes with Hangyeol's letter
 		post_q = 4
 		player.pots += 2
-		show_story("", STORY.BORI_LETTER + STORY.POST_BORI)
+		show_story("", STORY.BORI_LETTER + post_bori_lines())
 	else:
 		show_story("", STORY.BORI_LETTER)
 	set_quest("마을의 뱃사공 물결에게 가 보자 (E)")
@@ -8904,7 +8927,7 @@ func road_key() -> bool:
 		show_story("", STORY.ROAD_HOOK13 if hollow_q >= 3 else STORY.ROAD_HOOK)
 		return true
 	if me.distance_to(garden.road_marks.j) < 1.6:
-		show_story("", STORY.ROAD_PAGE)
+		show_story("", road_page_lines())
 		if road_q < 3:
 			road_q = 3
 			set_quest(road_quest())
@@ -9761,6 +9784,285 @@ func load_clock(d: Dictionary) -> void:
 	garden.clock_look(clock_q, clock_gears, clock_box)
 
 
+# ---- 깨어난 물가 (chapter 1, DESIGN.md): where Sora woke, pressed reeds lead to a lantern basket stuck in the mud.
+# The crown frees it (1 pip) and two packs of bricks rise (2 goblins, then a goblin and an archer); Bori knows the
+# basket and gives her lantern, never lit in a hundred years. After the Brick King, on a night, the crown lights it
+# (1 pip) and it floats about 20 tiles down the river to the lake's island; three brick snags hold it on the way
+# (2, 2, then a goblin and an archer). Bori's reed cushion: resting at night by a lit lantern heals 4 HP a second.
+const SHORE_HP := 10
+var shore_q := 0              # 0 not yet, 1 hint seen, 2 basket out, 3 Bori's lantern, 4 floated to the island, 5 cushion
+var has_cushion := false      # 갈대 방석, kept into a new round
+var shore_seen := false       # the basket's lines seen this session (not saved)
+var shore_wave := -1          # the pack fighting by the basket: 0 or 1, -1 none (not saved)
+var shore_up := false         # that pack has risen
+var shore_t := 0.0
+var shore_float := {}         # floating (not saved): d along the path, next snag, wait held, up its foes, t, lit, stop, wt
+var cushion_t := 0.0
+
+func shore_foes_alive() -> bool:
+	return enemies.any(func(e): return e.get("shore", false) and not e.dead)
+
+# E within 1.4 tiles of the basket (story step 3 on)
+func shore_key() -> bool:
+	if Vector2(player.x, player.z).distance_to(MARSH.BASKET_AT) >= 1.4:
+		return false
+	if shore_q <= 1:
+		if shore_wave >= 0:
+			return true
+		shore_q = 1
+		if not shore_seen:
+			shore_seen = true
+			show_story("", STORY.SHORE_BASKET)
+			after_story = func(): toast("왕관을 대 보자 (E)")
+			return true
+		if not spend_pips(1):
+			return true
+		var b: Vector2 = MARSH.BASKET_AT
+		burst(Vector3(b.x, height_at(b.x, b.y) + 0.3, b.y), Color("#c9a066"), 20, 2.0)
+		sfx(196, 0.3, "triangle", 0.25, -60)
+		shore_wave = 0
+		shore_up = false
+		show_story("", STORY.SHORE_WAKE)
+		after_story = spawn_shore_wave.bind(0)
+		return true
+	if shore_q == 3 and shore_float.is_empty():
+		if story_step < 5:
+			toast("물길이 막혀 있다. 벽돌왕을 넘어뜨린 뒤에 띄우자")
+			return true
+		if not is_night():
+			toast("등불 바구니는 밤에 띄우자 (21시 → 4시)")
+			return true
+		if not spend_pips(1):
+			return true
+		shore_float = {"d": 0.0, "snag": 0, "wait": false, "up": false, "t": 0.0, "lit": false, "stop": false, "wt": 0.0}
+		marsh.set_float(marsh.path[0], false)
+		sfx(330, 0.2, "triangle", 0.15)
+		return true
+	return false
+
+func spawn_shore_foe(at: Vector2, archer: bool) -> void:
+	spawn_enemy(at, archer)
+	var e: Dictionary = enemies[enemies.size() - 1]
+	e.cave = true # no respawn
+	e.shore = true
+	e.atk_cd = 1.5
+	var y := height_at(at.x, at.y)
+	burst(Vector3(at.x, y + 0.4, at.y), Color("#c9a066"), 20, 2.0)
+	pop_num(Vector3(at.x, y + 1.3, at.y), "!", Color("#ff5a4a"))
+	sfx(110, 0.25, "square", 0.25, 80)
+
+func spawn_shore_wave(i: int) -> void:
+	shore_wave = i
+	shore_up = true
+	shore_t = 0.0
+	var spots: Array = MARSH.SHORE_WAVES[i]
+	for k in spots.size():
+		spawn_shore_foe(spots[k], i == 1 and k == spots.size() - 1)
+
+func spawn_snag(i: int) -> void:
+	var spots: Array = MARSH.SNAG_FOES[i]
+	for k in spots.size():
+		spawn_shore_foe(spots[k], i == 2 and k == spots.size() - 1)
+
+# the second pack down: the basket comes out of the mud
+func shore_basket_out() -> void:
+	shore_wave = -1
+	shore_up = false
+	marsh.free_basket(self)
+	shore_q = 2
+	player.gold += 30
+	player.pots += 1
+	var b: Vector2 = MARSH.BASKET_AT
+	burst(Vector3(b.x, height_at(b.x, b.y) + 0.4, b.y), Color("#c9a066"), 24, 2.5)
+	sfx(587, 0.25, "triangle", 0.2)
+	show_story("", STORY.SHORE_FREE)
+	save_game()
+
+# fainting, loading or leaving the marsh: the packs go and a floating basket is taken back (shore_q stays: E again)
+func clear_shore_job() -> void:
+	for e in enemies:
+		if e.get("shore", false) and not e.dead:
+			e.dead = true
+			e.node.queue_free()
+			e.shadow.queue_free()
+	shore_wave = -1
+	shore_up = false
+	shore_t = 0.0
+	if not shore_float.is_empty():
+		shore_float = {}
+		marsh.hide_float()
+
+func update_shore(dt: float) -> void:
+	if intro or not in_marsh():
+		if shore_wave >= 0 or not shore_float.is_empty():
+			clear_shore_job()
+		return
+	var snags := 0 # snags still in the river, counted from the last
+	if not shore_float.is_empty():
+		snags = 3 - int(shore_float.snag)
+	elif shore_q == 3 and story_step >= 5:
+		snags = 3
+	marsh.shore_tick(self, night, snags)
+	if story_open:
+		return
+	var me := Vector2(player.x, player.z)
+	if story_step >= 3 and shore_q == 0 and me.distance_to(START) < 2.5:
+		shore_q = 1
+		show_story("", STORY.SHORE_HINT)
+		save_game()
+		return
+	if shore_wave >= 0 and shore_up and not shore_foes_alive():
+		shore_t += dt
+		if shore_t >= 1.0:
+			if shore_wave == 0:
+				spawn_shore_wave(1)
+			else:
+				shore_basket_out()
+	if not shore_float.is_empty():
+		update_float(dt, me)
+
+# the lantern basket floats 1 tile a second; it waits while Sora is more than 12 tiles off (on again inside 8)
+func update_float(dt: float, me: Vector2) -> void:
+	var f := shore_float
+	f.t += dt
+	if not f.lit: # a moment of the dusty unlit glass, then the crown lights it
+		if f.t >= 0.7:
+			f.lit = true
+			var p0: Vector2 = marsh.path[0]
+			marsh.set_float(p0, true)
+			burst(Vector3(p0.x, 0.2, p0.y), Color("#ffc46a"), 24, 2.0)
+			burst(Vector3(player.x, ground_y + 1.6, player.z), Color("#9fd4ff"), 14, 1.5)
+			sfx(523, 0.4, "sine", 0.3, 300)
+			show_story("", STORY.SHORE_FLOAT)
+		return
+	var d: float = f.d
+	var at: Vector2 = marsh.float_at(d)
+	marsh.move_float(at)
+	if f.wait: # held at a snag: its bricks rise 0.4 s after, and 1 s after the last falls it floats on
+		f.wt += dt
+		if not f.up:
+			if f.wt >= 0.4:
+				f.up = true
+				f.wt = 0.0
+				spawn_snag(int(f.snag))
+		elif shore_foes_alive():
+			f.wt = 0.0
+		elif f.wt >= 1.0:
+			snag_cleared()
+		return
+	var gap := me.distance_to(at)
+	if gap > 12.0:
+		f.stop = true
+	elif gap < 8.0:
+		f.stop = false
+	if f.stop:
+		return
+	var s: int = f.snag
+	if s < 3 and d >= float(marsh.snag_d[s]):
+		f.d = float(marsh.snag_d[s])
+		f.wait = true
+		f.up = false
+		f.wt = 0.0
+		toast("바구니가 벽돌에 걸렸다")
+		sfx(150, 0.2, "square", 0.15, -30)
+		return
+	var end: float = marsh.path_len()
+	if d >= end - 0.3:
+		if me.distance_to(MARSH.FLOAT_END) < 10.0:
+			shore_landed()
+		return
+	f.d = minf(d + dt, end)
+
+func snag_cleared() -> void:
+	var f := shore_float
+	f.wait = false
+	f.up = false
+	f.snag = int(f.snag) + 1
+	if int(f.snag) < 3:
+		var sn: Node3D = marsh.snag_nodes[int(f.snag) - 1]
+		burst(sn.position + Vector3(0, 0.3, 0), Color("#c9a066"), 18, 2.0)
+		sfx(392, 0.2, "triangle", 0.15)
+		toast("바구니가 다시 흐른다")
+		return
+	# the last snag: the fight's noise settles and only the water is left (GPT's note)
+	for sh in enemy_shots:
+		sh.node.queue_free()
+	enemy_shots.clear()
+	water_hush(4)
+
+func water_hush(n: int) -> void:
+	for k in n:
+		get_tree().create_timer(0.45 * k).timeout.connect(func(): sfx(240 - k * 20, 0.5, "noise", 0.04, -60))
+
+func shore_landed() -> void:
+	shore_float = {}
+	marsh.land_float()
+	shore_q = 4
+	player.max_hp += SHORE_HP
+	player.hp = minf(float(player.max_hp), player.hp + SHORE_HP)
+	show_story("", STORY.SHORE_LAND)
+	after_story = shore_hush
+	save_game()
+
+# after the lantern stops: 2 s of only water and the lantern, then the reward and the way back (GPT's note)
+func shore_hush() -> void:
+	water_hush(5)
+	get_tree().create_timer(2.0).timeout.connect(func(): toast(tr("최대 체력 +%d. 오두막에 들러 보리 할머니께 알리자") % SHORE_HP))
+
+# Bori and the basket (shore_q 2) and the lantern seen from her window (shore_q 4)
+func shore_bori() -> bool:
+	if shore_q == 2:
+		shore_q = 3
+		player.pots += 1
+		show_story("", STORY.SHORE_BORI + [STORY.SHORE_BORI_DAM if story_step < 5 else STORY.SHORE_BORI_FLOW] + STORY.SHORE_BORI_END)
+		save_game()
+		return true
+	if shore_q == 4:
+		shore_q = 5
+		var lines: Array = STORY.SHORE_THANKS.duplicate()
+		if has_cushion: # a new round: the cushion came along
+			lines[lines.size() - 1] = STORY.SHORE_THANKS_ROUND
+			player.gold += 40
+			player.pots += 1
+		has_cushion = true
+		show_story("", lines)
+		save_game()
+		return true
+	return false
+
+# load the shore's state (old saves: the basket is still in the mud); a fight or a float in progress starts over
+func load_shore(d: Dictionary) -> void:
+	shore_q = int(d.get("shore_q", 0))
+	has_cushion = bool(d.get("has_cushion", false))
+	clear_shore_job()
+	marsh.shore_look(self, shore_q)
+
+# chapter 9's diary page and chapter 3's postcard pick the basket and the lantern up
+func road_page_lines() -> Array:
+	var lines: Array = STORY.ROAD_PAGE.duplicate()
+	var i := lines.find("소라|surprised|늪…… 내가 깨어난 곳이야.")
+	if shore_q >= 2 and i >= 0:
+		lines.insert(i + 1, STORY.ROAD_PAGE_BASKET)
+	return lines
+
+func post_bori_lines() -> Array:
+	var lines: Array = STORY.POST_BORI.duplicate()
+	var i := lines.find("보리 할머니|bori|그 사람 편지는 도란이, 내 엽서는 네가. 둘 다 백 년이 걸렸구나.")
+	if i >= 0 and shore_q >= 3:
+		lines.insert(i + 1, STORY.POST_BORI_LAMP if shore_q >= 4 else STORY.POST_BORI_LAMP_HELD)
+	return lines
+
+func shore_journal() -> String:
+	match shore_q:
+		1: return tr("왕관을 대 진흙을 풀자 (E)") if shore_seen else tr("물가에 걸린 것을 보자")
+		2: return tr("보리 할머니께 바구니를")
+		3:
+			if not shore_float.is_empty():
+				return tr("바구니를 따라가 걸림을 풀자 %d/3") % int(shore_float.snag)
+			return tr("물길이 다시 흐르면 밤에 띄우자") if story_step < 5 else tr("밤에 물가에서 등불 바구니를 띄우자 (E)")
+		4: return tr("보리 할머니께 알리자")
+	return tr("끝")
+
 # put the kid goblin where kid_q says: in the field with guards, or beside Kongal
 func place_kid() -> void:
 	if kid_node == null:
@@ -9846,7 +10148,8 @@ var rest_need := 6.0         # seconds of rest for the next pip (lantern 6, jar 
 func update_pips(dt: float) -> void:
 	pip_flash -= dt
 	var night_now := is_night() or in_clock() # underground the clock room rests as at night
-	if crown_pips >= 8 or not night_now:
+	var heal: bool = has_cushion and night_now and player.hp < player.max_hp
+	if (crown_pips >= 8 or not night_now) and not heal:
 		rest_t = 0.0
 		return
 	var me := Vector3(player.x, 0, player.z)
@@ -9859,8 +10162,19 @@ func update_pips(dt: float) -> void:
 		if not e.dead and Vector2(e.x - me.x, e.z - me.z).length() < 6.0:
 			calm = false
 	var jar := fly_q >= 3
+	var still := Vector2(player.vx, player.vz).length() < 0.3
+	# 갈대 방석: resting at night by a lit lantern (or with the jar) heals 4 HP a second, full crown or not
+	if heal and (near_lamp or jar) and calm and still:
+		player.hp = minf(float(player.max_hp), player.hp + 4.0 * dt)
+		cushion_t += dt
+		if cushion_t >= 1.0:
+			cushion_t = 0.0
+			burst(Vector3(player.x, ground_y + 0.1, player.z), Color("#9fe07a"), 6, 0.8)
+	if crown_pips >= 8 or not night_now:
+		rest_t = 0.0
+		return
 	rest_need = (6.0 if near_lamp else 12.0) * (0.6 if has_tea else 1.0)
-	if (near_lamp or jar) and calm and Vector2(player.vx, player.vz).length() < 0.3:
+	if (near_lamp or jar) and calm and still:
 		rest_t += dt
 		if rest_t >= rest_need:
 			rest_t = 0.0
@@ -10466,6 +10780,8 @@ func journal_lines() -> Array:
 	if story_step >= 2:
 		var n: int = marsh.count()
 		side.call("늪의 옛 지도 조각", tr("끝") if marsh.chest_open else (tr("달지기 상자가 동쪽 둔덕에 솟았다") if n == 3 else tr("%d/3 찾음") % n))
+	if shore_q >= 1:
+		side.call("깨어난 물가", shore_journal())
 	if shrine_seen:
 		side.call("울림 수정", tr("끝") if has_ring else (tr("상자를 열자") if crystal_done else tr("낮은 소리부터 차례로")))
 	if story_step >= 6:
@@ -10542,6 +10858,8 @@ func journal_lines() -> Array:
 	if has_oar_ring: keep.append(tr("삿대 고리"))
 	if has_whistle: keep.append(tr("물지기 호루라기"))
 	if has_oil: keep.append(tr("달지기 기름병"))
+	if shore_q == 3: keep.append(tr("보리의 등불"))
+	if has_cushion: keep.append(tr("갈대 방석"))
 	if post_q == 3: keep.append(tr("보리의 엽서"))
 	if has_armour: keep.append(tr("달지기 갑옷"))
 	if has_tea: keep.append(tr("달꽃 차"))
@@ -10923,6 +11241,7 @@ func _process(dt: float) -> void:
 	update_oar()
 	if in_marsh() and not intro:
 		marsh.update(self)
+	update_shore(dt)
 	marsh.update_flies(self, in_marsh() and is_night())
 	marsh.update_flowers(self, in_marsh() and not intro and is_night() and moon_phase().x >= 0.6)
 	if jar_node != null:
@@ -11415,6 +11734,7 @@ func update_fall(dt: float) -> void:
 
 # Sora faints: say so plainly, keep gold and level, heal the boss, and wake her at the start
 func faint() -> void:
+	clear_shore_job()
 	for id in ["mulgyeol", "noeul"]:
 		if mate_down[id] > 0.0:
 			mate_down[id] = 0.001 # gets up on the next tick

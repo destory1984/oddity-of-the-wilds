@@ -45,6 +45,12 @@ func _draw() -> void:
 	if main.marsh.chest.visible and not main.marsh.chest_open: # the moonkeeper chest, a pale blue cross
 		draw_rect(Rect2(mc.x - 0.4, mc.y + 0.2, 1.8, 0.6), Color("#bcd6ff"))
 		draw_rect(Rect2(mc.x + 0.2, mc.y - 0.4, 0.6, 1.8), Color("#bcd6ff"))
+	if main.story_step >= 3 and main.shore_q < 2: # 깨어난 물가: the basket in the mud
+		var b: Vector2 = MARSH.BASKET_AT
+		draw_rect(Rect2(b.x - 0.1, b.y - 0.1, 1.2, 1.2), Color("#c8a060"))
+	if main.marsh.float_node.visible: # Bori's lantern, floating or off the island
+		var lp: Vector3 = main.marsh.float_node.position
+		draw_rect(Rect2(lp.x - 0.1, lp.z - 0.1, 1.2, 1.2), Color("#ffd060"))
 	draw_set_transform_matrix(Transform2D())
 	# the ways down (violet) and up (gold) as small upright stairs of three steps, drawn on screen over their tile
 	for st: Array in map_tex.get_meta("stairs", []):
