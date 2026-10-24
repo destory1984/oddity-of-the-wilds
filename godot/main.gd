@@ -3325,6 +3325,7 @@ const CHANGES := [
 	"개발 상황: 놀 수 있는 분량 약 302분 / 목표 300분 (100%)",
 	"",
 	"2026-10-24 저녁",
+	"· v0.0.45: 이야기 줄기를 사용자가 고른 안(태엽 팔찌, 함께 감는 손)으로 바꿨다. 소라는 왕관을 머리에 쓴 채 둔다. 왕관은 달지기의 표식이라 옛 장치와 벽돌이 알아보고 쫓는다. 힘을 쓰는 것은 소매 끝 파랑·금색 장식인 한 쌍의 태엽 팔찌다. 등불 켜기, 벽돌 풀기, 풍차 감기, 달빛 눈금 8칸이 모두 팔찌로 옮겨 갔다. 한결은 여덟 사람 몫을 혼자 감으려다 손이 굳었고, 보리 할머니의 말은 \"왕관을 썼다고 혼자 감는 건 아니란다. 옆 사람 손도 빌리렴.\"이 됐다. 이야기 대사 76줄, 할 일 줄과 알림과 조작법 26곳을 고쳤다. 큰 태엽 방의 왕관 모양 홈은 왕관 무늬가 새겨진 둥근 접점이 되어, 팔찌를 대면 테두리가 파랗게 빛난다(왕관이 둘 보이는 일은 없다). 이야기 그림 4장(02 등불, 06 동굴 벽화, 11 마지막 감기, 13 열셋째 등불)과 터치 팔찌 단추 그림을 GPT로 다시 그렸다. 휴대폰과 태블릿에서 \"E  보리 할머니의 상점\" 같은 글에 E가 그대로 남던 것을 고쳐, 상점 안내, 일지, 할 일 줄, 알림, 대사의 E를 모두 \"팔찌 단추\"로 보인다. 예전 저장의 할 일 줄도 불러오면 새 말로 바뀐다. 놀 수 있는 분량은 약 302분 그대로다.",
 	"· v0.0.44: GPT가 이야기 큰길을 다시 따라가며 찾은 일곱 가지를 고쳤다. (1) 동굴 문을 연 뒤에도 할 일 줄이 '열쇠를 찾아 잠긴 문을 열자'로 남았다. 이제 문이 열리면 '열린 문 너머, 수레두더지가 있는 안쪽 방으로 가자'로 바뀐다. (2) 마을에 처음 닿은 순간의 저장을 이어하면 이미 온 마을을 찾으라고 했다. 이제 광장의 등불지기에게 말을 걸라는 줄이 나온다. (3) 달의 계단 마지막 등불을 켜면 아직 못 만난 거푸집의 심장을 노리라고 했다. 이제 '꼭대기 문을 지나 정원으로 가자'이고, 거푸집 줄은 정원 봉인 셋을 푼 뒤에 나온다. (4) 엔딩 전에 편지 세 통을 전하거나 보름달 축제를 보면 정원을 이미 감았다고 했다. 엔딩 전에는 묵은 편지와 꺼진 등불을 되살린 덕이라고 말하고, 정원 이야기는 엔딩 뒤에만 한다. (5) 보리 할머니에게 한결이 누군지 들은 뒤 엽서를 주워도 '한결이 누군지는 몰라도'라고 했다. 이제 마지막 달지기 한결에게 못 간 엽서라고 말한다. (6) 밤 추격 중에 낮까지 있다가 저장하고 이어하면 낮에는 없는 노을을 쫓으라고 했다. 이제 밤이 되면 마을에서 쉬자는 줄이 나온다. (7) 마을 다섯째 집 그림을 안 봤는데도 물결이 그 그림 속 한결과 닮았다고 했다. 그림을 안 봤으면 처음 보는 말을 한다. 전체 시험에서 가끔 실패하던 동료 수다 시험(말풍선 4개 → 1개)은 앞 시험에서 쓰러진 고블린이 8초 뒤 9칸 밖에서 다시 일어나 8칸 안으로 다가와 수다를 끊은 탓이라, 그 시험 동안은 되살아나지 않게 했다.",
 	"",
 	"2026-10-24 아침",
@@ -3763,7 +3764,7 @@ func build_settings(root: Control) -> void:
 	ui.set_stacks[0].append([lt, lang, null])
 	# 도움말
 	var help_rows := [["이동", "WASD, 방향키. Shift로 달린다 (물수제비 걸음을 얻으면 물 위도)"], ["싸움", "J 또는 왼쪽 클릭 베기, K 또는 오른쪽 클릭 구르기, L 막기"],
-		["기술", "U I O 또는 1 2 3, 회복약은 4"], ["왕관", "E: 말 걸기, 등불, 벽돌 풀기, 길돌, 낚시"], ["열기", "Space: 상자, 집. Q 일지, H 조작법, M 소리, T 3시간 보내기"],
+		["기술", "U I O 또는 1 2 3, 회복약은 4"], ["팔찌", "E: 말 걸기, 등불, 벽돌 풀기, 길돌, 낚시"], ["열기", "Space: 상자, 집. Q 일지, H 조작법, M 소리, T 3시간 보내기"],
 		["화면", "Z X 또는 휠로 확대·축소. F8 처음 자리로, F9 처음부터. Esc 이 창"], ["요령", "맞기 직전에 구르면 섬광 피하기, 막으면 섬광 막기. 괴물은 때리기 전에 빨갛게 부풀고 \"!\"가 뜬다"]]
 	for i in help_rows.size():
 		var ht := label(ui.set_pages[1], help_rows[i][0], Vector2(0, i * 48), 16, Color("#eef3ff"))
@@ -3776,7 +3777,7 @@ func build_settings(root: Control) -> void:
 	# phones: the same page for the touch keys (use_touch_help swaps the two)
 	var touch_rows := [["이동", "화면 왼쪽에 엄지를 대면 막대가 생긴다. 끝까지 밀면 달린다 (물수제비 걸음을 얻으면 물 위도)"],
 		["싸움", "칼 단추로 베기, 화살표 단추로 구르기, 방패 단추를 누르고 있으면 막기"],
-		["기술", "오른쪽 아래 그림 셋은 회오리·불씨탄·빛파동, 초록 하트는 회복약"], ["왕관", "왕관 단추 (E): 말 걸기, 등불, 벽돌 풀기, 길돌, 낚시"],
+		["기술", "오른쪽 아래 그림 셋은 회오리·불씨탄·빛파동, 초록 하트는 회복약"], ["팔찌", "팔찌 단추 (E): 말 걸기, 등불, 벽돌 풀기, 길돌, 낚시"],
 		["열기", "손 단추 (Space): 상자, 집"], ["화면", "돋보기 단추로 확대·축소. 미니맵 왼쪽 단추 넷: 조작법, 효과음, 일지, 설정"], help_rows[6]]
 	ui.set_help_touch = []
 	for i in touch_rows.size():
@@ -4310,13 +4311,13 @@ const STAIRS_DONE_QUEST := "꼭대기 문을 지나 정원으로 가자"
 
 func stairs_quest() -> String:
 	if not stairs.wall_open:
-		return "계단을 막은 벽돌 벽을 왕관으로 풀자 (E)"
+		return "계단을 막은 벽돌 벽을 팔찌로 풀자 (E)"
 	# past the wall the line follows the landing she stands on (a playtest found it pointing back at the open wall)
 	if in_stairs() and player.z > 15.0:
 		return "깊은 물길은 Shift를 누른 채 물수제비 걸음으로 건너자"
 	if in_stairs() and player.z > 6.0:
 		return "무너진 틈은 빛나는 바람구멍을 밟아 넘자"
-	return tr("꼭대기 계단참의 등불 셋을 왕관으로 켜자 (E) %d/3") % stairs.lamps_lit()
+	return tr("꼭대기 계단참의 등불 셋을 팔찌로 켜자 (E) %d/3") % stairs.lamps_lit()
 
 func open_stairs() -> void:
 	stairs.open_wall()
@@ -5432,7 +5433,7 @@ func build_hud() -> void:
 	shop.visible = false
 	ui.shop = shop
 	ui.shop_hint = label(root, "E  보리 할머니의 상점", Vector2.ZERO, 16, Color("#fff1c8"))
-	place(ui.shop_hint, Control.PRESET_CENTER_BOTTOM, Vector2(-150, -260), Vector2(300, 24))
+	place(ui.shop_hint, Control.PRESET_CENTER_BOTTOM, Vector2(-200, -260), Vector2(400, 24))
 	ui.shop_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ui.shop_hint.add_theme_constant_override("outline_size", 6)
 	ui.shop_hint.add_theme_color_override("font_outline_color", Color.BLACK)
@@ -5554,7 +5555,7 @@ func build_hud() -> void:
 	help.mouse_filter = Control.MOUSE_FILTER_STOP
 	var help_title := label(help, "조작법", Vector2(62, 20), 13, Color("#a99d84"))
 	var rows := [["WASD / 방향키", "이동"], ["Shift", "달리기"], ["J / 왼쪽 클릭", "공격 (연속기)"], ["K / 오른쪽 클릭", "구르기 (때맞추면 섬광)"], ["L / 가운데 클릭", "막기 (때맞추면 반격, Lv4부터 1초 모아 J)"],
-		["U I O / 1 2 3", "스킬 (기세 30·15·60)"], ["4", "회복약"], ["Space", "상자 열기, 들어가기"], ["E", "왕관 만지기, 말 걸기 (보리 할머니 포함)"], ["Z X / 휠", "확대·축소"], ["T R P", "3시간 뒤로 / 비 / 사진"], ["F8", "처음 자리로 (진행은 그대로)"], ["F9", "처음부터 (저장 지우기)"], ["Q", "일지 (할 일과 곁이야기)"], ["H", "조작법 숨기기"]]
+		["U I O / 1 2 3", "스킬 (기세 30·15·60)"], ["4", "회복약"], ["Space", "상자 열기, 들어가기"], ["E", "팔찌 쓰기, 말 걸기 (보리 할머니 포함)"], ["Z X / 휠", "확대·축소"], ["T R P", "3시간 뒤로 / 비 / 사진"], ["F8", "처음 자리로 (진행은 그대로)"], ["F9", "처음부터 (저장 지우기)"], ["Q", "일지 (할 일과 곁이야기)"], ["H", "조작법 숨기기"]]
 	ui.help_rows = []
 	for i in rows.size():
 		var hk := label(help, rows[i][0], Vector2(14, 60 + i * 27), 13, Color("#e9dfc4"))
@@ -5566,7 +5567,7 @@ func build_hud() -> void:
 	# phones: the touch keys, each row with the key's own picture (use_touch_help swaps the two sets)
 	var trows := [["touch_stick_base", "왼쪽 막대", "이동, 끝까지 밀면 달리기"], ["touch_attack", "칼", "공격 (연속기)"],
 		["touch_dodge", "화살표", "구르기 (때맞추면 섬광)"], ["touch_guard", "방패 (누른 채)", "막기 (때맞추면 반격, Lv4부터 1초 모아 칼)"],
-		["touch_crown", "왕관 (E)", "왕관 만지기, 말 걸기 (보리 할머니 포함)"], ["touch_open", "손 (Space)", "상자 열기, 들어가기"],
+		["touch_crown", "팔찌 (E)", "팔찌 쓰기, 말 걸기 (보리 할머니 포함)"], ["touch_open", "손 (Space)", "상자 열기, 들어가기"],
 		["skill_0", "기술 그림 셋", "회오리·불씨탄·빛파동 (기세 30·15·60)"], ["skill_3", "초록 하트", "회복약"],
 		["touch_zoom_in", "돋보기 둘", "확대·축소"], ["key_help", "물음표", "조작법"], ["key_sound", "스피커", "효과음 켜고 끄기"],
 		["key_journal", "책", "일지 (할 일과 곁이야기)"], ["key_gear", "톱니바퀴", "설정"]]
@@ -5786,7 +5787,7 @@ func darken_first_lamp() -> void:
 
 func begin_opening() -> void:
 	story_step = 1
-	set_quest("왕관을 만져 보자 (E)")
+	set_quest("팔목의 팔찌를 만져 보자 (E)")
 
 func touch_crown() -> void:
 	if story_step != 1 or dark_lamp == null:
@@ -6274,17 +6275,17 @@ func load_game() -> void:
 		player.x = px
 		player.z = pz
 		ui.mini.map_tex = cave_map_tex()
-	quest_before_cave = String(d.get("cave_quest", "")) # enter_cave above overwrote it
+	quest_before_cave = old_quest_words(String(d.get("cave_quest", ""))) # enter_cave above overwrote it
 	if is_instance_valid(ui.title_hint):
 		ui.title_hint.text = "아무 키나 눌러 이어하기  ·  F9 처음부터"
 	repair_story_step(d)
 	if story_step >= 6: # later chapters: the quest line as it was saved (older saves keep what the zone set)
 		if d.has("quest"):
-			set_quest(String(d.quest))
+			set_quest(old_quest_words(String(d.quest)))
 		if ui.quest.text.begins_with(OLD_CAVE_QUEST) or ui.quest.text == CAVE_QUEST: # written by the bug below: the main road's last step instead
 			set_quest(main_road_quest())
 	else:
-		set_quest(["", "왕관을 만져 보자 (E)", "서쪽 오두막으로 가 보자", "북쪽 벽돌왕이 늪의 물길을 막고 있다", "", CAVE_QUEST][clampi(story_step, 0, 5)])
+		set_quest(["", "팔목의 팔찌를 만져 보자 (E)", "서쪽 오두막으로 가 보자", "북쪽 벽돌왕이 늪의 물길을 막고 있다", "", CAVE_QUEST][clampi(story_step, 0, 5)])
 	if turtle_cut: # the fight starts over from the pier
 		set_quest("부두의 물결에게 말을 걸자 (E)")
 	if bool(d.get("in_village", false)) and errand == 0: # saved on arrival before the quest changed (GPT playtest 5)
@@ -6307,6 +6308,14 @@ func repair_story_step(d: Dictionary) -> void:
 	if forest_q >= 1 or castle_q >= 1: at = maxi(at, 10)
 	if garden_q >= 1: at = maxi(at, 11)
 	story_step = at
+
+# v0.0.45: the bracelets wind, not the crown; quests saved before say 왕관
+const OLD_QUEST_WORDS := [["왕관 단추", "팔찌 단추"], ["왕관을 만져 보자", "팔목의 팔찌를 만져 보자"], ["왕관으로", "팔찌로"], ["왕관을 대", "팔찌를 대"], ["왕관을 높이 들어", "두 팔을 높이 들어"]]
+
+func old_quest_words(q: String) -> String:
+	for w in OLD_QUEST_WORDS:
+		q = q.replace(w[0], w[1])
+	return q
 
 func main_road_quest() -> String:
 	if garden_q >= 5: return "끝. 다시 돌기 시작한 정원을 거닐자 (정원 한가운데서 E 두 번: 새 바퀴)"
@@ -6766,7 +6775,7 @@ func crown_key() -> void:
 			if errand == 0:
 				errand = 1
 				show_story("", STORY.SIMJI)
-				set_quest("동쪽 끝 꺼진 등불을 왕관으로 켜자 (E) 0/3")
+				set_quest("동쪽 끝 꺼진 등불을 팔찌로 켜자 (E) 0/3")
 			elif errand == 2:
 				errand = 3
 				crown_pips = 8
@@ -6954,7 +6963,7 @@ func doran_errand() -> void:
 	if doran_q == 0:
 		doran_q = 1
 		show_story("", STORY.DORAN_ASK)
-		set_quest("도란의 편지에 왕관을 대 보자 (E, 달빛 눈금 사용)")
+		set_quest("도란의 편지에 팔찌를 대 보자 (E, 달빛 눈금 사용)")
 	elif spend_pips(lamp_cost()):
 		doran_q = 2
 		burst(Vector3(player.x, 1.4, player.z), Color("#9fd4ff"), 18, 1.5)
@@ -7248,7 +7257,7 @@ func enter_forest() -> void:
 	if hollow_q == 1:
 		spawn_hollow()
 	if forest_q < 3:
-		set_quest("벽돌 벽을 왕관으로 풀며 숲 동쪽 끝의 노을에게 가자 (E)")
+		set_quest("벽돌 벽을 팔찌로 풀며 숲 동쪽 끝의 노을에게 가자 (E)")
 	save_game()
 
 func leave_forest() -> void:
@@ -7401,7 +7410,7 @@ func hollow_key() -> bool:
 	var me := Vector2(player.x, player.z)
 	if hollow_q == 0 and me.distance_to(forest.marks.G) < 1.6:
 		if forest_q < 3:
-			toast("회색 벽돌 문. 왕관으로는 풀리지 않는다")
+			toast("회색 벽돌 문. 팔찌로는 풀리지 않는다")
 			return true
 		hollow_q = 1
 		forest.open_gate_look()
@@ -7954,7 +7963,7 @@ func enter_lake() -> void:
 	if lake_q == 0:
 		lake_q = 1
 		show_story("", STORY.LAKE_IN)
-		set_quest("수문의 벽돌을 왕관으로 풀자 (E)")
+		set_quest("수문의 벽돌을 팔찌로 풀자 (E)")
 	save_game()
 
 func leave_lake() -> void:
@@ -8838,7 +8847,7 @@ func enter_castle() -> void:
 
 func castle_quest() -> String:
 	if not castle.gate_open:
-		return "성문의 벽돌을 왕관으로 풀자 (E)"
+		return "성문의 벽돌을 팔찌로 풀자 (E)"
 	if not castle.door_open:
 		return tr("성 안에 흩어진 한결의 일기를 찾자 (E) %d/3") % castle.pages_read()
 	return "옥좌의 방으로 가자"
@@ -9809,7 +9818,7 @@ func enter_hill() -> void:
 				give_shield(e)
 		show_story("", STORY.HILL_IN)
 	if hill_q == 1:
-		set_quest(tr("풍차를 왕관으로 감자 (E) %d/3") % hill.turning_count())
+		set_quest(tr("풍차를 팔찌로 감자 (E) %d/3") % hill.turning_count())
 	elif hill_q == 2:
 		set_quest("바람 다리를 건너 벽돌 매를 물리치자")
 	save_game()
@@ -9852,7 +9861,7 @@ func hill_key() -> bool:
 				show_story("", STORY.WIND_BRIDGE)
 				set_quest("바람 다리를 건너 벽돌 매를 물리치자")
 			else:
-				set_quest(tr("풍차를 왕관으로 감자 (E) %d/3") % n)
+				set_quest(tr("풍차를 팔찌로 감자 (E) %d/3") % n)
 			save_game()
 			return true
 	return false
@@ -10256,7 +10265,7 @@ var road_camp_told := false
 
 func road_quest() -> String:
 	match road_q:
-		1: return "뿌리 벽돌을 왕관으로 풀자 (E)"
+		1: return "뿌리 벽돌을 팔찌로 풀자 (E)"
 		2: return "한결의 야영터를 살펴보자"
 		3: return "깊은 틈 위 한결의 발자국을 따라가자 (E로 비추기)"
 	return "회색 문을 지나 빈터로 가자"
@@ -10607,7 +10616,7 @@ func update_ring(dt: float) -> void:
 		if ring_k >= 8:
 			ring_k = -1
 			garden_q = 4
-			set_quest("왕관을 높이 들어 다 같이 땅을 감자 (E)")
+			set_quest("두 팔을 높이 들어 다 같이 땅을 감자 (E)")
 			save_game()
 		else:
 			set_quest(tr("마을 사람들이 등불을 켜는 동안 거푸집 조각을 막자 %d/8") % ring_k)
@@ -11204,7 +11213,7 @@ func shore_key() -> bool:
 		if not shore_seen:
 			shore_seen = true
 			show_story("", STORY.SHORE_BASKET)
-			after_story = func(): toast("왕관을 대 보자 (E)")
+			after_story = func(): toast("팔찌를 대 보자 (E)")
 			return true
 		if not spend_pips(1):
 			return true
@@ -11445,7 +11454,7 @@ func post_bori_lines() -> Array:
 
 func shore_journal() -> String:
 	match shore_q:
-		1: return tr("왕관을 대 진흙을 풀자 (E)") if shore_seen else tr("물가에 걸린 것을 보자")
+		1: return tr("팔찌를 대 진흙을 풀자 (E)") if shore_seen else tr("물가에 걸린 것을 보자")
 		2: return tr("보리 할머니께 바구니를")
 		3:
 			if not shore_float.is_empty():
@@ -11521,7 +11530,7 @@ func light_village_lamp(d: Dictionary) -> void:
 		errand = 2
 		set_quest("등불지기 심지에게 돌아가자")
 	else:
-		set_quest(tr("동쪽 끝 꺼진 등불을 왕관으로 켜자 (E) %d/3") % n)
+		set_quest(tr("동쪽 끝 꺼진 등불을 팔찌로 켜자 (E) %d/3") % n)
 	var at: Vector2 = d.brick
 	get_tree().create_timer(1.0).timeout.connect(func():
 		spawn_enemy(at)
@@ -12027,14 +12036,15 @@ func leave_cave() -> void:
 # on phones the keyboard words in quest lines, toasts and story lines become the touch keys' names
 const TOUCH_WORDS := [["Shift를 누르고 달리면", "막대를 끝까지 밀어 달리면"], ["Shift를 누르고", "막대를 끝까지 밀고"],
 	["Shift를 누른 채", "막대를 끝까지 민 채"], ["Shift로 달리며 J", "막대를 끝까지 밀며 칼 단추"], ["Shift로", "막대를 끝까지 밀어"],
-	["(E)", "(왕관 단추)"], ["E로", "왕관 단추로"], ["Space", "손 단추"]]
+	["Space", "손 단추"]]
+var touch_e := RegEx.create_from_string("(?<![A-Za-z])E(?![A-Za-z])") # the E key alone: "(E)", "E로", "E를", "E  ", "E!"
 
 func touch_words(t: String) -> String:
 	if not touch_ui:
 		return t
 	for w in TOUCH_WORDS:
 		t = t.replace(w[0], w[1])
-	return t
+	return touch_e.sub(t, "팔찌 단추", true)
 
 func set_quest(text: String) -> void:
 	ui.quest.text = touch_words(tr(text))
@@ -12169,7 +12179,7 @@ func journal_bbcode(lines: Array) -> String:
 	var heads := JOURNAL_HEADS.map(func(h): return tr(h))
 	var out: Array = []
 	for l in lines:
-		var line: String = String(l).replace("[", "[lb]")
+		var line: String = touch_words(String(l)).replace("[", "[lb]")
 		if l in heads:
 			out.append("[color=#f6d27a][font_size=17]%s[/font_size][/color]" % line)
 		elif String(l).ends_with(tr("완료")) or String(l).ends_with(tr("끝")):
@@ -12230,7 +12240,7 @@ func journal_lines() -> Array:
 		side.call("섬 밑 물빛 동굴", tr("끝") if grotto_q >= 4 else (tr("상자를 열자") if grotto_q == 3 else tr("섬 남쪽 계단으로")))
 		side.call("아랫못 물지기", [tr("섬 남쪽 끝 둑"), tr("물속 사슬은 물결에게 (E)"), tr("창살 안 걸쇠"), tr("물 태엽 열쇠를 감자"), tr("열쇠 기둥의 깡통"), tr("끝")][south_q])
 	if clock_q >= 1:
-		side.call("큰 태엽 방", [tr(""), tr("빈터 한가운데 구멍으로"), tr("굳은 톱니 셋 %d/3") % clock_gears.count(true), tr("열쇠 한가운데에 왕관을"), tr("다 같이 밀자"), tr("끝") if clock_box else tr("열쇠 북쪽 궤짝")][clock_q])
+		side.call("큰 태엽 방", [tr(""), tr("빈터 한가운데 구멍으로"), tr("굳은 톱니 셋 %d/3") % clock_gears.count(true), tr("왕관 무늬에 팔찌를 대자"), tr("다 같이 밀자"), tr("끝") if clock_box else tr("열쇠 북쪽 궤짝")][clock_q])
 	if forest_q >= 1:
 		var nf: int = forest.freed.filter(func(f): return f).size()
 		side.call("갇힌 다람쥐", tr("끝") if has_acorn else tr("%d/5 구함") % nf)
@@ -12240,7 +12250,7 @@ func journal_lines() -> Array:
 	if post_q >= 1:
 		side.call("물길 끝 굴", [tr(""), tr("섬 수정을 낮은 소리부터"), tr("물길 끝의 쓸려 온 더미"), tr("보리 할머니께 엽서를") if doran_q >= 3 else tr("한결이 누구일까"), tr("끝")][post_q])
 	if hill_q >= 3:
-		side.call("참새 방앗간", [tr("언덕 남쪽 담 위의 참새"), tr("큰 풍차를 왕관으로 감자"), tr("깃대에서 바람개비 넷을 돌리자"), tr("물길 어귀의 벽돌"), tr("건너편 나루의 궤짝"), tr("끝")][mill_q])
+		side.call("참새 방앗간", [tr("언덕 남쪽 담 위의 참새"), tr("큰 풍차를 팔찌로 감자"), tr("깃대에서 바람개비 넷을 돌리자"), tr("물길 어귀의 벽돌"), tr("건너편 나루의 궤짝"), tr("끝")][mill_q])
 	if hill_q >= 1:
 		side.call("바람개비 경주", tr("최고 기록 %.1f초") % race_best if race_best > 0.0 else tr("언덕 남서쪽 깃대에서"))
 	if cloud_q >= 1:
@@ -12297,7 +12307,7 @@ func journal_lines() -> Array:
 	if has_bookmark: keep.append(tr("달지기 책갈피"))
 	if has_lamp: keep.append(tr("한결의 등잔"))
 	if has_medal: keep.append(tr("과녁 메달"))
-	out.append("  " + (", ".join(keep) if not keep.is_empty() else tr("왕관 하나")))
+	out.append("  " + (", ".join(keep) if not keep.is_empty() else tr("왕관과 태엽 팔찌")))
 	return out
 
 func toast(msg: String) -> void:
@@ -12529,7 +12539,7 @@ func _process(dt: float) -> void:
 	slowmo -= dt
 	ui.slowmo_tint.visible = slowmo > 0
 	ui.shop_hint.visible = not intro and not shop_open and near_shop()
-	ui.shop_hint.text = "E  편지 전하기" if doran_q == 2 else "E  보리 할머니의 상점"
+	ui.shop_hint.text = touch_words(tr("E  편지 전하기") if doran_q == 2 else tr("E  보리 할머니의 상점"))
 	if shop_open and not near_shop():
 		toggle_shop(false)
 	if key_down(KEY_J) and player.atk_cd <= 0 and not intro and not shop_open:
@@ -13751,7 +13761,7 @@ func buy_stall(key: String) -> void:
 			pop_num(Vector3(player.x, 1.8, player.z), "+40", Color("#7aff9a"))
 		"2":
 			if crown_pips >= 8:
-				toast("왕관 달빛이 이미 가득하다")
+				toast("팔찌 달빛이 이미 가득하다")
 				return
 			crown_pips = mini(8, crown_pips + 2)
 			pip_flash = 0.3
@@ -13775,7 +13785,7 @@ func start_targets() -> void:
 	toast(tr("과녁 맞히기! %d초 동안 일어서는 과녁을 베자") % int(TARGET_TIME))
 
 # what a stall or the inn is, said once when Sora steps up to it (the signs are only pictures)
-const STALL_DOES := {"1": "체력 40", "2": "왕관 눈금 2칸", "3": "기력 가득, 기세 +50"}
+const STALL_DOES := {"1": "체력 40", "2": "팔찌 눈금 2칸", "3": "기력 가득, 기세 +50"}
 var stall_seen := ""
 
 func market_hint() -> void:

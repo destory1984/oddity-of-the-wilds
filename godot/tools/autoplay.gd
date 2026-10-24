@@ -10,7 +10,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "painting_once", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "esc_sheets", "news_more", "touch_controls", "folk_sleep", "folk_routine", "hint_folk", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "story_fixes", "playtest5", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "mill", "post", "lake_south", "clock", "shore", "quarters", "oak", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "painting_once", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "esc_sheets", "news_more", "touch_controls", "folk_sleep", "folk_routine", "hint_folk", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "story_fixes", "bracelet", "playtest5", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "mill", "post", "lake_south", "clock", "shore", "quarters", "oak", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -1792,7 +1792,7 @@ func run() -> void:
 		var quest0: String = main.ui.quest.text
 		var boss0: bool = main.ui.boss.visible
 		main.ui.boss.visible = true
-		main.set_quest("벽돌 벽을 왕관으로 풀며 숲 동쪽 끝의 노을에게 가자. 길을 막은 회색 나무는 왕관으로 하나씩 풀 수 있다")
+		main.set_quest("벽돌 벽을 팔찌로 풀며 숲 동쪽 끝의 노을에게 가자. 길을 막은 회색 나무는 팔찌로 하나씩 풀 수 있다")
 		await wait(0.1)
 		var tk: Dictionary = main.touch_layer.keys()
 		var boss_r: Rect2 = main.ui.boss.get_global_rect()
@@ -1836,7 +1836,7 @@ func run() -> void:
 		var q0: String = main.ui.quest.text
 		main.touch_ui = true # on phones the keyboard words read as the touch keys
 		main.set_quest("벽돌 벽을 풀자 (E)")
-		var words_ok: bool = "왕관 단추" in main.ui.quest.text and not "(E)" in main.ui.quest.text
+		var words_ok: bool = "팔찌 단추" in main.ui.quest.text and not "(E)" in main.ui.quest.text
 		main.touch_ui = false
 		main.ui.quest.text = q0
 		calm_enemies(false)
@@ -2708,6 +2708,68 @@ func run() -> void:
 		check("story_fixes", ending and once and cave_q and over == 0 and pages and box_back,
 			"winding-lines save plays the ending on load, +500 gold, step 12=%s paid once=%s cave quest back after a reload=%s lines over the box at 720x540 biggest text=%d of %d (%d grew the box)%s new-round notice on two pages=%s box back to 144=%s"
 			% [ending, once, cave_q, over, lines.size() * 2, grew, (" worst: " + worst.left(40)) if over > 0 else "", pages, box_back])
+	if want.call("bracelet"):
+		# v0.0.45 story change (the user's choice): Sora keeps the crown on her head and the sleeve cuffs are the winding
+		# bracelets. No story line may still have her hold the crown in her hands, and on phones and tablets no hint may
+		# show a bare E key (the user saw "E  보리 할머니의 상점" on an Android tablet)
+		if main.intro:
+			main.start_game(false)
+		await wait(0.2)
+		main.close_story()
+		var all_text: Array = []
+		var walk := func(v, me: Callable) -> void:
+			if v is String:
+				all_text.append(v)
+			elif v is Array:
+				for x in v:
+					me.call(x, me)
+			elif v is Dictionary:
+				for x in v.values():
+					me.call(x, me)
+		var consts: Dictionary = main.STORY.get_script_constant_map()
+		for k in consts:
+			walk.call(consts[k], walk)
+		var held: Array = []
+		for s in all_text:
+			for bad in ["왕관을 쥐", "손에 쥐는", "쥐는 거", "두 손으로 쥐", "왕관을 들", "왕관을 두 손", "쥐고 있던 왕관", "왕관을 받쳐"]:
+				if bad in String(s):
+					held.append(String(s).left(30))
+		var bare_e := RegEx.create_from_string("(?<![A-Za-z])E(?![A-Za-z])")
+		var touch0: bool = main.touch_ui
+		var q0: String = main.ui.quest.text
+		main.touch_ui = true
+		var shown: Array = []
+		await wait(0.15) # the shop hint is rewritten every frame
+		shown.append(main.ui.shop_hint.text)
+		var dq: int = main.doran_q
+		main.doran_q = 2
+		await wait(0.15)
+		shown.append(main.ui.shop_hint.text)
+		main.doran_q = dq
+		for q in ["팔목의 팔찌를 만져 보자 (E)", "도란의 편지에 팔찌를 대 보자 (E, 달빛 눈금 사용)", "끝. 다시 돌기 시작한 정원을 거닐자 (정원 한가운데서 E 두 번: 새 바퀴)", "깊은 틈 위 한결의 발자국을 따라가자 (E로 비추기)"]:
+			main.set_quest(q)
+			shown.append(main.ui.quest.text)
+		shown.append(main.touch_words(main.tr("낚싯줄을 던졌다. 찌가 흔들리면 E!")))
+		shown.append(main.touch_words(main.tr("태엽이 튕겨 나왔다. 문지기 곁에서 E")))
+		for s in all_text: # every story line as show_line words it
+			if String(s).count("|") >= 2:
+				shown.append(main.touch_words(main.tr(String(s).split("|", true, 2)[2])))
+		main.toggle_journal(true)
+		shown.append(main.ui.journal_text.text)
+		main.toggle_journal(false)
+		var bare: Array = []
+		for s in shown:
+			if bare_e.search(String(s)) != null:
+				bare.append(String(s).left(30))
+		var tablet_shop: bool = "팔찌 단추" in String(shown[0]) and "팔찌 단추" in String(shown[1])
+		main.touch_ui = touch0
+		main.set_quest(q0)
+		# an old save's quest still in the old words reads with the bracelet
+		var old_q: String = main.old_quest_words("동쪽 끝 꺼진 등불을 왕관으로 켜자 (E) 1/3")
+		var old_ok: bool = old_q == "동쪽 끝 꺼진 등불을 팔찌로 켜자 (E) 1/3" and main.old_quest_words("왕관을 높이 들어 다 같이 땅을 감자 (E)").begins_with("두 팔을")
+		check("bracelet", held.is_empty() and bare.is_empty() and tablet_shop and old_ok,
+			"story lines with the crown held in hand=%d %s; touch texts with a bare E=%d %s; shop hint on a tablet=%s; old save quest words=%s (%d story strings looked at)"
+			% [held.size(), held, bare.size(), bare, shown.slice(0, 2), old_ok, all_text.size()])
 	if want.call("playtest5"):
 		# GPT's fifth playtest (main road): quest lines after the cave door, the village arrival save, the stairs top and
 		# a day-loaded chase save; lines that must fit what Sora knows and holds. The state before comes back at the end.

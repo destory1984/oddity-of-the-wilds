@@ -86,7 +86,7 @@ var hatch: Node3D        # the hole in the arena's middle, shown once the mold b
 var key_spin: Node3D     # the key's hub and eight spokes; spoke 0 points south at J
 var dust: Array = []     # the dust lumps on the seven spokes nobody pushed
 var spoke_mat: StandardMaterial3D
-var crown_rim: Node3D    # pale blue round the crown-shaped slot, lit once the crown is in
+var crown_rim: Node3D    # pale blue round the crown pattern on the hub's contact, lit once the bracelet has touched it
 var clock_chest: Node3D
 var clock_screen: MeshInstance3D # a black wall at row 42 that hides the yard while Sora is in the room
 var wound := false
@@ -456,11 +456,24 @@ func build_clock(m: Node, post_mat: Material, glass: Material) -> void:
 			d.rotation.y = 0.3 * k
 			arm.add_child(d)
 			dust.append(d)
-	var slot: Material = m.mat_color(Color("#16121e"))
+	# v0.0.45: not a slot for the crown (Sora keeps it on her head) but a round contact with the crown pattern cut into it;
+	# her winding bracelet touches it and the pattern's rim lights pale blue
+	var slot: Material = m.mat_color(Color("#4a3418")) # the engraving, dark brass
 	var rim := StandardMaterial3D.new() # opaque pale blue, so it shows on the brass
 	rim.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	rim.albedo_color = Color("#9fd4ff")
-	var crown := Node3D.new() # the crown-shaped slot, turned so it stands upright to the camera while the key rests
+	var plate := MeshInstance3D.new() # the contact: a flat paler brass disc on the hub's top
+	var disc := CylinderMesh.new()
+	disc.top_radius = 0.37
+	disc.bottom_radius = 0.37
+	disc.height = 0.01
+	disc.radial_segments = 24
+	disc.rings = 1
+	plate.mesh = disc
+	plate.material_override = m.mat_color(Color("#e0b85a"), 0.4)
+	plate.position = Vector3(0, 0.9, 0)
+	key_spin.add_child(plate)
+	var crown := Node3D.new() # the crown pattern, turned so it stands upright to the camera while the key rests
 	crown.rotation.y = m.cam_yaw
 	key_spin.add_child(crown)
 	crown_rim = Node3D.new()
