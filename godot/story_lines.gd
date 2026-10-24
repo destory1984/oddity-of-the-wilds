@@ -1492,6 +1492,76 @@ const GROTTO_IN_WOUND := [
 	"소라|determined|물수제비 걸음이라면 자신 있어. 가 보자.",
 ]
 
+# ---- 큰 태엽 방 (after the ending of chapter 8 to 9): the room of the land's big clockwork under the arena, a
+# side story to visit after the end. Lines reworked with GPT's notes (2026-10-24): nothing here says the ending was
+# not real (the room is about tending the land for the next winding night), Hangyeol's lone push is not put down
+# to a headcount, the workers tend a gear before anyone explains them, and Bori closes it after a hush.
+const CLOCK_HINT := [
+	"||땅 밑 깊은 곳에서 톱니 소리가 아직 삐걱거린다.",
+	"||거푸집이 앉아 있던 자리에 둥근 구멍이 열려 있다. 아래로 돌계단이 이어진다.",
+	"노을|jae|땅은 다시 도는데, 아래 어딘가 아직 굳은 데가 있나 봐.",
+	"소라|determined|내려가 보자. 다음 감는 밤에도 잘 돌도록.",
+]
+
+const CLOCK_IN := [
+	"||둥근 방 한가운데 커다란 태엽 열쇠가 박혀 있다. 손잡이가 여덟 갈래로 뻗었다.",
+	"||벽을 따라 벽돌 고블린들이 장난감처럼 앉아 있다. 소라를 보고도 일어나지 않는다.",
+	"물결|mulgyeol|안 덤비네. 왕관이 한가운데까지 와서 그런가?",
+	"노을|jae|저 톱니 셋 봐. 회색으로 굳어서 열쇠를 붙잡고 있어.",
+	"소라|determined|톱니부터 풀자. 거푸집 찌꺼기가 또 달려들 거야.",
+]
+
+const CLOCK_WORN := [
+	"||여덟 손잡이 가운데 하나만 반들반들 닳아 있다. 나머지 일곱에는 먼지가 소복하다.",
+	"소라|sad|한결은 이걸 혼자 밀었구나. 여덟 사람 몫을.",
+	"노을|jae|……이번엔 옆 손잡이도 비워 두지 말자.",
+]
+const CLOCK_WORN_POST := "소라|calm|할머니가 엽서에 썼지. 혼자 가지 말라고."
+
+const CLOCK_GEAR1 := [
+	"||벽가에 앉아 있던 고블린 둘이 일어나 톱니에 붙었다. 이를 하나씩 닦는다.",
+	"물결|mulgyeol|저 녀석들, 톱니 닦는 손이 익숙한데.",
+]
+
+const CLOCK_GEARS := [
+	"||세 톱니가 맞물리자 태엽 열쇠가 삐걱 하고 반 칸 움직였다. 열쇠 한가운데에 왕관 모양 홈이 드러났다.",
+	"소라|calm|여기가 왕관 자리구나.",
+]
+
+const CLOCK_HUB := [
+	"||소라가 왕관을 두 손으로 받쳐 홈에 올렸다. 보석의 빛이 열쇠를 타고 여덟 손잡이로 퍼졌다.",
+	"||앉아 있던 일꾼들이 한꺼번에 고개를 들었다. 백 년 기다린 일이 끝났다.",
+	"노을|jae|원래 여기 일꾼이었구나. '왕관을 한가운데로'는 감는 밤에 왕관을 모셔 오라는 말이었어.",
+	"||돌계단으로 등불 빛이 내려온다. 빈터의 마을 사람들이 줄지어 들어왔다.",
+	"심지|simji|감는 밤엔 늘 이렇게 다 모였단다. 백 년 만이로군.",
+	"콩알|kongal|여기가 너희 집이었구나! 언니, 얘 손잡이는 여기야?",
+	"도란|doran|손잡이 하나는 이 늙은이 몫이오.",
+	"보리 할머니|bori|소라야, 네 옆에도 다들 섰니?",
+	"소라|determined|한결 손잡이는 내가 잡을게. 다 같이, 하나 둘에!",
+]
+
+# the eighth push, over the picture of everyone pushing together (art/story/14_clock_together.jpg)
+const CLOCK_WOUND := [
+	"||여덟 사람이 함께 밀자 큰 태엽이 한 바퀴를 다 돌았다. 방 안의 톱니가 모두 노래하듯 돌기 시작했다.",
+	"물결|mulgyeol|다 같이 미니까 하나도 안 무겁네.",
+	"노을|jae_smirk|달지기가 꼭 한 사람일 필요는 없었던 거야.",
+	"소라|laugh|응. 여덟 밤 뒤에도 다 같이 오자.",
+]
+
+# after 1.6 s of only the gears' sound: the worn handle with someone on each side, then Bori from the stairs
+const CLOCK_LATE := [
+	"||닳은 손잡이 양옆 손잡이에도 물결과 노을이 손을 얹은 채 숨을 고른다.",
+	"||땅 위 어딘가에서 물소리가 한층 커졌다.",
+	"보리 할머니|bori|다음 감는 밤에도 이렇게 모이면 되겠구나.",
+]
+
+const CLOCK_CHEST := [
+	"||열쇠 북쪽의 작은 궤짝. 감는 날 쓰던 기름병과 금화가 들어 있다.",
+	"||앞판에 이름 칸 여덟이 새겨져 있다. 맨 아래 한 칸에만 '한결'이라 적혀 있다.",
+	"소라|calm|다음엔 여덟 칸 다 채우자.",
+	"||달지기 기름병을 얻었다. 회복약을 마시면 기세가 20 찬다. 최대 체력 +20, 회복약 2, 금화 200.",
+]
+
 const REST_TALK_STORY := [
 	["mul_new", [["mulgyeol", "섬 밖에서 이렇게 오래 있어 본 건 처음이야."], ["sora", "할아버지 생각 나?"], ["mulgyeol", "응. 그래도 할아버지라면 가라고 했을 거야."]]],
 	["noeul_new", [["noeul", "……내가 같이 가도 괜찮은 거야? 마을 등불을 끈 건 나였는데."], ["mulgyeol", "그건 이제 다 갚았잖아."], ["sora", "응. 지금은 우리 편이야."], ["noeul", "……고마워."]]],
@@ -1500,6 +1570,7 @@ const REST_TALK_STORY := [
 	["post_done", [["sora", "보리 할머니 엽서, 백 년 만에 할머니한테 돌아갔어."], ["noeul", "한결이 그걸 받았으면 안 갔을까."], ["mulgyeol", "그래도 갔겠지. 그러니까 우리는 같이 가는 거야."]]],
 	["south_hint", [["mulgyeol", "섬 남쪽 끝 둑 너머, 할아버지가 일하던 데야."], ["sora", "가 보고 싶어?"], ["mulgyeol", "……응. 혼자는 좀 그렇고."]]],
 	["south_done", [["mulgyeol", "물이 다시 한 바퀴 도니까 물고기들이 돌아와."], ["sora", "할아버지 소식도 흘러올까?"], ["mulgyeol", "물결이 전해 주겠지. 내 이름처럼."]]],
+	["clock_done", [["noeul", "그 닳은 손잡이 봤어?"], ["sora", "응. 이제 여덟 개 다 닳겠지."], ["mulgyeol", "그만큼 자주 오자는 거지?"]]],
 	["mill_hint", [["mulgyeol", "언덕 남쪽 담에 참새들이 모여 있더라."], ["sora", "매 속에서 나온 애들?"], ["noeul", "뭘 찾나 봐."]]],
 	["mill_done", [["noeul", "장터 달빛 가루, 그 방앗간에서 빻던 거래."], ["mulgyeol", "그 가루 배로 실어 날랐겠지."], ["sora", "언젠가 그 배 고쳐서 셋이 타 보자."]]],
 	["scare", [["mulgyeol", "구름 위를 걸었다고 하면 아무도 안 믿을걸."], ["noeul", "바람 깃털이 증거지."], ["sora", "구르는 게 훨씬 가벼워졌어."]]],

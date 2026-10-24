@@ -9,7 +9,7 @@ var main: Node
 var only := "all"
 var results: Array = []
 
-const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "painting_once", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "esc_sheets", "news_more", "touch_controls", "folk_sleep", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "mill", "post", "lake_south", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
+const TESTS := ["start_click", "story_opens", "story_closes", "opening", "meet_bori", "boss_opens_cave", "save_load", "story_kept", "cave_enter", "cave_layout", "archer_telegraph", "key_door", "rival_scene", "cave_save_load", "painting_once", "unstick", "mole_charge", "mole_grants_skip", "cave_faint", "cave_exit", "water_skip", "water_skip_letgo", "village_enter", "village_layout", "simji_talk", "lamp_cost_night", "lamp_cost_day", "lamp_no_pips", "pip_rest", "errand_done", "kongal_errand", "doran_errand", "mulgyeol_errand", "lantern_night", "folk_again", "lake", "forest", "hill", "garden_end", "village_exit", "marsh_scraps", "forest_grove", "firefly_errand", "grotto", "cloud", "castle", "shrine", "journal", "esc_sheets", "news_more", "touch_controls", "folk_sleep", "wolf", "trial", "squirrels", "crystals", "race", "vault", "save_tonight", "fishing", "bat", "moonflowers", "houses", "feats", "mail", "festival", "new_round", "shop_price", "cloud_path", "waystones", "stuck_fixes", "books", "bori_e", "moon_stairs", "undercroft", "hollow", "hush", "trial_repeat", "road", "mill", "post", "lake_south", "clock", "village_market", "mate_facing", "settings", "mate_chat", "east_bridge", "fall_down", "mate_hp", "start_key", "bridges", "shop_buy", "shop_click", "footsteps", "boss_survive", "faint_resets",
 	"flash_dodge", "late_dodge", "flash_guard", "guard_block", "guard_back", "momentum", "level_moves", "skill_cost", "goblin_telegraph", "boss_phase2"]
 
 func _ready() -> void:
@@ -2836,6 +2836,221 @@ func run() -> void:
 		main.in_lake = false
 		check("lake_south", weir and sunk and stones and alone and latch and spring and tin and quick and kept and outside and round_ok,
 			"weir unwound, 5 foes=%s stones sunk, no skip=%s R1 raises them=%s R2 grate, alone, 3 bricks, Mulgyeol outside=%s latch=%s clockwork, carp 15=%s tin whistle=%s up in 5 s=%s saved=%s yard load outside=%s new round=%s" % [weir, sunk, stones, alone, latch, spring, tin, quick, kept, outside, round_ok])
+	if want.call("clock"):
+		# the clock room under the arena after the ending (DESIGN.md "큰 태엽 방"); the ending still comes when the
+		# mold breaks and the room is a side story after it. State is set directly and waits poll (slow machines)
+		if main.intro:
+			main.start_game(false)
+		await wait(0.2)
+		main.close_story()
+		var q0: int = main.clock_q
+		var gears0: Array = main.clock_gears.duplicate()
+		var box0: bool = main.clock_box
+		var oil0: bool = main.has_oil
+		var gq0: int = main.garden_q
+		var step0: int = main.story_step
+		var scraps := func(): return main.enemies.filter(func(e): return e.has("gear") and not e.dead)
+		main.in_village = false
+		main.in_forest = false
+		main.in_lake = false
+		main.in_hill = false
+		main.in_cave = false
+		main.in_house = -1
+		main.forest_q = 3
+		main.hill_q = 3
+		main.castle_q = 3
+		main.road_q = 4
+		main.join_mate()
+		main.join_noeul()
+		main.garden_q = 4
+		main.clock_q = 0
+		main.clock_gears = [false, false, false]
+		main.clock_box = false
+		main.has_oil = false
+		main.garden.clock_look(0, main.clock_gears, false)
+		main.enter_garden()
+		main.close_story()
+		calm_enemies(true)
+		main.mate_down.mulgyeol = 999.0 # the mates sit this one out, so they do not cut the scraps down for us
+		main.mate_down.noeul = 999.0
+		reset_to(main.garden.marks.C + Vector2(-5.0, 0))
+		main.player.inv = 120.0
+		# 1. the last wind: the ending as before, then the hole and the creak below
+		main.final_wind()
+		main.close_story()
+		await wait(0.3)
+		var ending: bool = main.story_open and main.ui.story_frame.visible and main.story_step == 12 and main.garden_q == 5 \
+			and main.clock_q == 1 and main.garden.char_at(244, 11) == "." and main.garden.hatch.visible
+		main.close_story()
+		for i in 30:
+			if main.story_open:
+				break
+			await wait(0.1)
+		var hint: bool = main.story_open and main.ui.story_text.text == tr("땅 밑 깊은 곳에서 톱니 소리가 아직 삐걱거린다.")
+		main.close_story()
+		await wait(0.6)
+		# 2. down the hole
+		reset_to(main.garden.marks.C)
+		for i in 40:
+			if main.in_clock():
+				break
+			await wait(0.1)
+		await wait(0.5)
+		var down: bool = main.in_clock() and Vector2(main.player.x, main.player.z).distance_to(main.garden.clock_marks.U) < 2.0 \
+			and main.clock_q == 2 and main.garden.clock_screen.visible
+		main.close_story()
+		# 3. one gear at a time; a scrap that reaches its gear hardens it again
+		var hard: bool = not main.player_can(236, 53)
+		main.crown_pips = 8
+		var g0: Vector2 = main.garden.gears[0].pos
+		reset_to(g0 + Vector2(1.2, 0))
+		main.player.inv = 120.0
+		tap(KEY_E)
+		await wait(0.1)
+		var pip1: bool = main.crown_pips == 7 and main.garden.gears[0].open
+		for i in 30:
+			if not scraps.call().is_empty():
+				break
+			await wait(0.1)
+		var first: Array = scraps.call()
+		var two: bool = first.size() == 2 and first.all(func(e): return e.get("shard", false) and e.cave and int(e.gear) == 0)
+		reset_to(main.garden.gears[1].pos + Vector2(-1.2, 0))
+		main.player.inv = 120.0
+		tap(KEY_E)
+		await wait(0.1)
+		var one_at_a_time: bool = main.crown_pips == 7 and not main.garden.gears[1].open
+		if not first.is_empty():
+			first[0].x = first[0].post.x
+			first[0].z = first[0].post.y
+		await wait(0.15)
+		var lost: bool = not main.garden.gears[0].open and not main.clock_gears[0] and scraps.call().is_empty()
+		# 4 - 5. free all three: packs of 2, 3, 4; two workers rise for each
+		var counts: Array = []
+		for gi in [0, 1, 2]:
+			var gp: Vector2 = main.garden.gears[gi].pos
+			reset_to(gp + (main.garden.clock_marks.O - gp).normalized() * 1.2)
+			main.player.inv = 120.0
+			tap(KEY_E)
+			for i in 30:
+				if not scraps.call().is_empty():
+					break
+				await wait(0.1)
+			var pack: Array = scraps.call()
+			counts.append(pack.size())
+			for e in pack:
+				main.damage_enemy(e, 999999.0, Vector2(e.x - 1.0, e.z))
+			for i in 40:
+				if main.clock_gears[gi]:
+					break
+				await wait(0.1)
+			for i in 40: # the workers' line (first gear) and the slot's line (last) come a moment later
+				if gi == 1 or main.story_open:
+					break
+				await wait(0.1)
+			main.close_story()
+		var tending: int = main.workers.filter(func(w): return w.job >= 0 and w.job <= 2).size()
+		var gears_ok: bool = counts == [2, 3, 4] and main.clock_gears == [true, true, true] and main.clock_q == 3 \
+			and main.crown_pips == 4 and tending == 6
+		# 6. the crown into the key: Sora at Hangyeol's spoke, everyone at one
+		reset_to(Vector2(243, 56))
+		main.player.inv = 120.0
+		tap(KEY_E)
+		await wait(0.2)
+		main.close_story()
+		await wait(0.3)
+		var mp := Vector2(main.mate.position.x, main.mate.position.z)
+		var hub: bool = main.clock_q == 4 and Vector2(main.player.x, main.player.z).distance_to(main.garden.clock_marks.J) < 0.35 \
+			and absf(mp.x - 241.0) <= 1.0 and absf(mp.y - 55.0) <= 1.0 and main.garden.crown_rim.visible and main.clock_folk.size() == 4
+		# 7. eight pushes on the beat (the ring is set directly); an early press does not count
+		for i in 20:
+			if not main.beat.is_empty():
+				break
+			await wait(0.1)
+		main.beat.r = 1.5
+		main.beat.hit = false
+		tap(KEY_E)
+		await wait(0.05)
+		var early: bool = not main.beat.is_empty() and main.beat.n == 0
+		for k in 8:
+			if main.beat.is_empty():
+				break
+			main.beat.r = 0.9
+			main.beat.hit = false
+			tap(KEY_E)
+			await wait(0.08)
+		var wound: bool = main.clock_q == 5 and main.story_open and main.ui.story_frame.visible and main.beat.is_empty()
+		main.close_story()
+		await wait(1.0)
+		var hush: bool = not main.story_open # 1.6 s of only the gears' sound
+		for i in 30:
+			if main.story_open:
+				break
+			await wait(0.1)
+		var late: bool = main.story_open and main.ui.story_text.text == tr("닳은 손잡이 양옆 손잡이에도 물결과 노을이 손을 얹은 채 숨을 고른다.")
+		main.close_story()
+		await wait(0.2)
+		late = late and not main.clock_still and main.garden.wound
+		# 8. the chest: the oil, and a potion also gives 20 momentum
+		var hp0: int = main.player.max_hp
+		var pots0: int = main.player.pots
+		var gold0: int = main.player.gold
+		reset_to(main.garden.clock_marks.c + Vector2(-1.0, 0))
+		main.player.inv = 120.0
+		tap(KEY_E)
+		await wait(0.15)
+		main.close_story()
+		var box: bool = main.clock_box and main.has_oil and main.player.max_hp == hp0 + 20 and main.player.pots == pots0 + 2 \
+			and main.player.gold == gold0 + 200
+		main.player.mp = 0.0
+		main.player.cds[3] = 0.0
+		main.drink_potion()
+		var oil: bool = absf(main.player.mp - 20.0) < 0.01
+		# 9. up the stairs to the arena
+		reset_to(main.garden.clock_marks.U)
+		for i in 40:
+			if not main.in_clock():
+				break
+			await wait(0.1)
+		await wait(0.5)
+		var up: bool = not main.in_clock() and Vector2(main.player.x, main.player.z).distance_to(Vector2(244, 13.5)) < 0.5 \
+			and not main.garden.clock_screen.visible
+		# 10. saves keep it; an old save past the ending finds the hole open; a new round keeps only the oil
+		main.save_game()
+		var sd = JSON.parse_string(FileAccess.get_file_as_string(main.SAVE_PATH))
+		var kept: bool = sd != null and int(sd.get("clock_q", 0)) == 5 and Array(sd.get("clock_gears", [])) == [true, true, true] \
+			and bool(sd.get("clock_box", false)) and bool(sd.get("has_oil", false))
+		main.load_clock({"garden_q": 5})
+		var old: bool = main.clock_q == 1 and main.clock_late and main.clock_gears == [false, false, false] and not main.clock_box \
+			and main.garden.hatch.visible and not main.garden.wound
+		if sd != null:
+			main.load_clock(sd)
+		var back: bool = main.clock_q == 5 and main.clock_gears == [true, true, true] and main.clock_box and main.garden.wound
+		main.write_new_round()
+		var ng = JSON.parse_string(FileAccess.get_file_as_string(main.SAVE_PATH))
+		var round_ok: bool = ng != null and not ng.has("clock_q") and bool(ng.get("has_oil", false))
+		# leave it as it was for the other tests
+		main.clock_q = q0
+		main.clock_gears = gears0
+		main.clock_box = box0
+		main.has_oil = oil0
+		main.clock_late = false
+		main.clear_clock_wave()
+		main.beat_clear()
+		main.clock_still = false
+		main.garden.clock_look(q0, gears0, box0)
+		main.place_workers()
+		for id in main.clock_folk:
+			main.clock_folk[id].visible = false
+		main.garden_q = gq0
+		main.story_step = step0
+		main.mate_down.mulgyeol = 0.001
+		main.mate_down.noeul = 0.001
+		main.garden.clock_view(false)
+		main.in_garden = false
+		calm_enemies(false)
+		main.save_game()
+		check("clock", ending and hint and down and hard and pip1 and two and one_at_a_time and lost and gears_ok and hub and early and wound and hush and late and box and oil and up and kept and old and back and round_ok,
+			"ending then hole=%s hint=%s down=%s gear hard=%s 1 pip=%s 2 scraps=%s one at a time=%s rehardened=%s packs %s, 6 workers=%s crown, all at spokes=%s early E=%s wound with picture=%s hush=%s Bori=%s chest=%s oil +20=%s up=%s saved=%s old save=%s load=%s new round=%s" % [ending, hint, down, hard, pip1, two, one_at_a_time, lost, str(counts), gears_ok, hub, early, wound, hush, late, box, oil, up, kept, old, back, round_ok])
 	if want.call("trial_repeat"):
 		# after the first clear, the trial's foes give nothing (the field is where gold and XP come from)
 		var best0: float = main.trial_best

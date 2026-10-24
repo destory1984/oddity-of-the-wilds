@@ -409,6 +409,8 @@ const SCENES := {
 	"mill": {"play": true, "village": true, "mill": true, "hour": 15.0},
 	"mill_water": {"play": true, "village": true, "mill": true, "water": true, "hour": 15.0},
 	"road_echo": {"play": true, "village": true, "road": true, "echo": true, "hour": 14.0},
+	"clock": {"play": true, "village": true, "clock": true, "hour": 21.0},
+	"clock_wind": {"play": true, "village": true, "clock": true, "wind": true, "hour": 21.0},
 	"flies": {"play": true, "at": Vector2(8, 23), "hour": 22.5, "flies": true},
 	"crab": {"play": true, "village": true, "crab": true, "hour": 14.0},
 	"grotto_in": {"play": true, "village": true, "crab": true, "grotto_in": true, "hour": 21.0},
@@ -596,6 +598,33 @@ func apply_test_args(args: PackedStringArray) -> void:
 				spawn_knight(true)
 				player.x = garden.road_marks.X.x - 1.0
 				player.z = garden.road_marks.X.y + 3.0
+			snap_mates()
+		if sc.get("clock", false): # the clock room after the ending, gears still hard; "wind": the crown in, all at a spoke
+			night_q = 4
+			lake_q = 4
+			forest_q = 3
+			hill_q = 3
+			castle_q = 3
+			hollow_q = 4
+			road_q = 4
+			join_mate()
+			join_noeul()
+			garden_q = 5
+			story_step = 12
+			clock_q = 2
+			if sc.has("wind"):
+				clock_q = 4
+				clock_gears = [true, true, true]
+			enter_garden()
+			close_story()
+			garden.clock_look(clock_q, clock_gears, clock_box)
+			player.x = 243.0
+			player.z = 58.0
+			clock_zone()
+			if sc.has("wind"):
+				var j := hand_spot(0)
+				player.x = j.x
+				player.z = j.y
 			snap_mates()
 		if sc.get("mold", false): # the last boss in the heart of the garden
 			night_q = 4
@@ -2843,7 +2872,7 @@ func festival_key() -> bool:
 # attack, max HP, gold, potions, keepsakes, the woken skill, feats and records. Monsters then take
 # 1/(1 + 0.5 x round) of the damage and deal (1 + 0.5 x round) times as much.
 const NG_KEEP := ["lv", "xp", "max_hp", "atk", "gold", "pots", "has_pearl", "has_feather", "has_acorn", "has_ring", "has_shoes",
-	"has_armour", "has_tea", "has_shard", "has_bookmark", "has_lamp", "has_medal", "has_oar_ring", "has_whistle", "skill_up", "stats", "feats", "trial_best", "race_best", "fish"]
+	"has_armour", "has_tea", "has_shard", "has_bookmark", "has_lamp", "has_medal", "has_oar_ring", "has_whistle", "has_oil", "skill_up", "stats", "feats", "trial_best", "race_best", "fish"]
 var ng := 0                 # how many rounds were finished before this one
 var ng_armed := 0.0         # seconds left to confirm with a second E
 
@@ -2989,9 +3018,10 @@ func travel(i: int) -> void:
 
 const CHANGES_PAGE := 100 # lines of 바뀐 것 shown before the 더 읽기 button
 const CHANGES := [
-	"개발 상황: 놀 수 있는 분량 약 285분 / 목표 300분 (95%)",
+	"개발 상황: 놀 수 있는 분량 약 290분 / 목표 300분 (97%)",
 	"",
 	"2026-10-24 아침",
+	"· v0.0.33: 8 → 9장 끝 뒤에 큰 태엽 방(약 5분). 끝 장면은 그대로이고, 거푸집이 앉아 있던 자리에 구멍이 열린다. 내려가면 땅을 돌리는 큰 태엽 열쇠가 있다. 굳은 톱니 셋을 왕관으로 풀며(눈금 1칸씩) 열쇠에서 달려 나오는 거푸집 찌꺼기(2, 3, 4마리)를 막으면 벽돌 일꾼들이 일어나 톱니를 돌본다. 열쇠 한가운데에 왕관을 올리면 마을 사람들이 내려와 손잡이 여덟을 함께 잡고, 금빛 고리에 맞춰 E를 여덟 번 누르면 다 같이 감는다(그림 한 장). 궤짝에서 달지기 기름병(회복약을 마시면 기세 +20), 최대 체력 +20, 회복약 2, 금화 200. 대사와 소품은 GPT와 의논해 다듬었다.",
 	"· v0.0.32: 밤이 되면 마을 사람들(도란, 콩알, 마을에 있을 때의 물결, 꼬마 고블린)이 저마다 가까운 집 문으로 걸어 들어가 자고, 아침이면 나와 제자리로 돌아간다. 등불지기 심지는 밤에도 광장에 남고, 보름달 축제 밤에는 모두 밖에 있다. 자는 사람의 집 문 위에 z가 뜨고, 그 집에 들어가면 침대에서 자는 모습(GPT 그림)이 보인다. 곁에서 E를 누르면 깨어 낮과 같은 이야기와 심부름을 하니 반딧불, 달꽃 같은 밤 심부름도 막히지 않는다. 낮에 서던 자리에서 E를 누르면 어디서 자는지 알려 준다.",
 	"· v0.0.31: 아이폰과 아이패드에서 글자와 단추가 너무 작던 것을 키웠다. 휴대폰은 기준 화면을 640 → 540으로 줄여 모든 것이 약 1.2배 커지고 글자도 한 단계 커진다. 아이패드도 터치 화면으로 알아본다(전에는 사파리가 맥이라고 해서 데스크톱 화면이 나왔다). 메뉴 단추 넷은 미니맵 왼쪽에 2x2로 모이고, 설정과 일지 같은 큰 창은 화면에 맞게 줄어든다.",
 	"· v0.0.30: 아이폰에서 미니맵은 움직이는데 화면 속 세상은 멈춰 있던 잘못을 고쳤다. 미니어처 흐림이 흐리게 하려고 복사한 화면이 아이폰 브라우저에서 첫 장면에 멈춰 있었다. 아이폰과 아이패드에서는 미니어처 흐림을 끄고, 다른 기기에서도 화면 복사에 밉맵을 쓰지 않는다.",
@@ -3615,6 +3645,7 @@ func story_talk_ok(key: String) -> bool:
 		"post_done": return post_q >= 4
 		"south_hint": return lake_q >= 4 and south_q == 0
 		"south_done": return south_q >= 5
+		"clock_done": return clock_q >= 5
 		"mill_hint": return hill_q >= 3 and mill_q == 0
 		"mill_done": return mill_q >= 5
 		"pearl": return grotto_q >= 4
@@ -4008,10 +4039,9 @@ func add_fx(node: Node3D, life: float, update: Callable) -> void:
 	add_child(node)
 	fx.append({"node": node, "life": life, "t": 0.0, "update": update})
 
-func ring_mesh(r0: float, r1: float, a0: float, arc: float) -> ArrayMesh:
+func ring_mesh(r0: float, r1: float, a0: float, arc: float, seg := 24) -> ArrayMesh:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var seg := 24
 	for i in seg:
 		var a := a0 + arc * i / seg
 		var b := a0 + arc * (i + 1) / seg
@@ -4609,6 +4639,8 @@ func drink_potion() -> void:
 	player.cds[3] = 2.0
 	var h := minf(player.max_hp - player.hp, 65.0 if has_acorn else 45.0)
 	player.hp += h
+	if has_oil:
+		player.mp = minf(player.max_mp, player.mp + 20.0)
 	var y := height_at(player.x, player.z)
 	pop_num(Vector3(player.x, y + 1.9, player.z), "+%d" % int(h), Color("#8dff9a"))
 	burst(Vector3(player.x, y + 0.6, player.z), Color("#8dff9a"), 20, 2.0)
@@ -4722,7 +4754,7 @@ func skip_time(hours: float) -> void:
 
 func update_daylight(dt: float) -> void:
 	env.tonemap_exposure = 0.9
-	if in_grotto() or in_under(): # underground: the same soft blue light at any hour, a lamp on Sora (the clock waits, as in the cave)
+	if in_grotto() or in_under() or in_clock(): # underground: the same soft blue light at any hour, a lamp on Sora (the clock waits, as in the cave)
 		sun.light_energy = 0.35
 		env.ambient_light_color = Color("#9ab4d8")
 		env.ambient_light_energy = 1.4
@@ -5410,7 +5442,7 @@ func save_game() -> void:
 		"grotto_q": grotto_q, "grotto_side": grotto_side, "has_pearl": has_pearl,
 		"cloud_q": cloud_q, "cloud_chest": cloud_chest, "has_feather": has_feather,
 		"skill_up": skill_up, "crystal_done": crystal_done, "has_ring": has_ring, "freed": forest.freed, "has_acorn": has_acorn, "shrine_seen": shrine_seen, "trial_best": trial_best, "race_best": race_best, "books": castle.books.map(func(b): return b.read), "has_bookmark": has_bookmark, "has_shard": has_shard, "shop_bought": shop_bought, "play_secs": play_secs, "ng": ng, "fest_gift": fest_gift, "mail_q": mail_q, "mail_got": mail_got, "stats": stats, "feats": feats_done, "houses": house_seen, "flowers": marsh.picked, "has_tea": has_tea, "fish": fish_kinds, "has_shoes": has_shoes, "target_best": target_best, "has_medal": has_medal, "bottles": village.bottles.map(func(b): return b.got), "inn_nights": inn_nights, "magpie_q": magpie_q, "talks_heard": talks_heard.keys(),
-		"road_q": road_q, "road_box": road_box, "mill_q": mill_q, "has_oar_ring": has_oar_ring, "post_q": post_q, "south_q": south_q, "has_whistle": has_whistle, "hollow_q": hollow_q, "mem_lit": forest.mem_lamps.map(func(l): return l.lit), "hollow_doors": forest.doors.map(func(dr): return dr.open), "hollow_boxes": forest.boxes.map(func(b): return b.open),
+		"road_q": road_q, "road_box": road_box, "mill_q": mill_q, "has_oar_ring": has_oar_ring, "post_q": post_q, "south_q": south_q, "has_whistle": has_whistle, "clock_q": clock_q, "clock_gears": clock_gears, "clock_box": clock_box, "clock_late": clock_late, "has_oil": has_oil, "hollow_q": hollow_q, "mem_lit": forest.mem_lamps.map(func(l): return l.lit), "hollow_doors": forest.doors.map(func(dr): return dr.open), "hollow_boxes": forest.boxes.map(func(b): return b.open),
 		"seals": garden.seals.map(func(sl): return sl.open),
 		"stairs_wall": stairs.wall_open, "stairs_lamps": stairs.lamps.map(func(l): return l.lit),
 		"castle_q": castle_q, "bars": castle.bars, "levers": castle.levers.map(func(lv): return lv.up), "vault": castle.vault_open, "has_armour": has_armour, "castle_gate": castle.gate_open, "castle_pages": castle.pages.map(func(pg): return pg.read),
@@ -5661,6 +5693,7 @@ func load_game() -> void:
 	for i in mini(sls.size(), garden.seals.size()):
 		if bool(sls[i]):
 			garden.open_seal(garden.seals[i])
+	load_clock(d)
 	if bool(d.get("under_drained", false)):
 		under.drain()
 	if bool(d.get("under_door", false)):
@@ -5714,6 +5747,13 @@ func load_game() -> void:
 		enter_garden()
 		player.x = gx
 		player.z = gz
+		if in_clock(): # saved in the clock room; with the crown in she wakes at Hangyeol's spoke and pushes from 0
+			clock_zone()
+			if clock_q == 4:
+				var j := hand_spot(0)
+				player.x = j.x
+				player.z = j.y
+			snap_mates()
 	if bool(d.get("in_forest", false)):
 		var fx: float = player.x
 		var fz: float = player.z
@@ -6177,12 +6217,14 @@ func crown_key() -> void:
 			return
 		if try_unbrick():
 			return
+	if in_clock() and clock_key():
+		return
 	if ng_key():
 		return
 	if in_garden and garden_q == 4:
 		final_wind()
 		return
-	if in_garden and road_key():
+	if in_garden and not in_clock() and road_key():
 		return
 	if in_garden and garden_q == 1 and seal_key():
 		return
@@ -7462,13 +7504,16 @@ func in_grotto() -> bool:
 # steps going down on the island's south shore, at the lake's G: a stone frame over a stair that sinks step by step
 # into a dark opening, with a lamp on top, so it reads as a way down from far off
 func grotto_steps() -> void:
+	stair_frame(lake.marks.G)
+
+func stair_frame(at: Vector2, turn := 0.0, shade := 0.0, lamp_col := Color("#9fd8ff")) -> Node3D:
 	var g := Node3D.new()
-	var frame: Material = mat_color(Color("#7a7468"))
+	var frame: Material = mat_color(Color("#7a7468").darkened(shade))
 	var hole: MeshInstance3D = box(Vector3(1.1, 0.06, 1.2), mat_color(Color("#101418")))
 	hole.position = Vector3(0, 0.03, 0)
 	g.add_child(hole)
 	for k in 4: # steps from the near edge going down and away, each darker
-		var st: MeshInstance3D = box(Vector3(0.9, 0.08, 0.26), mat_color(Color("#a8a49a").darkened(k * 0.2)))
+		var st: MeshInstance3D = box(Vector3(0.9, 0.08, 0.26), mat_color(Color("#a8a49a").darkened(shade + k * 0.2)))
 		st.position = Vector3(0, 0.1 - k * 0.025, 0.42 - k * 0.27)
 		g.add_child(st)
 	for side in [-0.62, 0.62]: # low side walls
@@ -7478,12 +7523,13 @@ func grotto_steps() -> void:
 	var back: MeshInstance3D = box(Vector3(1.4, 0.9, 0.16), frame) # the head wall at the far end
 	back.position = Vector3(0, 0.45, -0.65)
 	g.add_child(back)
-	var lamp: MeshInstance3D = box(Vector3(0.22, 0.26, 0.22), glow_mat(Color("#9fd8ff"), 1.4))
+	var lamp: MeshInstance3D = box(Vector3(0.22, 0.26, 0.22), glow_mat(lamp_col, 1.4))
 	lamp.position = Vector3(0, 1.05, -0.65)
 	g.add_child(lamp)
-	var at: Vector2 = lake.marks.G
+	g.rotation.y = turn
 	g.position = Vector3(at.x, 0, at.y)
 	add_child(g)
+	return g
 
 func enter_grotto() -> void:
 	player.x = grotto.marks.S.x + 1.2
@@ -8260,6 +8306,10 @@ func update_mate2(dt: float) -> void:
 	if mate2 == null:
 		return
 	mate2.visible = true
+	if clock_hold(): # at a spoke of the big key, pushing with everyone
+		var hs := hand_spot(CLOCK_HANDS.find("noeul"))
+		mate2.position = Vector3(hs.x, clock_hop_y(), hs.y)
+		return
 	if mate_job_state() == "wait": # waiting outside the grate by Mulgyeol, not at Sora's side
 		var post := Vector3(mate_job.home.x, 0, mate_job.home.y - 1.0)
 		mate2.position = post if mate2.position.distance_to(post) > 3.0 else mate2.position.move_toward(post, dt * 5.5)
@@ -8303,6 +8353,10 @@ func update_mate(dt: float) -> void:
 			update_mate_job(dt)
 			return
 		mate_job = {}
+	if clock_hold():
+		var hs := hand_spot(CLOCK_HANDS.find("mulgyeol"))
+		mate.position = Vector3(hs.x, clock_hop_y(), hs.y)
+		return
 	var me := Vector3(player.x, 0, player.z)
 	if mate.position.distance_to(me) > 8.0:
 		snap_mate()
@@ -8768,7 +8822,8 @@ func enter_garden() -> void:
 	elif road_q >= 2:
 		garden.open_roots()
 	ground_y = 0.0
-	ui.mini.map_tex = garden.map_tex(GARDEN.GARDEN_X + GARDEN.W)
+	garden.clock_view(false)
+	ui.mini.map_tex = garden_map()
 	if garden_q == 0 and road_q < 4: # in at the yard below, by the stairs' top
 		player.x = garden.road_marks.A.x + 1.5
 		player.z = garden.road_marks.A.y
@@ -8834,7 +8889,7 @@ func road_key() -> bool:
 				if not spend_pips(unbrick_cost()):
 					return true
 				garden.open_roots()
-				ui.mini.map_tex = garden.map_tex(GARDEN.GARDEN_X + GARDEN.W)
+				ui.mini.map_tex = garden_map()
 				burst(Vector3(r[0].x, 0.7, r[0].y), Color("#9a4ad8"), 36, 3.5)
 				shake = 0.25
 				sfx(196, 0.5, "triangle", 0.3, -60)
@@ -8916,7 +8971,7 @@ func echo_beaten() -> void:
 	road_q = 4
 	garden.open_gate()
 	garden.reveal(true)
-	ui.mini.map_tex = garden.map_tex(GARDEN.GARDEN_X + GARDEN.W)
+	ui.mini.map_tex = garden_map()
 	ui.boss.visible = false
 	player.gold += 100
 	gain_xp(200)
@@ -8945,6 +9000,16 @@ func leave_garden() -> void:
 	save_game()
 
 func update_garden(dt: float) -> void:
+	if in_clock():
+		update_clock(dt)
+		return
+	var me := Vector2(player.x, player.z)
+	if clock_q >= 1 and not story_open and fade_rect.color.a == 0.0 and me.distance_to(garden.marks.C) < 0.9:
+		fade_then(enter_clock)
+		return
+	if clock_q == 1 and not clock_hint_told and not story_open and me.y < GARDEN.ROAD_Z - 0.5:
+		clock_hint_told = true
+		toast("거푸집이 있던 자리에 둥근 구멍이 열려 있다")
 	update_road(dt)
 	if garden_q == 1 and not story_open and garden.seals_open() == garden.seals.size() and Vector2(player.x, player.z).distance_to(garden.marks.C) < 8.0:
 		garden_q = 2
@@ -9162,6 +9227,9 @@ func update_shard(e: Dictionary, dt: float) -> void:
 		m.emission = Color.WHITE
 	e.shadow.position = Vector3(e.x, 0.02, e.z)
 	if d < 0.8:
+		if e.has("gear"): # in the clock room: it hardens its gear again (the lantern ring's rule does not apply)
+			clock_gear_lost(int(e.gear))
+			return
 		e.dead = true
 		e.node.queue_free()
 		e.shadow.queue_free()
@@ -9206,7 +9274,492 @@ func mold_breaks() -> void:
 		ending.insert(at if at >= 0 else ending.size(), STORY.ENDING_ROAD)
 	show_story("res://art/story/12_festival.jpg", ending + [record])
 	set_quest("끝. 다시 돌기 시작한 정원을 거닐자 (정원 한가운데서 E 두 번: 새 바퀴)")
+	clock_q = maxi(clock_q, 1) # where the mold sat a hole opens down to the clock room (a side story after the end)
+	clock_hint_told = true
+	garden.open_hatch()
+	ui.mini.map_tex = garden_map()
+	after_story = clock_hint
 	save_game()
+
+# ---- 큰 태엽 방 (DESIGN.md, after the ending of chapter 8 to 9): the room of the land's big clockwork under the
+# arena, a side story to visit after the end. The hole opens where the mold sat. Three gears the mold left hardened
+# hold the key: the crown frees each (1 pip) while mold scraps (2, 3, 4) run from the key to harden it again; brick
+# workers rise and tend the freed gears. The crown goes into the key's slot, the villagers come down, and eight push
+# together on a gold beat ring (E eight times). The chest holds the moonkeeper's oil (a potion also gives 20
+# momentum). Nine scraps, once per gear; nothing here hurts Sora. The ending itself stays where it was.
+const CLOCK_BEAT := 1.2       # seconds a beat ring takes to close from 3.0 to 0.6 tiles
+const CLOCK_WINDOW := 1.1     # E counts while the ring is inside this radius (its last 0.25 s)
+const CLOCK_HANDS := ["sora", "noeul", "doran", "worker", "simji", "kid", "kongal", "mulgyeol"] # spoke k from the south, turning east
+var clock_q := 0              # 0 not yet, 1 the hole open, 2 down in the room, 3 gears freed, 4 crown in the key, 5 wound
+var clock_gears := [false, false, false] # west, east, north freed (true only once their scraps are cut down)
+var clock_box := false
+var clock_late := false       # a save that saw the ending before the room was added
+var has_oil := false          # 달지기 기름병: a potion also gives 20 momentum
+var clock_hint_told := false
+var clock_wave := {}          # the scraps let loose by freeing a gear: "gear", "t", "spawned", "done"
+var clock_say_t := -1.0       # a story held back a moment (the workers tend the gear first)
+var clock_say: Array = []
+var beat := {}                # the gold ring closing on the key: "r", "node", "thick", "rim", "n", "hit", "win"
+var clock_hop := 0.0          # everyone at a spoke hops once per push
+var clock_still := false      # after the last push everyone stays at the spokes until Bori has spoken
+var clock_cam := 0.0
+var workers: Array = []       # [{"node", "seat", "job", "side"}] job -1 sitting, 0 - 2 the gear it tends, 3 at a spoke
+var clock_folk := {}          # villagers at the spokes: id -> Node3D
+
+func in_clock() -> bool:
+	return in_garden and player.z > GARDEN.CLOCK_Z - 0.5
+
+# the garden's map with the way down at the arena's middle and the way up in the room, once the hole is open
+func garden_map() -> ImageTexture:
+	var tex: ImageTexture = garden.map_tex(GARDEN.GARDEN_X + GARDEN.W)
+	if clock_q >= 1:
+		tex = with_up_marks(with_stair_marks(tex, [garden.marks.C]), [garden.clock_marks.U])
+	return tex
+
+# where the one pushing spoke k stands
+func hand_spot(k: int) -> Vector2:
+	var a := TAU * k / 8.0
+	return garden.clock_marks.O + Vector2(sin(a), cos(a)) * 2.3
+
+func clock_hold() -> bool:
+	return (clock_q == 4 or clock_still) and in_clock()
+
+func clock_hop_y() -> float:
+	return 0.12 * sin(PI * clock_hop / 0.15) if clock_hop > 0.0 else 0.0
+
+# after the ending: a creak far below and the hole where the mold sat
+func clock_hint() -> void:
+	get_tree().create_timer(0.8).timeout.connect(func():
+		if in_garden and not in_clock() and not story_open and fade_rect.color.a == 0.0 and clock_q == 1:
+			show_story("", STORY.CLOCK_HINT))
+
+func enter_clock() -> void:
+	var u: Vector2 = garden.clock_marks.U
+	player.x = u.x
+	player.z = u.y - 1.3
+	ground_y = 0.0
+	clock_zone()
+	snap_mates()
+	if clock_q == 1:
+		clock_q = 2
+		show_story("", STORY.CLOCK_IN)
+	save_game()
+
+# the room's name, map and look, for a way in, a load or a scene
+func clock_zone() -> void:
+	ui.zone_name.text = "큰 태엽 방"
+	ui.zone_sub.text = "정원 한가운데 아래"
+	ui.mini.map_tex = garden_map()
+	garden.clock_view(true)
+	place_workers()
+	place_clock_folk()
+	update_daylight(0.0)
+
+func leave_clock() -> void:
+	clear_clock_wave()
+	beat_clear()
+	clock_still = false
+	player.x = garden.marks.C.x
+	player.z = garden.marks.C.y + 2.5
+	ground_y = 0.0
+	garden.clock_view(false)
+	ui.zone_name.text = "정원 한가운데"
+	ui.zone_sub.text = "굳은달 빈터"
+	ui.mini.map_tex = garden_map()
+	if clock_q >= 5: # wound: the villagers have gone home
+		for id in clock_folk:
+			(clock_folk[id] as Node3D).visible = false
+	snap_mates()
+	save_game()
+
+# E in the clock room
+func clock_key() -> bool:
+	var me := Vector2(player.x, player.z)
+	if clock_q == 4:
+		if me.distance_to(garden.clock_marks.J) < 1.6:
+			beat_key()
+		else:
+			toast("한결의 손잡이에서 박자에 맞춰 E")
+		return true
+	if not clock_box and clock_q >= 2 and me.distance_to(garden.clock_marks.c) < 1.6:
+		open_clock_box()
+		return true
+	for i in garden.gears.size():
+		var p: Vector2 = garden.gears[i].pos
+		if not clock_gears[i] and me.distance_to(p) < 1.6:
+			if not clock_wave.is_empty():
+				toast("찌꺼기부터 막자")
+				return true
+			if not spend_pips(1): # like a seal: the heart is near, so the crown is strong, day or night
+				return true
+			garden.set_gear(i, true)
+			clock_wave = {"gear": i, "t": 0.0, "spawned": false, "done": 0.0}
+			burst(Vector3(p.x, 0.9, p.y), Color("#c8962a"), 30, 3.0)
+			shake = 0.2
+			sfx(150, 0.5, "triangle", 0.3, -40)
+			return true
+	if clock_q == 3 and me.distance_to(garden.clock_marks.O) < 3.1:
+		crown_into_key()
+		return true
+	if me.distance_to(garden.clock_marks.J) < 1.6:
+		var lines: Array = STORY.CLOCK_WORN.duplicate()
+		if post_q >= 4:
+			lines.append(STORY.CLOCK_WORN_POST)
+		show_story("", lines)
+		return true
+	return false
+
+# freeing a gear lets 2, 3 then 4 scraps out of the key; they run for that gear and do not hit Sora
+func shed_clock_shards(i: int) -> void:
+	clock_wave.spawned = true
+	var c: Vector2 = garden.clock_marks.O
+	var to: Vector2 = garden.gears[i].pos
+	var dir := (to - c).normalized()
+	var n: int = clock_gears.count(true) + 2
+	for k in n:
+		var at := c + dir.rotated((k - (n - 1) / 2.0) * 0.5) * rnd(1.5, 2.0)
+		spawn_enemy(at)
+		var e: Dictionary = enemies[enemies.size() - 1]
+		e.shard = true
+		e.cave = true # no respawn
+		e.gear = i
+		e.hp = 18.0 + player.lv * 4
+		e.max_hp = int(e.hp)
+		e.post = to
+		for mm in e.node.get_meta("mats"):
+			mm.albedo_color = Color("#8a8a96").lightened(rnd(0, 0.15))
+		burst(Vector3(at.x, 1.0, at.y), Color("#8a8a96"), 10, 2.0)
+	sfx(110, 0.3, "square", 0.15, -30)
+
+func clock_scraps_alive() -> bool:
+	return enemies.any(func(e): return e.has("gear") and not e.dead)
+
+# a scrap reached its gear: the gear hardens again and the rest of its pack goes
+func clock_gear_lost(i: int) -> void:
+	for g in enemies:
+		if g.has("gear") and not g.dead:
+			g.dead = true
+			g.node.queue_free()
+			g.shadow.queue_free()
+	clock_wave = {}
+	garden.set_gear(i, false)
+	ui.mini.map_tex = garden_map()
+	var p: Vector2 = garden.gears[i].pos
+	burst(Vector3(p.x, 1.0, p.y), Color("#9a4ad8"), 24, 3.0)
+	shake = 0.2
+	sfx(90, 0.3, "square", 0.2, -40)
+	toast("거푸집 찌꺼기가 톱니를 다시 굳혔다")
+
+# scraps left over (Sora went up, fainted or loaded): they go, and a gear they had not yet lost stays hardened
+func clear_clock_wave() -> void:
+	for e in enemies:
+		if e.has("gear") and not e.dead:
+			e.dead = true
+			e.node.queue_free()
+			e.shadow.queue_free()
+	if not clock_wave.is_empty() and not clock_gears[int(clock_wave.gear)]:
+		garden.set_gear(int(clock_wave.gear), false)
+	clock_wave = {}
+	clock_say_t = -1.0
+
+func clock_gear_freed(i: int) -> void:
+	clock_wave = {}
+	clock_gears[i] = true
+	var n: int = clock_gears.count(true)
+	workers_rise(i)
+	ui.mini.map_tex = garden_map()
+	sfx(392 + 60 * n, 0.3, "sine", 0.2)
+	if n == 1: # two workers get up and tend the gear a moment before anyone says what they are (GPT's note)
+		clock_say = STORY.CLOCK_GEAR1
+		clock_say_t = 2.4
+	else:
+		toast(tr("벽돌 일꾼 둘이 톱니에 붙었다 (%d/3)") % n)
+	if n == 3:
+		clock_q = maxi(clock_q, 3)
+		clock_say = STORY.CLOCK_GEARS
+		clock_say_t = 2.0
+	save_game()
+
+func crown_into_key() -> void:
+	clock_q = 4
+	garden.crown_in(true)
+	var o: Vector2 = garden.clock_marks.O
+	burst(Vector3(o.x, 1.2, o.y), Color("#9fd4ff"), 40, 3.5)
+	sfx(523, 0.6, "sine", 0.25, 200)
+	var j := hand_spot(0)
+	player.x = j.x
+	player.z = j.y
+	place_workers()
+	place_clock_folk(true)
+	snap_mates()
+	show_story("", STORY.CLOCK_HUB)
+	save_game()
+
+# ---- the brick workers: they sit by the walls like toys; two rise for each freed gear and the last takes a spoke
+func place_workers() -> void:
+	if workers.is_empty():
+		for s in garden.seats:
+			var node := make_monster()
+			add_child(node)
+			workers.append({"node": node, "seat": s, "job": -1, "side": 1.0})
+	for w in workers:
+		w.job = -1
+	for i in 3:
+		if clock_gears[i]:
+			assign_workers(i)
+	if clock_q >= 4:
+		for w in workers:
+			if w.job == -1:
+				w.job = 3
+				break
+	for w in workers:
+		var at := worker_spot(w)
+		(w.node as Node3D).position = Vector3(at.x, 0, at.y)
+		(w.node as Node3D).scale = Vector3(1, 0.8, 1) if w.job == -1 else Vector3.ONE
+
+# the two nearest sitting workers take gear i
+func assign_workers(i: int) -> Array:
+	var p: Vector2 = garden.gears[i].pos
+	var free := workers.filter(func(w): return w.job == -1)
+	free.sort_custom(func(a, b): return (a.seat as Vector2).distance_to(p) < (b.seat as Vector2).distance_to(p))
+	var got: Array = free.slice(0, 2)
+	for k in got.size():
+		got[k].job = i
+		got[k].side = -1.0 if k == 0 else 1.0
+	return got
+
+func worker_spot(w: Dictionary) -> Vector2:
+	var job: int = w.job
+	if job == -1:
+		return w.seat
+	if job == 3:
+		return hand_spot(3)
+	var p: Vector2 = garden.gears[job].pos
+	var dir: Vector2 = (p - garden.clock_marks.O).normalized()
+	return p + Vector2(-dir.y, dir.x) * float(w.side) * 0.95
+
+func workers_rise(i: int) -> void:
+	for w in assign_workers(i):
+		var node: Node3D = w.node
+		var to := worker_spot(w)
+		node.scale = Vector3.ONE
+		var tw := create_tween()
+		tw.tween_property(node, "position", Vector3(to.x, 0, to.y), clampf(Vector2(node.position.x, node.position.z).distance_to(to) / 2.0, 0.5, 3.0))
+		burst(node.position + Vector3(0, 0.6, 0), Color("#c8962a"), 8, 1.2)
+
+# sitting workers face the key; the ones at a gear rub its teeth, the one at a spoke pushes with the rest
+func update_workers() -> void:
+	var o: Vector2 = garden.clock_marks.O
+	for w in workers:
+		var node: Node3D = w.node
+		var at := Vector2(node.position.x, node.position.z)
+		var job: int = w.job
+		var look: Vector2 = o - at
+		if job >= 0 and job <= 2:
+			look = (garden.gears[job].pos as Vector2) - at
+		node.rotation.y = atan2(look.x, look.y) + (sin(t * 7.0 + float(w.side)) * 0.35 if job >= 0 and job <= 2 else 0.0)
+		if job == 3:
+			node.position.y = clock_hop_y()
+
+# villagers come down the stairs to the spokes once the crown is in; after the winding they go home with Sora
+func place_clock_folk(walk := false) -> void:
+	if clock_q != 4:
+		return
+	var k := 0
+	for id in ["simji", "kongal", "doran", "kid"]:
+		if not clock_folk.has(id):
+			var g := Node3D.new()
+			var spr := folk_sprite(id)
+			var hpx := float(spr.texture.get_height())
+			spr.pixel_size = {"simji": 2.1, "kid": 1.0}.get(id, 1.75) / hpx
+			spr.offset = Vector2(0, hpx / 2.0)
+			g.add_child(spr)
+			add_child(g)
+			clock_folk[id] = g
+		var g: Node3D = clock_folk[id]
+		g.visible = true
+		var to := hand_spot(CLOCK_HANDS.find(id))
+		if walk: # one after another down the stairs, round the key, to a spoke
+			var u: Vector2 = garden.clock_marks.U
+			var side: Vector2 = garden.clock_marks.O + Vector2(-3.3 if to.x <= garden.clock_marks.O.x else 3.3, 0.5)
+			g.position = Vector3(u.x, 0, u.y)
+			var tw := create_tween()
+			tw.tween_interval(0.4 + k * 0.6)
+			tw.tween_property(g, "position", Vector3(side.x, 0, side.y), 1.2)
+			tw.tween_property(g, "position", Vector3(to.x, 0, to.y), 1.0)
+		else:
+			g.position = Vector3(to.x, 0, to.y)
+		k += 1
+
+# ---- winding together: a thin gold octagon closes on the key every 1.2 s; E while it is inside the brass rim
+# (the last 0.25 s) is one push. Early or missed presses do nothing and the next ring comes; there is no losing.
+func start_beat() -> void:
+	var o: Vector2 = garden.clock_marks.O
+	var at := Vector3(o.x, 0.98, o.y)
+	var ring := MeshInstance3D.new()
+	ring.mesh = ring_mesh(0.96, 1.0, PI / 8.0, TAU, 8)
+	ring.material_override = glow_mat(Color("#ffd27a"), 2.4)
+	ring.position = at
+	add_child(ring)
+	var thick := MeshInstance3D.new() # the same ring drawn thicker while E counts
+	thick.mesh = ring_mesh(0.84, 1.0, PI / 8.0, TAU, 8)
+	thick.material_override = glow_mat(Color("#ffd27a"), 4.0)
+	thick.position = at
+	thick.visible = false
+	add_child(thick)
+	var rim := MeshInstance3D.new() # the fixed rim it closes onto
+	rim.mesh = ring_mesh(CLOCK_WINDOW - 0.05, CLOCK_WINDOW, PI / 8.0, TAU, 8)
+	rim.material_override = glow_mat(Color("#c8962a"), 1.0)
+	rim.position = at
+	add_child(rim)
+	beat = {"r": 3.0, "node": ring, "thick": thick, "rim": rim, "n": 0, "hit": false, "win": false}
+
+func beat_clear() -> void:
+	for k in ["node", "thick", "rim"]:
+		if beat.has(k) and is_instance_valid(beat[k]):
+			(beat[k] as Node).queue_free()
+	beat = {}
+
+func update_beat(dt: float) -> void:
+	if story_open or fade_rect.color.a > 0.0:
+		return
+	if beat.is_empty():
+		start_beat()
+	beat.r -= dt * 2.4 / CLOCK_BEAT
+	if beat.r < 0.6:
+		beat.r = 3.0
+		beat.hit = false
+	var win: bool = beat.r < CLOCK_WINDOW and not beat.hit
+	if win and not beat.win:
+		sfx(784, 0.05, "sine", 0.06) # a soft tick as it meets the rim
+	beat.win = win
+	var ring: MeshInstance3D = beat.node
+	var thick: MeshInstance3D = beat.thick
+	ring.scale = Vector3(beat.r, 1.0, beat.r)
+	thick.scale = ring.scale
+	ring.visible = not win and not beat.hit
+	thick.visible = win
+
+func beat_key() -> void:
+	if beat.is_empty() or beat.hit or beat.r >= CLOCK_WINDOW:
+		return
+	beat.hit = true
+	beat.n += 1
+	var n: int = beat.n
+	garden.turn_key(self, 45.0)
+	sfx(392 + 40 * (n - 1), 0.25, "sine", 0.2)
+	var o: Vector2 = garden.clock_marks.O
+	burst(Vector3(o.x, 1.0, o.y), Color("#ffd27a"), 16, 2.5)
+	if n < 8:
+		clock_hop = 0.15
+		toast(tr("박자에 맞춰 다 같이 밀자 (E) %d/8") % n)
+		return
+	# the last push: no hop, hands stay on the spokes
+	clock_q = 5
+	clock_still = true
+	beat_clear()
+	shake = 0.3
+	show_story("res://art/story/14_clock_together.jpg", STORY.CLOCK_WOUND)
+	after_story = clock_hush
+	save_game()
+
+# after the last push: 1.6 s with only the gears' sound while the camera comes close on the worn handle and the two
+# beside it, then Bori's line from the stairs (GPT's note)
+func clock_hush() -> void:
+	garden.wind_look(true)
+	ui.mini.map_tex = garden_map()
+	clock_cam = cam_dist
+	create_tween().tween_property(self, "cam_dist", 11.0, 1.2)
+	var grip: Vector2 = garden.clock_marks.O + Vector2(0, 1.95)
+	burst(Vector3(grip.x, 0.8, grip.y), Color("#e8c060"), 12, 1.0)
+	for k in 4:
+		get_tree().create_timer(0.4 * k).timeout.connect(func(): sfx(180 - k * 10, 0.06, "triangle", 0.08))
+	get_tree().create_timer(1.6).timeout.connect(func():
+		if story_open:
+			clock_cam_back()
+			return
+		show_story("", STORY.CLOCK_LATE)
+		after_story = clock_cam_back)
+
+func clock_cam_back() -> void:
+	clock_still = false
+	if clock_cam > 0.0:
+		create_tween().tween_property(self, "cam_dist", clock_cam, 0.8)
+		clock_cam = 0.0
+	save_game()
+
+func open_clock_box() -> void:
+	clock_box = true
+	garden.chest_look(true)
+	var lines: Array = STORY.CLOCK_CHEST.duplicate()
+	if not has_oil:
+		has_oil = true
+		player.max_hp += 20
+		player.hp = float(player.max_hp)
+		player.pots += 2
+		player.gold += 200
+	else: # a new round: the oil came along
+		lines.pop_back()
+		player.gold += 50
+		player.pots += 1
+		toast("금화 50, 회복약 1")
+	var c: Vector2 = garden.clock_marks.c
+	burst(Vector3(c.x, 0.6, c.y), Color("#f2ead8"), 30, 2.5)
+	sfx(784, 0.12, "triangle", 0.25)
+	ui.mini.map_tex = garden_map()
+	show_story("", lines)
+	save_game()
+
+func update_clock(dt: float) -> void:
+	garden.tick(dt)
+	clock_hop = maxf(0.0, clock_hop - dt)
+	update_workers()
+	for id in clock_folk:
+		var g: Node3D = clock_folk[id]
+		if g.visible and clock_hop > 0.0:
+			g.position.y = clock_hop_y()
+	if fade_rect.color.a == 0.0 and not story_open and Vector2(player.x, player.z).distance_to(garden.clock_marks.U) < 0.9:
+		fade_then(leave_clock)
+		return
+	if clock_say_t > 0.0:
+		clock_say_t -= dt
+		if clock_say_t <= 0.0:
+			if story_open:
+				clock_say_t = 0.3
+			else:
+				show_story("", clock_say)
+	if not clock_wave.is_empty():
+		clock_wave.t += dt
+		if not clock_wave.spawned:
+			if clock_wave.t >= 0.6:
+				shed_clock_shards(int(clock_wave.gear))
+		elif not clock_scraps_alive():
+			clock_wave.done += dt
+			if clock_wave.done >= 1.0:
+				clock_gear_freed(int(clock_wave.gear))
+	if clock_q == 4:
+		update_beat(dt)
+	elif not beat.is_empty():
+		beat_clear()
+
+# load the room's state (old saves without it: past the ending the hole is open)
+func load_clock(d: Dictionary) -> void:
+	if d.has("clock_q"):
+		clock_q = int(d.clock_q)
+		clock_late = bool(d.get("clock_late", false))
+	else:
+		clock_q = 1 if garden_q >= 5 else 0
+		clock_late = garden_q >= 5
+	var cg: Array = d.get("clock_gears", [])
+	for i in 3:
+		clock_gears[i] = i < cg.size() and bool(cg[i])
+	clock_box = bool(d.get("clock_box", false))
+	has_oil = bool(d.get("has_oil", false))
+	clear_clock_wave()
+	beat_clear()
+	clock_still = false
+	garden.clock_look(clock_q, clock_gears, clock_box)
+
 
 # put the kid goblin where kid_q says: in the field with guards, or beside Kongal
 func place_kid() -> void:
@@ -9292,7 +9845,7 @@ var rest_need := 6.0         # seconds of rest for the next pip (lantern 6, jar 
 
 func update_pips(dt: float) -> void:
 	pip_flash -= dt
-	var night_now := is_night()
+	var night_now := is_night() or in_clock() # underground the clock room rests as at night
 	if crown_pips >= 8 or not night_now:
 		rest_t = 0.0
 		return
@@ -9937,6 +10490,8 @@ func journal_lines() -> Array:
 	if lake_q >= 4:
 		side.call("섬 밑 물빛 동굴", tr("끝") if grotto_q >= 4 else (tr("상자를 열자") if grotto_q == 3 else tr("섬 남쪽 계단으로")))
 		side.call("아랫못 물지기", [tr("섬 남쪽 끝 둑"), tr("물속 사슬은 물결에게 (E)"), tr("창살 안 걸쇠"), tr("물 태엽 열쇠를 감자"), tr("열쇠 기둥의 깡통"), tr("끝")][south_q])
+	if clock_q >= 1:
+		side.call("큰 태엽 방", [tr(""), tr("빈터 한가운데 구멍으로"), tr("굳은 톱니 셋 %d/3") % clock_gears.count(true), tr("열쇠 한가운데에 왕관을"), tr("다 같이 밀자"), tr("끝") if clock_box else tr("열쇠 북쪽 궤짝")][clock_q])
 	if forest_q >= 1:
 		var nf: int = forest.freed.filter(func(f): return f).size()
 		side.call("갇힌 다람쥐", tr("끝") if has_acorn else tr("%d/5 구함") % nf)
@@ -9986,6 +10541,7 @@ func journal_lines() -> Array:
 	if has_shoes: keep.append(tr("바람 신발"))
 	if has_oar_ring: keep.append(tr("삿대 고리"))
 	if has_whistle: keep.append(tr("물지기 호루라기"))
+	if has_oil: keep.append(tr("달지기 기름병"))
 	if post_q == 3: keep.append(tr("보리의 엽서"))
 	if has_armour: keep.append(tr("달지기 갑옷"))
 	if has_tea: keep.append(tr("달꽃 차"))
@@ -10868,6 +11424,10 @@ func faint() -> void:
 	if trial_wave > 0:
 		end_trial("시련에서 쓰러졌다")
 	if in_garden:
+		clear_clock_wave()
+		beat_clear()
+		clock_still = false
+		garden.clock_view(false)
 		ui.mini.map_tex = village.map_tex(VILLAGE.VILLAGE_X + VILLAGE.W)
 		in_garden = false
 		in_village = true
