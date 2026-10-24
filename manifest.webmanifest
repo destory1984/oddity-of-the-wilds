@@ -1,0 +1,14 @@
+{
+  "name": "The Crown Oddity",
+  "short_name": "Crown Oddity",
+  "start_url": "https://destory1984.github.io/the-crown-oddity/",
+  "scope": "https://destory1984.github.io/the-crown-oddity/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#02040B",
+  "theme_color": "#02040B",
+  "icons": [
+    {"src": "https://destory1984.github.io/the-crown-oddity/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "https://destory1984.github.io/the-crown-oddity/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
